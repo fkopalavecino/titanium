@@ -172,7 +172,7 @@ V.hoy = () => {
   const mes = t.slice(0, 7); const delMes = S.clases.filter(r => r.fecha.startsWith(mes) && r.asis === 'presente').length;
   return `
   <div class="row" style="align-items:center"><div><div class="eyebrow">${esc(longD(t))}</div><h1>Hola, ${esc(nombreC)}</h1></div>
-    <button class="btn" style="width:auto;min-height:40px;border-radius:20px" onclick="tlLogout()" aria-label="Cerrar sesión">Salir</button></div>
+</div>
   <section class="card">
     <div class="row"><span class="eyebrow red">${rd.hoy ? 'Tu clase de hoy' : 'Tu próxima clase'}</span><span class="small muted">${prox ? esc((prox.f === t ? 'Hoy' : DL[dayKey(prox.f)] + ' ' + fmtD(prox.f)) + ' · ' + prox.h) : 'Sin clases agendadas'}</span></div>
     ${rd.r ? `<div><div class="disp" style="font-size:28px;line-height:1.05">${esc(rd.r.tipo || 'Rutina')}</div><div class="small muted">${esc(rd.r.familia || '')} · ${esc(rd.r.nivel || '')}</div></div>` : `<div class="muted">Franco te asigna la rutina en la clase.</div>`}
@@ -230,7 +230,7 @@ V.progreso = () => {
   <section class="card"><h2>Tus mejores marcas</h2>${best.length ? best.slice(0, 8).map(([n, b]) => `<div class="row small"><span>${esc(n.replace(/^\d+[ab]? · /, ''))}</span><b>${esc(fmtSet(b))}</b></div>`).join('') : '<div class="small muted">Cuando anotes tus series en «Rutina», aquí verás tus récords.</div>'}</section>`;
 };
 V.plan = () => {
-  const p = planActual(); if (!p) return `<h1>Mi plan</h1><div class="card"><div class="muted">Todavía no tienes un plan registrado. Habla con Franco.</div></div>`;
+  const p = planActual(); if (!p) return `<h1>Mi plan</h1><div class="card"><div class="muted">Todavía no tienes un plan registrado. Habla con Franco.</div></div><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
   const usadas = presentes(p.inicio, p.fin); const tot = p.clases || S.a.clases || 0; const ab = abonado(p); const saldo = Math.max(0, (p.monto || 0) - ab);
   const dias = (S.a.bloques || []).map(k => DL[k.split('-')[0]] + ' ' + k.split('-')[1]).join(' · ');
   return `<h1>Mi plan</h1>
@@ -244,7 +244,7 @@ V.plan = () => {
   <section class="card"><h2>Avisar un pago</h2><div class="small muted">Si ya transferiste, avísale a Franco para que lo registre.</div>
     <label class="field">Monto transferido<input id="pmonto" inputmode="numeric" placeholder="${saldo ? saldo : (p.monto || '')}"></label>
     <button class="btn pri" id="avisarPago">Avisar que pagué</button></section>
-  <section class="card"><h2>Pagos registrados</h2>${(p.pagos || []).length ? p.pagos.map(x => `<div class="row small"><span>${esc(fmtD(x.fecha))} · ${esc(x.medio || '')}</span><b>${clp(x.monto)}</b></div>`).join('') : '<div class="small muted">Sin pagos registrados en este plan.</div>'}</section>`;
+  <section class="card"><h2>Pagos registrados</h2>${(p.pagos || []).length ? p.pagos.map(x => `<div class="row small"><span>${esc(fmtD(x.fecha))} · ${esc(x.medio || '')}</span><b>${clp(x.monto)}</b></div>`).join('') : '<div class="small muted">Sin pagos registrados en este plan.</div>'}</section><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
 };
 V.clases = () => {
   const t = today(); const pas = S.clases.filter(r => r.fecha < t && r.fecha >= addDays(t, -14) && (r.asis || r.quitado)).slice(-6).reverse();
