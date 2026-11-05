@@ -21,10 +21,10 @@
   #tl-gate .err{color:#ff8a94;font-size:14px;min-height:18px}`;
   function gateHTML(step, email) {
     return `<div class="box"><h1>TITANIUM<br><span>SPORT</span></h1>
-      ${step === 'email' ? `<p>Entra con tu correo. Te enviamos un enlace para entrar.</p>
-        <form id="tl-f1" style="display:flex;flex-direction:column;gap:12px"><label>Tu correo<input id="tl-email" type="email" autocomplete="email" required value="${email || ''}"></label><button>Enviarme el enlace</button></form>`
-      : `<p>Revisa tu correo <b style="color:#f2eef0">${email}</b> (mira también en Spam) y toca el enlace <b style="color:#f2eef0">«Log In»</b>. Si el correo trae un código, escríbelo aquí.</p>
-        <form id="tl-f2" style="display:flex;flex-direction:column;gap:12px"><label>Código<input id="tl-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" ></label><button>Entrar con código</button><button type="button" class="sec" id="tl-back">Usar otro correo</button></form>`}
+      ${step === 'email' ? `<p>Entra con tu correo. Te enviamos un código para entrar.</p>
+        <form id="tl-f1" style="display:flex;flex-direction:column;gap:12px"><label>Tu correo<input id="tl-email" type="email" autocomplete="email" required value="${email || ''}"></label><button>Enviarme el código</button></form>`
+      : `<p>Revisa tu correo <b style="color:#f2eef0">${email}</b> y escribe aquí el código que te llegó (si no lo ves, mira en Spam).</p>
+        <form id="tl-f2" style="display:flex;flex-direction:column;gap:12px"><label>Código<input id="tl-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required></label><button>Entrar</button><button type="button" class="sec" id="tl-back">Usar otro correo</button></form>`}
       <div class="err" id="tl-err"></div></div>`;
   }
   function showGate(onDone) {
