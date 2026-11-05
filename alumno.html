@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap">
 <style>
-:root{--bg:#121013;--ink:#0e0c0f;--surface:#1b181c;--sunk:#161317;--line:#2f2a2e;--fg:#f2eef0;--muted:#a69ea3;--red:#d71f30;--red-t:#ff5a68;--ok:#6fd39a;--warn:#f3b45b}
+:root{--bg:#121013;--ink:#0e0c0f;--surface:#1b181c;--sunk:#161317;--line:#2f2a2e;--fg:#f2eef0;--muted:#a69ea3;--red:#d71f30;--red-t:#ff5a68;--ok:#6fd39a;--warn:#f3b45b;--ev:#4da3ff}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--fg);font:16px Barlow,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
 body{padding:env(safe-area-inset-top) 0 calc(76px + env(safe-area-inset-bottom))}
@@ -52,9 +52,12 @@ nav.tabs button[aria-current=page]{color:var(--red-t)}
 .wk{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
 .wk button{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:4px;font:600 12px Barlow,sans-serif;cursor:pointer;min-height:76px}
 .wk button b{font:700 20px 'Barlow Condensed',sans-serif}
-.wk button i{width:6px;height:6px;border-radius:50%;background:transparent}
-.wk button.has i{background:var(--red)}
-.wk button.done i{background:var(--ok)}
+.wk .dots{display:flex;gap:4px;height:7px}
+.wk .dots i{width:7px;height:7px;border-radius:50%;background:var(--red)}
+.wk .dots i.ok{background:var(--ok)}
+.wk .dots i.ev{background:var(--ev)}
+.legend{display:flex;gap:14px;justify-content:center;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
 .wk button[aria-pressed=true]{background:var(--fg);color:var(--ink);border-color:var(--fg)}
 .wk button.today:not([aria-pressed=true]){border-color:var(--red)}
 .wknav{display:flex;align-items:center;justify-content:space-between}
@@ -274,7 +277,7 @@ function clasesDia(f) { const t = today();
   return [...hs.map(h => ({ h, rec: recOf(f, h) })), ...recs.map(r => ({ h: r.hora, rec: r }))].sort((a, b) => a.h.localeCompare(b.h)); }
 const evDia = f => S.eventos.filter(e => e.fecha === f);
 const EVI = { 'Reunión': '👥', 'Evaluación': '📋', 'Actividad': '🏃', 'Evento': '⭐', 'Nutrición': '🥗', 'Otro': '📌' };
-const evHTML = e => `<section class="card" style="border-color:#4a4247"><div class="row"><div class="disp" style="font-size:22px">${e.hora ? esc(e.hora) : 'Todo el día'}</div><span class="chip" style="cursor:default">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span></div><b>${esc(e.titulo)}</b>${e.detalle ? `<div class="small muted" style="white-space:pre-line">${esc(e.detalle)}</div>` : ''}</section>`;
+const evHTML = e => `<section class="card" style="border-color:var(--ev);border-left-width:5px"><div class="row"><div class="disp" style="font-size:22px">${e.hora ? esc(e.hora) : 'Todo el día'}</div><span class="chip" style="cursor:default;background:var(--ev);border-color:var(--ev);color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span></div><b>${esc(e.titulo)}</b>${e.detalle ? `<div class="small muted" style="white-space:pre-line">${esc(e.detalle)}</div>` : ''}</section>`;
 const sesHTML = r => (r?.bloques || []).map(b => `<div class="small" style="margin-top:6px"><b>${esc(b.titulo || '')}</b>${(b.ejercicios || []).map(e => `<div class="row" style="padding:3px 0"><span>${esc(e.nombre)}</span><span class="muted" style="white-space:nowrap">${esc(e.dosis || '')}</span></div>`).join('')}</div>`).join('');
 V.agenda = () => {
   const t = today(); S.dia = S.dia || t; S.wk = S.wk || lunesDe(S.dia);
@@ -297,7 +300,8 @@ V.agenda = () => {
   return `<div class="row" style="align-items:center"><h1>Agenda</h1>${S.dia !== t ? '<button class="chip" data-hoy="1">Hoy</button>' : ''}</div>
   <div class="wknav"><button data-wk="-7" aria-label="Semana anterior">‹</button><b class="small">${esc(titulo)}</b><button data-wk="7" aria-label="Semana siguiente">›</button></div>
   <div class="wk">${dias.map(f => { const its = clasesDia(f); const done = its.some(x => x.rec?.asis === 'presente'); const ne = evDia(f).length;
-    return `<button data-dia="${f}" aria-pressed="${f === S.dia}" class="${its.length || ne ? (done ? 'done' : 'has') : ''} ${f === t ? 'today' : ''}" aria-label="${esc(longD(f))}${its.length ? ', con clase' : ''}${ne ? ', con actividad' : ''}">${DL[dayKey(f)].charAt(0)}<b>${pad(parseISO(f).getDate())}</b><i></i></button>`; }).join('')}</div>
+    return `<button data-dia="${f}" aria-pressed="${f === S.dia}" class="${f === t ? 'today' : ''}" aria-label="${esc(longD(f))}${its.length ? ', con clase' : ''}${ne ? ', con actividad' : ''}">${DL[dayKey(f)].charAt(0)}<b>${pad(parseISO(f).getDate())}</b><span class="dots">${its.length ? `<i class="${done ? 'ok' : ''}"></i>` : ''}${ne ? '<i class="ev"></i>' : ''}</span></button>`; }).join('')}</div>
+  <div class="legend"><span><i style="background:var(--red)"></i>Clase</span><span><i style="background:var(--ok)"></i>Asististe</span><span><i style="background:var(--ev)"></i>Actividad</span></div>
   <div class="eyebrow">${esc(longD(S.dia))}</div>
   ${items.length || evs.length ? [...items.map(x => ({ k: x.h, html: card(x) })), ...evs.map(e => ({ k: e.hora || '00:00', html: evHTML(e) }))].sort((a, b) => a.k.localeCompare(b.k)).map(x => x.html).join('') : `<div class="card"><div class="muted">${S.dia < t ? 'No tuviste clase este día.' : 'No tienes nada agendado este día. ¡Descansa o muévete libre!'}</div></div>`}
   <section class="card"><h2>Recuperar una clase</h2><div class="small muted">Dile a Franco qué día y hora te acomoda. Él te confirma según cupos.</div>
