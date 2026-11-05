@@ -198,8 +198,9 @@
   let ready = null;
   async function boot() {
     const s = await ensureSession();
-    const { data: esCoach } = await sb.rpc('is_coach');
-    if (!esCoach) { location.replace('alumno.html'); return new Promise(() => {}); }
+    const { data: esCoach, error: eC } = await sb.rpc('is_coach');
+    if (!esCoach && !eC) { location.replace('alumno.html'); return new Promise(() => {}); }
+    const hide = document.getElementById('tl-hide'); if (hide) hide.remove();
     solicitudes(); sb.channel('tl-sol').on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes' }, () => solicitudes()).subscribe();
     return s;
   }
