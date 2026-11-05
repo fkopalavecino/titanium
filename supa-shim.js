@@ -195,13 +195,62 @@
     document.body.appendChild(p);
   }
 
+  /* ---------- agenda de alumnos: reuniones, actividades, eventos ---------- */
+  const TIPOS = ['Reunión', 'Evaluación', 'Actividad', 'Evento', 'Nutrición', 'Otro'];
+  const escA = x => String(x == null ? '' : x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function agendaBtn() {
+    if (document.getElementById('tl-agb')) return;
+    const b = document.createElement('button'); b.id = 'tl-agb'; b.textContent = '+ Agenda alumnos';
+    b.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:900;height:48px;padding:0 16px;border-radius:24px;border:0;background:#0e0c0f;color:#fff;font:700 15px Barlow,system-ui,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.25);cursor:pointer';
+    b.onclick = abrirAgenda; document.body.appendChild(b);
+  }
+  async function abrirAgenda() {
+    let p = document.getElementById('tl-agp'); if (p) { p.remove(); return; }
+    p = document.createElement('div'); p.id = 'tl-agp';
+    p.style.cssText = 'position:fixed;left:16px;bottom:72px;z-index:901;width:min(400px,calc(100vw - 32px));max-height:75vh;overflow:auto;background:#1b181c;color:#f2eef0;border:1px solid #2f2a2e;border-radius:14px;padding:14px;font:14px Barlow,system-ui,sans-serif;display:grid;gap:10px';
+    const inp = 'height:42px;border-radius:10px;border:1px solid #2f2a2e;background:#161317;color:#f2eef0;padding:0 10px;font:15px Barlow,sans-serif;width:100%';
+    const hoy = new Date(); const iso = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0') + '-' + String(hoy.getDate()).padStart(2, '0');
+    const { data: al } = await sb.from('alumnos').select('codigo,nombre,estado').order('nombre');
+    const act = (al || []).filter(a => a.estado !== 'inactivo');
+    p.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:17px">Agregar a la agenda</b><button id="tl-agx" style="background:none;border:0;color:#a69ea3;font-size:20px;cursor:pointer" aria-label="Cerrar">✕</button></div>
+      <label style="display:grid;gap:4px;color:#a69ea3">Para<select id="tl-ag-al" style="${inp}"><option value="">Todos los alumnos</option>${act.map(a => `<option value="${escA(a.codigo)}">${escA(a.nombre)}</option>`).join('')}</select></label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><label style="display:grid;gap:4px;color:#a69ea3">Tipo<select id="tl-ag-tipo" style="${inp}">${TIPOS.map(t => `<option>${t}</option>`).join('')}</select></label>
+        <label style="display:grid;gap:4px;color:#a69ea3">Hora (opcional)<input id="tl-ag-hora" type="time" style="${inp}"></label></div>
+      <label style="display:grid;gap:4px;color:#a69ea3">Fecha<input id="tl-ag-fecha" type="date" value="${iso}" style="${inp}"></label>
+      <label style="display:grid;gap:4px;color:#a69ea3">Título<input id="tl-ag-tit" placeholder="Ej: Evaluación BodyGo" style="${inp}"></label>
+      <label style="display:grid;gap:4px;color:#a69ea3">Detalle (opcional)<textarea id="tl-ag-det" rows="2" style="${inp};height:auto;padding:8px 10px"></textarea></label>
+      <button id="tl-ag-ok" style="height:44px;border-radius:10px;border:0;background:#d71f30;color:#fff;font:700 15px Barlow,sans-serif;cursor:pointer">Guardar en su agenda</button>
+      <div id="tl-ag-msg" style="color:#6fd39a;min-height:16px"></div>
+      <b style="font-size:15px">Próximos</b><div id="tl-ag-list" style="display:grid;gap:6px"></div>`;
+    document.body.appendChild(p);
+    const nom = Object.fromEntries((al || []).map(a => [a.codigo, a.nombre]));
+    const lista = async () => {
+      const { data } = await sb.from('eventos').select('*').gte('fecha', iso).order('fecha').order('hora', { nullsFirst: true }).limit(40);
+      const l = document.getElementById('tl-ag-list'); if (!l) return;
+      l.innerHTML = (data || []).length ? data.map(e => `<div style="display:flex;justify-content:space-between;gap:8px;border-top:1px solid #2f2a2e;padding-top:6px"><div><b>${escA(e.titulo)}</b><div style="color:#a69ea3;font-size:13px">${escA(e.fecha.split('-').reverse().join('/'))}${e.hora ? ' · ' + escA(e.hora) : ''} · ${escA(e.tipo)} · ${escA(e.alumno ? (nom[e.alumno] || e.alumno) : 'Todos')}</div></div><button data-del="${e.id}" style="background:none;border:0;color:#ff8a94;cursor:pointer" aria-label="Borrar">Borrar</button></div>`).join('') : '<div style="color:#a69ea3">Nada agendado todavía.</div>';
+    };
+    p.onclick = async ev => {
+      if (ev.target.id === 'tl-agx') { p.remove(); return; }
+      const d = ev.target.closest('[data-del]'); if (d) { if (!confirm('¿Borrar este evento?')) return; await sb.from('eventos').delete().eq('id', d.dataset.del); lista(); return; }
+      if (ev.target.id === 'tl-ag-ok') {
+        const v = id => document.getElementById(id).value.trim(); const msg = document.getElementById('tl-ag-msg');
+        if (!v('tl-ag-tit') || !v('tl-ag-fecha')) { msg.style.color = '#ff8a94'; msg.textContent = 'Falta el título o la fecha.'; return; }
+        const { error } = await sb.from('eventos').insert({ alumno: v('tl-ag-al') || null, tipo: v('tl-ag-tipo'), fecha: v('tl-ag-fecha'), hora: v('tl-ag-hora') || null, titulo: v('tl-ag-tit'), detalle: v('tl-ag-det') || null });
+        if (error) { msg.style.color = '#ff8a94'; msg.textContent = 'No se pudo guardar: ' + error.message; return; }
+        msg.style.color = '#6fd39a'; msg.textContent = 'Guardado ✓ Ya aparece en la agenda del alumno.';
+        document.getElementById('tl-ag-tit').value = ''; document.getElementById('tl-ag-det').value = ''; lista();
+      }
+    };
+    lista();
+  }
+
   let ready = null;
   async function boot() {
     const s = await ensureSession();
     const { data: esCoach, error: eC } = await sb.rpc('is_coach');
     if (!esCoach && !eC) { location.replace('alumno.html'); return new Promise(() => {}); }
     const hide = document.getElementById('tl-hide'); if (hide) hide.remove();
-    solicitudes(); sb.channel('tl-sol').on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes' }, () => solicitudes()).subscribe();
+    solicitudes(); agendaBtn(); sb.channel('tl-sol').on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes' }, () => solicitudes()).subscribe();
     return s;
   }
   window.claude = {
