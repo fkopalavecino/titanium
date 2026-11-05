@@ -202,7 +202,7 @@ V.hoy = () => {
     <div class="card kpi"><div class="small muted">Clases del plan</div><div class="v">${usadas} <span class="muted" style="font-size:18px">de ${tot || '—'}</span></div>${tot ? `<div class="bar"><i style="width:${Math.min(100, Math.round(usadas / tot * 100))}%"></i></div>` : ''}</div>
     <div class="card kpi"><div class="small muted">Renueva</div><div class="v">${p ? esc(fmtD(p.fin)) : '—'}</div><div class="small ${saldo ? 'warn' : 'ok'}">${p ? (saldo ? 'Saldo ' + clp(saldo) : 'Al día ✓') : ''}</div></div>
   </div>
-  <div class="grid2"><button class="btn" data-go="agenda">No puedo ir</button><button class="btn" data-go="agenda">Recuperar clase</button></div>
+  <button class="btn" data-go="agenda">Ver mi agenda</button>
   <section class="card"><div class="small">Este mes llevas <b>${delMes} clase${delMes === 1 ? '' : 's'}</b>. ${delMes >= 8 ? '¡Vas excelente!' : 'Cada clase suma.'}</div></section>
   <div class="small muted" style="text-align:center;font-style:italic">«${esc(S.cfg.lema || 'El que abandona pierde')}» · ${esc(S.cfg.gimnasio || 'Titanium Sport')}</div>`;
 };
@@ -303,19 +303,13 @@ V.agenda = () => {
     return `<button data-dia="${f}" aria-pressed="${f === S.dia}" class="${f === t ? 'today' : ''}" aria-label="${esc(longD(f))}${its.length ? ', con clase' : ''}${ne ? ', con actividad' : ''}">${DL[dayKey(f)].charAt(0)}<b>${pad(parseISO(f).getDate())}</b><span class="dots">${its.length ? `<i class="${done ? 'ok' : ''}"></i>` : ''}${ne ? '<i class="ev"></i>' : ''}</span></button>`; }).join('')}</div>
   <div class="legend"><span><i style="background:var(--red)"></i>Clase</span><span><i style="background:var(--ok)"></i>Asististe</span><span><i style="background:var(--ev)"></i>Actividad</span></div>
   <div class="eyebrow">${esc(longD(S.dia))}</div>
-  ${items.length || evs.length ? [...items.map(x => ({ k: x.h, html: card(x) })), ...evs.map(e => ({ k: e.hora || '00:00', html: evHTML(e) }))].sort((a, b) => a.k.localeCompare(b.k)).map(x => x.html).join('') : `<div class="card"><div class="muted">${S.dia < t ? 'No tuviste clase este día.' : 'No tienes nada agendado este día. ¡Descansa o muévete libre!'}</div></div>`}
-  <section class="card"><h2>Recuperar una clase</h2><div class="small muted">Dile a Franco qué día y hora te acomoda. Él te confirma según cupos.</div>
-    <label class="field">¿Cuándo puedes?<input id="pref" placeholder="Ej: viernes 07:00 o lunes 19:30"></label>
-    <button class="btn pri" id="recuperar">Enviar solicitud</button></section>`;
+  ${items.length || evs.length ? [...items.map(x => ({ k: x.h, html: card(x) })), ...evs.map(e => ({ k: e.hora || '00:00', html: evHTML(e) }))].sort((a, b) => a.k.localeCompare(b.k)).map(x => x.html).join('') : `<div class="card"><div class="muted">${S.dia < t ? 'No tuviste clase este día.' : 'No tienes nada agendado este día. ¡Descansa o muévete libre!'}</div></div>`}`;
 };
 V.clases = () => {
   const t = today(); const pas = S.clases.filter(r => r.fecha < t && r.fecha >= addDays(t, -14) && (r.asis || r.quitado)).slice(-6).reverse();
   const prox = proximas(4);
   return `<h1>Mis clases</h1>
   <section class="list"><div class="eyebrow">Próximas</div>${prox.length ? prox.map((x, i) => `<div class="li"><div><b>${esc((x.f === t ? 'Hoy' : DL[dayKey(x.f)] + ' ' + fmtD(x.f)) + ' · ' + x.h)}</b></div><button class="btn" style="width:auto;min-height:40px" data-novoy="${i}">No puedo ir</button></div>`).join('') : '<div class="muted small">No tienes clases agendadas.</div>'}</section>
-  <section class="card"><h2>Recuperar una clase</h2><div class="small muted">Dile a Franco qué día y hora te acomoda. Él te confirma según cupos.</div>
-    <label class="field">¿Cuándo puedes?<input id="pref" placeholder="Ej: viernes 07:00 o lunes 19:30"></label>
-    <button class="btn pri" id="recuperar">Enviar solicitud</button></section>
   ${pas.length ? `<section class="list"><div class="eyebrow">Últimas clases</div>${pas.map(r => `<div class="li"><span>${esc(DL[dayKey(r.fecha)] + ' ' + fmtD(r.fecha) + ' · ' + r.hora)}</span><span class="small ${r.asis === 'presente' ? 'ok' : r.asis === 'ausente' ? 'warn' : 'muted'}" style="font-weight:700">${r.asis === 'presente' ? 'Asistió ✓' : r.asis === 'ausente' ? 'Faltó' : 'Reagendada'}</span></div>`).join('')}</section>` : ''}`;
 };
 
