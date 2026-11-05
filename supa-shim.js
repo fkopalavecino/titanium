@@ -21,10 +21,10 @@
   #tl-gate .err{color:#ff8a94;font-size:14px;min-height:18px}`;
   function gateHTML(step, email) {
     return `<div class="box"><h1>TITANIUM<br><span>SPORT</span></h1>
-      ${step === 'email' ? `<p>Entra con tu correo. Te enviamos un código de 6 dígitos.</p>
-        <form id="tl-f1" style="display:flex;flex-direction:column;gap:12px"><label>Tu correo<input id="tl-email" type="email" autocomplete="email" required value="${email || ''}"></label><button>Enviarme el código</button></form>`
-      : `<p>Revisa tu correo <b style="color:#f2eef0">${email}</b> y escribe el código.</p>
-        <form id="tl-f2" style="display:flex;flex-direction:column;gap:12px"><label>Código<input id="tl-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required></label><button>Entrar</button><button type="button" class="sec" id="tl-back">Usar otro correo</button></form>`}
+      ${step === 'email' ? `<p>Entra con tu correo. Te enviamos un enlace para entrar.</p>
+        <form id="tl-f1" style="display:flex;flex-direction:column;gap:12px"><label>Tu correo<input id="tl-email" type="email" autocomplete="email" required value="${email || ''}"></label><button>Enviarme el enlace</button></form>`
+      : `<p>Revisa tu correo <b style="color:#f2eef0">${email}</b> (mira también en Spam) y toca el enlace <b style="color:#f2eef0">«Log In»</b>. Si el correo trae un código, escríbelo aquí.</p>
+        <form id="tl-f2" style="display:flex;flex-direction:column;gap:12px"><label>Código<input id="tl-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" ></label><button>Entrar con código</button><button type="button" class="sec" id="tl-back">Usar otro correo</button></form>`}
       <div class="err" id="tl-err"></div></div>`;
   }
   function showGate(onDone) {
@@ -38,7 +38,7 @@
       document.getElementById('tl-f1').onsubmit = async ev => {
         ev.preventDefault(); email = document.getElementById('tl-email').value.trim().toLowerCase();
         try { localStorage.setItem('tl-email', email); } catch (e) {}
-        const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+        const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: location.origin + location.pathname } });
         if (error) { err(error.status === 429 ? 'Se pidieron muchos códigos. Espera unos minutos.' : 'No se pudo enviar el código: ' + error.message); return; }
         step2();
       };
@@ -55,6 +55,7 @@
       };
     };
     step1();
+    const { data: sub } = sb.auth.onAuthStateChange((ev, ses) => { if (ses && document.getElementById('tl-gate')) { sub.subscription.unsubscribe(); g.remove(); onDone(); } });
   }
   async function ensureSession() {
     const { data } = await sb.auth.getSession();
