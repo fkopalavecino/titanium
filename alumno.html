@@ -15,7 +15,8 @@
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--fg);font:16px Barlow,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
 body{padding:env(safe-area-inset-top) 0 calc(76px + env(safe-area-inset-bottom))}
-main{max-width:520px;margin:0 auto;padding:22px 18px 24px;display:flex;flex-direction:column;gap:14px}
+main{max-width:520px;margin:0 auto;padding:22px 18px 24px;display:flex;flex-direction:column;gap:14px;min-height:calc(100vh - 76px);min-height:calc(100dvh - 76px - env(safe-area-inset-bottom))}
+html{min-height:100%;overscroll-behavior-y:none}
 h1,h2,.disp{font-family:'Barlow Condensed',sans-serif;font-weight:700;margin:0}
 h1{font-size:32px;line-height:1}
 h2{font-size:22px}
@@ -319,10 +320,11 @@ V.clases = () => {
 };
 
 function render() {
+  window.scrollTo(0, 0);
   $('#app').innerHTML = V[S.v]();
   $('#tabs').hidden = false;
   document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.v === S.v || (S.v === 'clases' && b.dataset.v === 'agenda') ? 'page' : 'false'));
-  window.scrollTo({ top: 0 });
+  window.scrollTo(0, 0); requestAnimationFrame(() => window.scrollTo(0, 0));
 }
 async function solicitar(tipo, data) {
   const { error } = await sb.from('solicitudes').insert({ alumno: codigo, tipo, data: Object.assign({ nombre: S.a.nombre }, data) });
