@@ -43,12 +43,24 @@ h2{font-size:22px}
 input,select,textarea{font-family:Barlow,sans-serif}
 .field{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}
 .field input,.field select,.field textarea{min-height:46px;border-radius:10px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);padding:8px 12px;font-size:16px}
-nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--sunk);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--sunk);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom);z-index:5}
 nav.tabs button{height:68px;border:0;background:none;color:var(--muted);font:600 12px Barlow,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer}
 nav.tabs button[aria-current=page]{color:var(--red-t)}
 .list{display:flex;flex-direction:column;gap:8px}
 .li{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px}
 .toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);background:#f2eef0;color:#0e0c0f;padding:10px 16px;border-radius:12px;font-weight:600;z-index:20;max-width:90vw}
+.wk{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.wk button{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:4px;font:600 12px Barlow,sans-serif;cursor:pointer;min-height:76px}
+.wk button b{font:700 20px 'Barlow Condensed',sans-serif}
+.wk button i{width:6px;height:6px;border-radius:50%;background:transparent}
+.wk button.has i{background:var(--red)}
+.wk button.done i{background:var(--ok)}
+.wk button[aria-pressed=true]{background:var(--fg);color:var(--ink);border-color:var(--fg)}
+.wk button.today:not([aria-pressed=true]){border-color:var(--red)}
+.wknav{display:flex;align-items:center;justify-content:space-between}
+.wknav button{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--fg);font-size:20px;cursor:pointer}
+details.ses summary{cursor:pointer;color:var(--red-t);font-weight:600;font-size:14px;list-style:none}
+details.ses summary::-webkit-details-marker{display:none}
 .center{min-height:70vh;display:flex;align-items:center;justify-content:center;text-align:center;flex-direction:column;gap:12px}
 </style>
 </head>
@@ -56,6 +68,7 @@ nav.tabs button[aria-current=page]{color:var(--red-t)}
 <main id="app"><div class="center muted">Cargando…</div></main>
 <nav class="tabs" id="tabs" hidden>
   <button data-v="hoy"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Hoy</button>
+  <button data-v="agenda"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Agenda</button>
   <button data-v="rutina"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg>Rutina</button>
   <button data-v="progreso"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Progreso</button>
   <button data-v="plan"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>Mi plan</button>
@@ -84,7 +97,7 @@ const clp = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
 const hm = s => { const [h, m] = String(s).split(':').map(Number); return h * 60 + (m || 0); };
 const nowM = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
 const toast = m => { const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2800); };
-const S = { v: 'hoy', a: null, planes: [], clases: [], rutinas: new Map(), cfg: {}, sel: null };
+const S = { v: 'hoy', wk: null, dia: null, a: null, planes: [], clases: [], rutinas: new Map(), cfg: {}, sel: null, eventos: [] };
 
 await window.tlSession();
 const { data: codigo, error: e1 } = await sb.rpc('vincular_alumno');
@@ -96,12 +109,14 @@ if (!codigo) {
 
 async function load() {
   const desde = addDays(today(), -120);
-  const [a, p, c, cf] = await Promise.all([
+  const [a, p, c, cf, ev] = await Promise.all([
     sb.from('alumnos').select('*').eq('codigo', codigo).single(),
     sb.from('planes').select('*').eq('alumno', codigo),
     sb.from('clases').select('*').eq('alumno', codigo).gte('fecha', desde).order('fecha'),
     sb.from('config').select('data').eq('id', 1).maybeSingle(),
+    sb.from('eventos').select('*').gte('fecha', desde).order('fecha'),
   ]);
+  S.eventos = (ev.data || []).sort((x, y) => (x.fecha + (x.hora || '')).localeCompare(y.fecha + (y.hora || '')));
   S.a = a.data; S.planes = (p.data || []).sort((x, y) => String(x.inicio || '').localeCompare(String(y.inicio || '')));
   S.clases = c.data || []; S.cfg = cf.data?.data || {};
   const ids = new Set(S.clases.map(r => r.rutina).filter(Boolean));
@@ -179,11 +194,12 @@ V.hoy = () => {
     ${linea ? `<div class="note"><b class="red">Semana ${Math.min(rd.pe.semana, rd.pe.total)} de ${rd.pe.total}</b> · ${esc(linea.replace(/^Semana \d+ · /, ''))}</div>` : ''}
     ${rd.r ? `<button class="btn pri" data-go="rutina">Ver mi rutina</button>` : ''}
   </section>
+  ${evDia(t).map(evHTML).join('')}
   <div class="grid2">
     <div class="card kpi"><div class="small muted">Clases del plan</div><div class="v">${usadas} <span class="muted" style="font-size:18px">de ${tot || '—'}</span></div>${tot ? `<div class="bar"><i style="width:${Math.min(100, Math.round(usadas / tot * 100))}%"></i></div>` : ''}</div>
     <div class="card kpi"><div class="small muted">Renueva</div><div class="v">${p ? esc(fmtD(p.fin)) : '—'}</div><div class="small ${saldo ? 'warn' : 'ok'}">${p ? (saldo ? 'Saldo ' + clp(saldo) : 'Al día ✓') : ''}</div></div>
   </div>
-  <div class="grid2"><button class="btn" data-go="clases">No puedo ir</button><button class="btn" data-go="clases">Recuperar clase</button></div>
+  <div class="grid2"><button class="btn" data-go="agenda">No puedo ir</button><button class="btn" data-go="agenda">Recuperar clase</button></div>
   <section class="card"><div class="small">Este mes llevas <b>${delMes} clase${delMes === 1 ? '' : 's'}</b>. ${delMes >= 8 ? '¡Vas excelente!' : 'Cada clase suma.'}</div></section>
   <div class="small muted" style="text-align:center;font-style:italic">«${esc(S.cfg.lema || 'El que abandona pierde')}» · ${esc(S.cfg.gimnasio || 'Titanium Sport')}</div>`;
 };
@@ -246,6 +262,48 @@ V.plan = () => {
     <button class="btn pri" id="avisarPago">Avisar que pagué</button></section>
   <section class="card"><h2>Pagos registrados</h2>${(p.pagos || []).length ? p.pagos.map(x => `<div class="row small"><span>${esc(fmtD(x.fecha))} · ${esc(x.medio || '')}</span><b>${clp(x.monto)}</b></div>`).join('') : '<div class="small muted">Sin pagos registrados en este plan.</div>'}</section><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
 };
+const lunesDe = f => addDays(f, -((parseISO(f).getDay() + 6) % 7));
+function prediccion() { const m = new Map(); const pe = progEstado(); const t = today(); let i = 0;
+  for (let d = 0; d < 70; d++) { const f = addDays(t, d);
+    for (const h of bloquesDe(f)) { if (f === t && hm(h) + 60 < nowM()) continue; const rec = recOf(f, h);
+      if (rec?.rutina) m.set(f + '|' + h, rec.rutina); else if (pe) m.set(f + '|' + h, pe.ses[(pe.idx + i) % pe.ses.length][0]); i++; } }
+  return m; }
+function clasesDia(f) { const t = today();
+  if (f < t) return S.clases.filter(r => r.fecha === f && !r.quitado).map(r => ({ h: r.hora, rec: r }));
+  const hs = bloquesDe(f); const recs = S.clases.filter(r => r.fecha === f && !r.quitado && !hs.includes(r.hora) && (r.asis || r.ej));
+  return [...hs.map(h => ({ h, rec: recOf(f, h) })), ...recs.map(r => ({ h: r.hora, rec: r }))].sort((a, b) => a.h.localeCompare(b.h)); }
+const evDia = f => S.eventos.filter(e => e.fecha === f);
+const EVI = { 'Reunión': '👥', 'Evaluación': '📋', 'Actividad': '🏃', 'Evento': '⭐', 'Nutrición': '🥗', 'Otro': '📌' };
+const evHTML = e => `<section class="card" style="border-color:#4a4247"><div class="row"><div class="disp" style="font-size:22px">${e.hora ? esc(e.hora) : 'Todo el día'}</div><span class="chip" style="cursor:default">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span></div><b>${esc(e.titulo)}</b>${e.detalle ? `<div class="small muted" style="white-space:pre-line">${esc(e.detalle)}</div>` : ''}</section>`;
+const sesHTML = r => (r?.bloques || []).map(b => `<div class="small" style="margin-top:6px"><b>${esc(b.titulo || '')}</b>${(b.ejercicios || []).map(e => `<div class="row" style="padding:3px 0"><span>${esc(e.nombre)}</span><span class="muted" style="white-space:nowrap">${esc(e.dosis || '')}</span></div>`).join('')}</div>`).join('');
+V.agenda = () => {
+  const t = today(); S.dia = S.dia || t; S.wk = S.wk || lunesDe(S.dia);
+  const dias = Array.from({ length: 7 }, (_, i) => addDays(S.wk, i)); const pred = prediccion();
+  const fin = dias[6]; const m1 = MES[parseISO(S.wk).getMonth()], m2 = MES[parseISO(fin).getMonth()];
+  const titulo = parseISO(S.wk).getDate() + (m1 !== m2 ? ' ' + m1.slice(0, 3) : '') + ' al ' + parseISO(fin).getDate() + ' ' + m2.slice(0, 3) + ' ' + parseISO(fin).getFullYear();
+  const items = clasesDia(S.dia); const evs = evDia(S.dia);
+  const card = x => { const rec = x.rec; const past = S.dia < t || (S.dia === t && rec?.asis);
+    const id = rec?.rutina || pred.get(S.dia + '|' + x.h); const r = id ? S.rutinas.get(id) : null;
+    const est = rec?.asis === 'presente' ? '<span class="small ok" style="font-weight:700">Asististe ✓</span>' : rec?.asis === 'ausente' ? '<span class="small warn" style="font-weight:700">Faltaste</span>'
+      : rec?.reag_a ? '<span class="small muted" style="font-weight:700">Reagendada</span>' : past ? '<span class="small muted">Sin registro</span>' : '<span class="small red" style="font-weight:700">Agendada</span>';
+    const ej = (rec?.ej || []).length ? `<div class="small muted">Anotaste ${rec.ej.length} ejercicio${rec.ej.length === 1 ? '' : 's'}${rec.carga ? ' · ' + esc(rec.carga) : ''}${rec.rpe != null ? ' · RPE ' + esc(rec.rpe) : ''}</div>` : '';
+    const nv = !past ? proximas(4).findIndex(p => p.f === S.dia && p.h === x.h) : -1;
+    return `<section class="card"><div class="row"><div class="disp" style="font-size:26px">${esc(x.h)}</div>${est}</div>
+      ${r ? `<div><b>${esc(r.tipo || 'Rutina')}</b><div class="small muted">${esc(r.familia || '')}${!rec?.rutina && !past ? ' · según tu programa' : ''}</div></div>
+      <details class="ses"><summary>Ver ejercicios</summary>${sesHTML(r)}</details>` : `<div class="small muted">${past ? 'Clase en Titanium' : 'Franco te asigna la rutina en la clase.'}</div>`}
+      ${ej}
+      ${S.dia === t && r && !past ? '<button class="btn pri" data-go="rutina">Entrenar ahora</button>' : ''}
+      ${nv >= 0 ? `<button class="btn" data-novoy="${nv}">No puedo ir</button>` : ''}</section>`; };
+  return `<div class="row" style="align-items:center"><h1>Agenda</h1>${S.dia !== t ? '<button class="chip" data-hoy="1">Hoy</button>' : ''}</div>
+  <div class="wknav"><button data-wk="-7" aria-label="Semana anterior">‹</button><b class="small">${esc(titulo)}</b><button data-wk="7" aria-label="Semana siguiente">›</button></div>
+  <div class="wk">${dias.map(f => { const its = clasesDia(f); const done = its.some(x => x.rec?.asis === 'presente'); const ne = evDia(f).length;
+    return `<button data-dia="${f}" aria-pressed="${f === S.dia}" class="${its.length || ne ? (done ? 'done' : 'has') : ''} ${f === t ? 'today' : ''}" aria-label="${esc(longD(f))}${its.length ? ', con clase' : ''}${ne ? ', con actividad' : ''}">${DL[dayKey(f)].charAt(0)}<b>${pad(parseISO(f).getDate())}</b><i></i></button>`; }).join('')}</div>
+  <div class="eyebrow">${esc(longD(S.dia))}</div>
+  ${items.length || evs.length ? [...items.map(x => ({ k: x.h, html: card(x) })), ...evs.map(e => ({ k: e.hora || '00:00', html: evHTML(e) }))].sort((a, b) => a.k.localeCompare(b.k)).map(x => x.html).join('') : `<div class="card"><div class="muted">${S.dia < t ? 'No tuviste clase este día.' : 'No tienes nada agendado este día. ¡Descansa o muévete libre!'}</div></div>`}
+  <section class="card"><h2>Recuperar una clase</h2><div class="small muted">Dile a Franco qué día y hora te acomoda. Él te confirma según cupos.</div>
+    <label class="field">¿Cuándo puedes?<input id="pref" placeholder="Ej: viernes 07:00 o lunes 19:30"></label>
+    <button class="btn pri" id="recuperar">Enviar solicitud</button></section>`;
+};
 V.clases = () => {
   const t = today(); const pas = S.clases.filter(r => r.fecha < t && r.fecha >= addDays(t, -14) && (r.asis || r.quitado)).slice(-6).reverse();
   const prox = proximas(4);
@@ -260,7 +318,7 @@ V.clases = () => {
 function render() {
   $('#app').innerHTML = V[S.v]();
   $('#tabs').hidden = false;
-  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.v === S.v || (S.v === 'clases' && b.dataset.v === 'hoy') ? 'page' : 'false'));
+  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.v === S.v || (S.v === 'clases' && b.dataset.v === 'agenda') ? 'page' : 'false'));
   window.scrollTo({ top: 0 });
 }
 async function solicitar(tipo, data) {
@@ -269,6 +327,9 @@ async function solicitar(tipo, data) {
 }
 document.addEventListener('click', async ev => {
   const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.v = go.dataset.go || go.dataset.v; render(); return; }
+  const wd = ev.target.closest('[data-dia]'); if (wd) { S.dia = wd.dataset.dia; render(); return; }
+  const wn = ev.target.closest('[data-wk]'); if (wn) { S.wk = addDays(S.wk, Number(wn.dataset.wk)); const t = today(); S.dia = (t >= S.wk && t <= addDays(S.wk, 6)) ? t : S.wk; render(); return; }
+  if (ev.target.closest('[data-hoy]')) { S.dia = today(); S.wk = lunesDe(S.dia); render(); return; }
   const rp = ev.target.closest('[data-rpe]'); if (rp) { S.rpe = Number(rp.dataset.rpe); document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', b === rp)); return; }
   const nv = ev.target.closest('[data-novoy]'); if (nv) { const x = proximas(4)[Number(nv.dataset.novoy)]; if (x && await solicitar('no_voy', { fecha: x.f, hora: x.h })) nv.disabled = true; return; }
   if (ev.target.id === 'recuperar') { const v = $('#pref').value.trim(); if (!v) { toast('Escribe qué día te acomoda.'); return; } if (await solicitar('recuperar', { prefiere: v })) $('#pref').value = ''; return; }
@@ -287,7 +348,8 @@ document.addEventListener('click', async ev => {
   }
 });
 render();
-sb.channel('al-' + codigo).on('postgres_changes', { event: '*', schema: 'public', table: 'clases', filter: 'alumno=eq.' + codigo }, async () => { await load(); if (!document.activeElement || !document.activeElement.matches('input')) render(); }).subscribe();
+const rel = async () => { await load(); if (!document.activeElement || !document.activeElement.matches('input')) render(); };
+sb.channel('al-' + codigo).on('postgres_changes', { event: '*', schema: 'public', table: 'clases', filter: 'alumno=eq.' + codigo }, rel).on('postgres_changes', { event: '*', schema: 'public', table: 'eventos' }, rel).subscribe();
 })();
 </script>
 </body>
