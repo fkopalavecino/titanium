@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Titanium Sport</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0e0c0f">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+:root{--bg:#121013;--ink:#0e0c0f;--surface:#1b181c;--sunk:#161317;--line:#2f2a2e;--fg:#f2eef0;--muted:#a69ea3;--red:#d71f30;--red-t:#ff5a68;--ok:#6fd39a;--warn:#f3b45b}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:16px Barlow,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+body{padding:env(safe-area-inset-top) 0 calc(76px + env(safe-area-inset-bottom))}
+main{max-width:520px;margin:0 auto;padding:22px 18px 24px;display:flex;flex-direction:column;gap:14px}
+h1,h2,.disp{font-family:'Barlow Condensed',sans-serif;font-weight:700;margin:0}
+h1{font-size:32px;line-height:1}
+h2{font-size:22px}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.muted{color:var(--muted)}.small{font-size:14px}.red{color:var(--red-t)}.ok{color:var(--ok)}.warn{color:var(--warn)}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.kpi .v{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:700;line-height:1.1}
+.bar{height:7px;border-radius:4px;background:var(--line)}.bar>i{display:block;height:7px;border-radius:4px;background:var(--red)}
+.btn{display:flex;align-items:center;justify-content:center;min-height:48px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 15px Barlow,sans-serif;text-decoration:none;cursor:pointer;width:100%}
+.btn.pri{background:var(--red);border-color:var(--red);color:#fff;font-weight:700}
+.btn:disabled{opacity:.5}
+.note{background:var(--sunk);border-radius:10px;padding:10px 12px;font-size:15px;line-height:1.4}
+.chips{display:flex;gap:8px;overflow-x:auto}
+.chip{padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 13px Barlow,sans-serif;white-space:nowrap;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--red);border-color:var(--red);color:#fff}
+.ej{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line)}.ej:first-of-type{border-top:0;padding-top:0}
+.sets{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.set{background:var(--sunk);border:1px dashed #4a4247;border-radius:10px;padding:6px 8px;display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;color:var(--muted)}
+.set.done{border-style:solid;border-color:var(--red)}
+.set span{grid-column:1/-1;text-align:center}
+.set input{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--fg);font:600 15px Barlow,sans-serif;text-align:center;padding:2px 0}
+input,select,textarea{font-family:Barlow,sans-serif}
+.field{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}
+.field input,.field select,.field textarea{min-height:46px;border-radius:10px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);padding:8px 12px;font-size:16px}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--sunk);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav.tabs button{height:68px;border:0;background:none;color:var(--muted);font:600 12px Barlow,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer}
+nav.tabs button[aria-current=page]{color:var(--red-t)}
+.list{display:flex;flex-direction:column;gap:8px}
+.li{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);background:#f2eef0;color:#0e0c0f;padding:10px 16px;border-radius:12px;font-weight:600;z-index:20;max-width:90vw}
+.center{min-height:70vh;display:flex;align-items:center;justify-content:center;text-align:center;flex-direction:column;gap:12px}
+</style>
+</head>
+<body>
+<main id="app"><div class="center muted">Cargando…</div></main>
+<nav class="tabs" id="tabs" hidden>
+  <button data-v="hoy"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Hoy</button>
+  <button data-v="rutina"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg>Rutina</button>
+  <button data-v="progreso"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Progreso</button>
+  <button data-v="plan"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>Mi plan</button>
+</nav>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>window.TL_MODE = 'alumno';</script>
+<script src="supa-shim.js"></script>
+<script>
+(async () => {
+const sb = window.__sb;
+const $ = s => document.querySelector(s);
+const esc = x => String(x == null ? '' : x).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+const toISO = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const parseISO = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const today = () => toISO(new Date());
+const addDays = (s, n) => { const d = parseISO(s); d.setDate(d.getDate() + n); return toISO(d); };
+const diffDays = (a, b) => Math.round((parseISO(b) - parseISO(a)) / 864e5);
+const DK = ['dom','lun','mar','mie','jue','vie','sab'];
+const DL = {dom:'Dom',lun:'Lun',mar:'Mar',mie:'Mié',jue:'Jue',vie:'Vie',sab:'Sáb'};
+const MES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const dayKey = s => DK[parseISO(s).getDay()];
+const fmtD = s => s ? parseISO(s).getDate() + ' ' + MES[parseISO(s).getMonth()].slice(0, 3) : '—';
+const longD = s => { const d = parseISO(s); return ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][d.getDay()] + ' ' + d.getDate() + ' de ' + MES[d.getMonth()]; };
+const clp = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
+const hm = s => { const [h, m] = String(s).split(':').map(Number); return h * 60 + (m || 0); };
+const nowM = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+const toast = m => { const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2800); };
+const S = { v: 'hoy', a: null, planes: [], clases: [], rutinas: new Map(), cfg: {}, sel: null };
+
+await window.tlSession();
+const { data: codigo, error: e1 } = await sb.rpc('vincular_alumno');
+if (!codigo) {
+  const { data: u } = await sb.auth.getUser();
+  $('#app').innerHTML = `<div class="center"><h1>Casi listo</h1><p class="muted">No encontramos una ficha con el correo <b style="color:var(--fg)">${esc(u?.user?.email)}</b>.</p><p class="muted">Pídele a Franco que lo registre en tu ficha de Titanium y vuelve a entrar.</p><button class="btn" onclick="tlLogout()">Usar otro correo</button></div>`;
+  return;
+}
+
+async function load() {
+  const desde = addDays(today(), -120);
+  const [a, p, c, cf] = await Promise.all([
+    sb.from('alumnos').select('*').eq('codigo', codigo).single(),
+    sb.from('planes').select('*').eq('alumno', codigo),
+    sb.from('clases').select('*').eq('alumno', codigo).gte('fecha', desde).order('fecha'),
+    sb.from('config').select('data').eq('id', 1).maybeSingle(),
+  ]);
+  S.a = a.data; S.planes = (p.data || []).sort((x, y) => String(x.inicio || '').localeCompare(String(y.inicio || '')));
+  S.clases = c.data || []; S.cfg = cf.data?.data || {};
+  const ids = new Set(S.clases.map(r => r.rutina).filter(Boolean));
+  const pr = S.a.programa;
+  const qs = [];
+  if (pr?.familia) qs.push(sb.from('rutinas').select('id,data').eq('data->>familia', pr.familia));
+  if (ids.size) qs.push(sb.from('rutinas').select('id,data').in('id', [...ids]));
+  const rs = await Promise.all(qs);
+  rs.forEach(r => (r.data || []).forEach(x => S.rutinas.set(x.id, x.data)));
+}
+await load();
+
+/* ---------- lógica ---------- */
+const planActual = () => { const t = today(); return S.planes.find(p => p.inicio && p.fin && p.inicio <= t && t <= p.fin) || S.planes[S.planes.length - 1] || null; };
+const presentes = (desde, hasta) => S.clases.filter(r => r.asis === 'presente' && (!desde || r.fecha >= desde) && (!hasta || r.fecha <= hasta)).length;
+const abonado = p => (p?.pagos || []).reduce((s, x) => s + (Number(x.monto) || 0), 0);
+const recOf = (f, h) => S.clases.find(r => r.fecha === f && r.hora === h);
+function bloquesDe(f) {
+  const base = (S.a.bloques || []).filter(k => k.startsWith(dayKey(f) + '-')).map(k => k.split('-')[1]);
+  const extra = S.clases.filter(r => r.fecha === f && r.extra).map(r => r.hora);
+  const quit = new Set(S.clases.filter(r => r.fecha === f && r.quitado).map(r => r.hora));
+  return [...new Set([...base, ...extra])].filter(h => !quit.has(h) && /^\d\d:\d\d$/.test(h)).sort();
+}
+function proximas(n) {
+  const out = []; const t = today();
+  for (let i = 0; i < 21 && out.length < n; i++) { const f = addDays(t, i);
+    for (const h of bloquesDe(f)) { if (f === t && hm(h) + 60 < nowM()) continue; out.push({ f, h }); if (out.length >= n) break; } }
+  return out;
+}
+function progSes() { const pr = S.a.programa; if (!pr?.familia) return [];
+  return [...S.rutinas.entries()].filter(([, r]) => r.familia === pr.familia && String(r.nivel).toLowerCase() === String(pr.nivel || 'Básico').toLowerCase()).sort((a, b) => (a[1].dia || 0) - (b[1].dia || 0)); }
+function progEstado() {
+  const pr = S.a.programa; const ses = progSes(); if (!ses.length) return null;
+  const ids = new Set(ses.map(([id]) => id)); const pos = new Map(ses.map(([id], i) => [id, i])); const t = today();
+  let last = -1, hechas = 0;
+  for (const r of S.clases) { if (r.fecha >= t || (pr.inicio && r.fecha < pr.inicio)) continue;
+    if (r.asis === 'ausente' || !(r.asis === 'presente' || r.aprobada)) continue; if (r.rutina && !ids.has(r.rutina)) continue;
+    hechas++; last = r.rutina ? pos.get(r.rutina) : (last + 1) % ses.length; }
+  const semana = pr.inicio ? Math.max(1, Math.floor(diffDays(pr.inicio, t) / 7) + 1) : 1; const total = Number(pr.semanas) || 6;
+  const idx = (last + 1) % ses.length;
+  return { pr, ses, next: ses[idx], idx, hechas, semana, total };
+}
+const progIdx = s => s <= 8 ? s - 1 : 4 + ((s - 9) % 4);
+const progLinea = (r, s) => { const p = r?.progresion; return Array.isArray(p) && p.length ? p[Math.min(progIdx(s), p.length - 1)] : ''; };
+function rutinaDeHoy() {
+  const t = today(); const prox = proximas(1)[0]; const hora = prox && prox.f === t ? prox.h : (bloquesDe(t)[0] || 'libre');
+  const rec = recOf(t, hora); const pe = progEstado();
+  let id = rec?.rutina || (pe ? pe.next[0] : null);
+  const r = id ? S.rutinas.get(id) : null;
+  return { id, r: rec?.sesion ? Object.assign({}, r || {}, { bloques: rec.sesion }) : r, hora, rec, pe, hoy: !!(prox && prox.f === t) };
+}
+function historial() { // {nombre: [{f, kg, r}]}
+  const h = {}; for (const r of S.clases) for (const e of r.ej || []) { const sets = e.sets && e.sets.length ? e.sets : [{ kg: e.kg, r: e.r }];
+    for (const s of sets) if (s.kg != null || s.r != null) (h[e.n] = h[e.n] || []).push({ f: r.fecha, kg: s.kg, r: s.r }); }
+  return h;
+}
+const nSer = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? Math.min(6, Number(m[1])) : 1; };
+const fmtSet = s => s ? (s.kg != null ? String(s.kg).replace('.', ',') + ' kg' : '') + (s.r != null ? ' × ' + s.r : '') : '';
+
+/* ---------- vistas ---------- */
+const V = {};
+V.hoy = () => {
+  const t = today(); const nombre = String(S.a.nombre || '').split(' ')[0]; const nombreC = nombre.charAt(0).toUpperCase() + nombre.slice(1);
+  const p = planActual(); const usadas = p ? presentes(p.inicio, p.fin) : 0; const tot = p?.clases || S.a.clases || 0;
+  const saldo = p ? Math.max(0, (p.monto || 0) - abonado(p)) : 0;
+  const rd = rutinaDeHoy(); const prox = proximas(1)[0];
+  const linea = rd.pe && rd.r ? progLinea(rd.r, rd.pe.semana) : '';
+  const mes = t.slice(0, 7); const delMes = S.clases.filter(r => r.fecha.startsWith(mes) && r.asis === 'presente').length;
+  return `
+  <div class="row" style="align-items:center"><div><div class="eyebrow">${esc(longD(t))}</div><h1>Hola, ${esc(nombreC)}</h1></div>
+    <button class="btn" style="width:auto;min-height:40px;border-radius:20px" onclick="tlLogout()" aria-label="Cerrar sesión">Salir</button></div>
+  <section class="card">
+    <div class="row"><span class="eyebrow red">${rd.hoy ? 'Tu clase de hoy' : 'Tu próxima clase'}</span><span class="small muted">${prox ? esc((prox.f === t ? 'Hoy' : DL[dayKey(prox.f)] + ' ' + fmtD(prox.f)) + ' · ' + prox.h) : 'Sin clases agendadas'}</span></div>
+    ${rd.r ? `<div><div class="disp" style="font-size:28px;line-height:1.05">${esc(rd.r.tipo || 'Rutina')}</div><div class="small muted">${esc(rd.r.familia || '')} · ${esc(rd.r.nivel || '')}</div></div>` : `<div class="muted">Franco te asigna la rutina en la clase.</div>`}
+    ${linea ? `<div class="note"><b class="red">Semana ${Math.min(rd.pe.semana, rd.pe.total)} de ${rd.pe.total}</b> · ${esc(linea.replace(/^Semana \d+ · /, ''))}</div>` : ''}
+    ${rd.r ? `<button class="btn pri" data-go="rutina">Ver mi rutina</button>` : ''}
+  </section>
+  <div class="grid2">
+    <div class="card kpi"><div class="small muted">Clases del plan</div><div class="v">${usadas} <span class="muted" style="font-size:18px">de ${tot || '—'}</span></div>${tot ? `<div class="bar"><i style="width:${Math.min(100, Math.round(usadas / tot * 100))}%"></i></div>` : ''}</div>
+    <div class="card kpi"><div class="small muted">Renueva</div><div class="v">${p ? esc(fmtD(p.fin)) : '—'}</div><div class="small ${saldo ? 'warn' : 'ok'}">${p ? (saldo ? 'Saldo ' + clp(saldo) : 'Al día ✓') : ''}</div></div>
+  </div>
+  <div class="grid2"><button class="btn" data-go="clases">No puedo ir</button><button class="btn" data-go="clases">Recuperar clase</button></div>
+  <section class="card"><div class="small">Este mes llevas <b>${delMes} clase${delMes === 1 ? '' : 's'}</b>. ${delMes >= 8 ? '¡Vas excelente!' : 'Cada clase suma.'}</div></section>
+  <div class="small muted" style="text-align:center;font-style:italic">«${esc(S.cfg.lema || 'El que abandona pierde')}» · ${esc(S.cfg.gimnasio || 'Titanium Sport')}</div>`;
+};
+V.rutina = () => {
+  const rd = rutinaDeHoy(); const r = rd.r;
+  if (!r) return `<h1>Rutina</h1><div class="card"><div class="muted">Aún no tienes una rutina asignada. Franco te la asigna en la clase.</div></div>`;
+  const H = historial(); const cur = {}; (rd.rec?.ej || []).forEach(e => cur[e.n] = e);
+  const bloques = r.bloques || [];
+  return `
+  <div><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) : ''}</div><h1>${esc(r.tipo || 'Rutina')}</h1></div>
+  ${bloques.map((b, bi) => { const isB = /bloque b/i.test(b.titulo || '');
+    return `<section class="card"><div class="row"><h2>${esc(b.titulo)}</h2></div>${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}
+      ${(b.ejercicios || []).map((e, ei) => { const last = (H[e.nombre] || []).filter(x => x.f < today()).slice(-1)[0]; const c = cur[e.nombre];
+        const n = isB ? nSer(e.dosis) : 0; const sets = c?.sets || [];
+        return `<div class="ej"><div class="row"><b>${esc(e.nombre)}</b><span class="small muted" style="white-space:nowrap">${esc(e.dosis)}</span></div>
+          ${isB ? `${last ? `<div class="small muted">Última vez: <b style="color:var(--fg)">${esc(fmtSet(last))}</b></div>` : ''}
+          <div class="sets">${Array.from({ length: n }, (_, i) => { const s = sets[i] || {}; const done = s.kg != null || s.r != null;
+            return `<div class="set ${done ? 'done' : ''}"><span>Serie ${i + 1}</span><input inputmode="decimal" placeholder="kg" aria-label="kg serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s.kg != null ? esc(String(s.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="reps" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s.r != null ? esc(s.r) : ''}"></div>`; }).join('')}</div>` : ''}</div>`; }).join('')}
+    </section>`; }).join('')}
+  <section class="card">
+    <label class="field">Resultado del bloque C<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>
+    <div class="field">¿Qué tan duro fue? (RPE)<div class="chips">${[5,6,7,8,9,10].map(v => `<button class="chip" data-rpe="${v}" aria-pressed="${String(rd.rec?.rpe ?? S.rpe) === String(v)}">${v}</button>`).join('')}</div></div>
+    <button class="btn pri" id="guardar">Guardar mi entrenamiento</button>
+    ${rd.hoy ? '' : '<div class="small muted">Hoy no tienes clase agendada: se guarda como entrenamiento libre.</div>'}
+  </section>`;
+};
+V.progreso = () => {
+  const t = today(); const mes = t.slice(0, 7);
+  const delMes = S.clases.filter(r => r.fecha.startsWith(mes) && r.asis === 'presente').length;
+  const marcadas = S.clases.filter(r => r.fecha.startsWith(mes) && (r.asis === 'presente' || r.asis === 'ausente')).length;
+  const H = historial(); const best = Object.entries(H).map(([n, l]) => [n, l.reduce((b, x) => (x.kg || 0) > (b.kg || 0) ? x : b, l[0]), l]).filter(([, b]) => b && b.kg);
+  best.sort((a, b) => b[2].length - a[2].length);
+  const top = best[0];
+  let chart = '';
+  if (top) { const byF = {}; top[2].forEach(x => { if (x.kg != null) byF[x.f] = Math.max(byF[x.f] || 0, x.kg); });
+    const pts = Object.entries(byF).sort(); if (pts.length >= 2) { const mn = Math.min(...pts.map(p => p[1])), mx = Math.max(...pts.map(p => p[1])); const W = 320, Hh = 110;
+      const xy = pts.map(([f, v], i) => [10 + i * (W - 20) / (pts.length - 1), Hh - 10 - (mx === mn ? 0.5 : (v - mn) / (mx - mn)) * (Hh - 30)]);
+      chart = `<svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="${esc(top[0])}: de ${mn} a ${mx} kg"><polyline points="${xy.map(p => p.join(',')).join(' ')}" fill="none" stroke="#d71f30" stroke-width="3" stroke-linejoin="round"/>${xy.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#d71f30"/>`).join('')}<text x="${W - 4}" y="14" text-anchor="end" fill="#f2eef0" font-size="13" font-weight="700">${String(mx).replace('.', ',')} kg</text></svg>`; } }
+  return `<h1>Mi progreso</h1>
+  <div class="grid3"><div class="card kpi"><div class="small muted">Clases mes</div><div class="v">${delMes}</div></div>
+    <div class="card kpi"><div class="small muted">Asistencia</div><div class="v">${marcadas ? Math.round(delMes / marcadas * 100) + '%' : '—'}</div></div>
+    <div class="card kpi"><div class="small muted">Ejercicios</div><div class="v red">${best.length}</div></div></div>
+  ${top ? `<section class="card"><div class="row"><h2>${esc(top[0].replace(/^\d+[ab]? · /, ''))}</h2><span class="small muted">mejor ${esc(fmtSet(top[1]))}</span></div>${chart || '<div class="small muted">Anota más sesiones para ver tu gráfico.</div>'}</section>` : ''}
+  <section class="card"><h2>Tus mejores marcas</h2>${best.length ? best.slice(0, 8).map(([n, b]) => `<div class="row small"><span>${esc(n.replace(/^\d+[ab]? · /, ''))}</span><b>${esc(fmtSet(b))}</b></div>`).join('') : '<div class="small muted">Cuando anotes tus series en «Rutina», aquí verás tus récords.</div>'}</section>`;
+};
+V.plan = () => {
+  const p = planActual(); if (!p) return `<h1>Mi plan</h1><div class="card"><div class="muted">Todavía no tienes un plan registrado. Habla con Franco.</div></div>`;
+  const usadas = presentes(p.inicio, p.fin); const tot = p.clases || S.a.clases || 0; const ab = abonado(p); const saldo = Math.max(0, (p.monto || 0) - ab);
+  const dias = (S.a.bloques || []).map(k => DL[k.split('-')[0]] + ' ' + k.split('-')[1]).join(' · ');
+  return `<h1>Mi plan</h1>
+  <section class="card"><div class="row" style="align-items:center"><div><div class="disp" style="font-size:26px">Plan ${tot || ''} clases</div><div class="small muted">${esc(fmtD(p.inicio))} → ${esc(fmtD(p.fin))}${dias ? ' · ' + esc(dias) : ''}</div></div>
+    <span class="small ${saldo ? 'warn' : 'ok'}" style="font-weight:700">${saldo ? 'Pendiente' : 'Pagado'}</span></div>
+    <div class="row small"><span class="muted">Clases usadas</span><b>${usadas} de ${tot || '—'}</b></div>${tot ? `<div class="bar"><i style="width:${Math.min(100, Math.round(usadas / tot * 100))}%"></i></div>` : ''}
+    <div class="row small"><span class="muted">Monto</span><b>${clp(p.monto)}</b></div>
+    <div class="row small"><span class="muted">Pagado</span><b>${clp(ab)}</b></div>
+    ${saldo ? `<div class="row small"><span class="muted">Saldo</span><b class="warn">${clp(saldo)}</b></div>` : ''}
+    <div class="row small"><span class="muted">Renovación</span><b>${esc(fmtD(p.fin))}</b></div></section>
+  <section class="card"><h2>Avisar un pago</h2><div class="small muted">Si ya transferiste, avísale a Franco para que lo registre.</div>
+    <label class="field">Monto transferido<input id="pmonto" inputmode="numeric" placeholder="${saldo ? saldo : (p.monto || '')}"></label>
+    <button class="btn pri" id="avisarPago">Avisar que pagué</button></section>
+  <section class="card"><h2>Pagos registrados</h2>${(p.pagos || []).length ? p.pagos.map(x => `<div class="row small"><span>${esc(fmtD(x.fecha))} · ${esc(x.medio || '')}</span><b>${clp(x.monto)}</b></div>`).join('') : '<div class="small muted">Sin pagos registrados en este plan.</div>'}</section>`;
+};
+V.clases = () => {
+  const t = today(); const pas = S.clases.filter(r => r.fecha < t && r.fecha >= addDays(t, -14) && (r.asis || r.quitado)).slice(-6).reverse();
+  const prox = proximas(4);
+  return `<h1>Mis clases</h1>
+  <section class="list"><div class="eyebrow">Próximas</div>${prox.length ? prox.map((x, i) => `<div class="li"><div><b>${esc((x.f === t ? 'Hoy' : DL[dayKey(x.f)] + ' ' + fmtD(x.f)) + ' · ' + x.h)}</b></div><button class="btn" style="width:auto;min-height:40px" data-novoy="${i}">No puedo ir</button></div>`).join('') : '<div class="muted small">No tienes clases agendadas.</div>'}</section>
+  <section class="card"><h2>Recuperar una clase</h2><div class="small muted">Dile a Franco qué día y hora te acomoda. Él te confirma según cupos.</div>
+    <label class="field">¿Cuándo puedes?<input id="pref" placeholder="Ej: viernes 07:00 o lunes 19:30"></label>
+    <button class="btn pri" id="recuperar">Enviar solicitud</button></section>
+  ${pas.length ? `<section class="list"><div class="eyebrow">Últimas clases</div>${pas.map(r => `<div class="li"><span>${esc(DL[dayKey(r.fecha)] + ' ' + fmtD(r.fecha) + ' · ' + r.hora)}</span><span class="small ${r.asis === 'presente' ? 'ok' : r.asis === 'ausente' ? 'warn' : 'muted'}" style="font-weight:700">${r.asis === 'presente' ? 'Asistió ✓' : r.asis === 'ausente' ? 'Faltó' : 'Reagendada'}</span></div>`).join('')}</section>` : ''}`;
+};
+
+function render() {
+  $('#app').innerHTML = V[S.v]();
+  $('#tabs').hidden = false;
+  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.v === S.v || (S.v === 'clases' && b.dataset.v === 'hoy') ? 'page' : 'false'));
+  window.scrollTo({ top: 0 });
+}
+async function solicitar(tipo, data) {
+  const { error } = await sb.from('solicitudes').insert({ alumno: codigo, tipo, data: Object.assign({ nombre: S.a.nombre }, data) });
+  if (error) { toast('No se pudo enviar. Intenta de nuevo.'); return false; } toast('Enviado a Franco ✓'); return true;
+}
+document.addEventListener('click', async ev => {
+  const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.v = go.dataset.go || go.dataset.v; render(); return; }
+  const rp = ev.target.closest('[data-rpe]'); if (rp) { S.rpe = Number(rp.dataset.rpe); document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', b === rp)); return; }
+  const nv = ev.target.closest('[data-novoy]'); if (nv) { const x = proximas(4)[Number(nv.dataset.novoy)]; if (x && await solicitar('no_voy', { fecha: x.f, hora: x.h })) nv.disabled = true; return; }
+  if (ev.target.id === 'recuperar') { const v = $('#pref').value.trim(); if (!v) { toast('Escribe qué día te acomoda.'); return; } if (await solicitar('recuperar', { prefiere: v })) $('#pref').value = ''; return; }
+  if (ev.target.id === 'avisarPago') { const v = $('#pmonto').value.trim(); if (await solicitar('pago', { monto: v ? clp(v.replace(/\D/g, '')) : 'sin monto' })) $('#pmonto').value = ''; return; }
+  if (ev.target.id === 'guardar') {
+    const rd = rutinaDeHoy(); const by = {};
+    document.querySelectorAll('.set input').forEach(i => { const v = i.value.trim().replace(',', '.'); const o = (by[i.dataset.n] = by[i.dataset.n] || []); o[i.dataset.i] = o[i.dataset.i] || {}; if (v !== '' && !isNaN(v)) o[i.dataset.i][i.dataset.f] = Number(v); });
+    const ej = Object.entries(by).map(([n, sets]) => { const ss = sets.map(s => s || {}).filter(s => s.kg != null || s.r != null); if (!ss.length) return null;
+      const top = ss.reduce((b, s) => (s.kg || 0) > (b.kg || 0) ? s : b, ss[0]); return { n, kg: top.kg, r: top.r, s: ss.length, sets: ss }; }).filter(Boolean);
+    const btn = ev.target; btn.disabled = true;
+    const rpe = S.rpe ?? rd.rec?.rpe ?? null;
+    const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: today(), p_hora: rd.hora, p_ej: ej, p_carga: $('#carga').value.trim() || null, p_rpe: rpe });
+    btn.disabled = false;
+    if (error) { toast('No se pudo guardar: ' + error.message); return; }
+    await load(); toast('Entrenamiento guardado 💪'); render();
+  }
+});
+render();
+sb.channel('al-' + codigo).on('postgres_changes', { event: '*', schema: 'public', table: 'clases', filter: 'alumno=eq.' + codigo }, async () => { await load(); if (!document.activeElement || !document.activeElement.matches('input')) render(); }).subscribe();
+})();
+</script>
+</body>
+</html>
