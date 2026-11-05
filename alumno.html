@@ -278,6 +278,11 @@ function clasesDia(f) { const t = today();
 const evDia = f => S.eventos.filter(e => e.fecha === f);
 const EVI = { 'Reunión': '👥', 'Evaluación': '📋', 'Actividad': '🏃', 'Evento': '⭐', 'Nutrición': '🥗', 'Otro': '📌' };
 const evHTML = e => `<section class="card" style="border-color:var(--ev);border-left-width:5px"><div class="row"><div class="disp" style="font-size:22px">${e.hora ? esc(e.hora) : 'Todo el día'}</div><span class="chip" style="cursor:default;background:var(--ev);border-color:var(--ev);color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span></div><b>${esc(e.titulo)}</b>${e.detalle ? `<div class="small muted" style="white-space:pre-line">${esc(e.detalle)}</div>` : ''}</section>`;
+const waNum = () => String(S.cfg.whatsapp || '').replace(/\D/g, '');
+function noVoyBtn(i, f, h) { const n = waNum(); const nom = String(S.a.nombre || '').split(' ')[0];
+  const msg = `Hola Franco, soy ${nom}. No puedo ir a mi clase del ${longD(f).toLowerCase()} a las ${h}.`;
+  return n ? `<a class="btn" data-novoy="${i}" href="https://wa.me/${n}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">No puedo ir · avisar por WhatsApp</a>`
+    : `<button class="btn" data-novoy="${i}">No puedo ir</button>`; }
 const sesHTML = r => (r?.bloques || []).map(b => `<div class="small" style="margin-top:6px"><b>${esc(b.titulo || '')}</b>${(b.ejercicios || []).map(e => `<div class="row" style="padding:3px 0"><span>${esc(e.nombre)}</span><span class="muted" style="white-space:nowrap">${esc(e.dosis || '')}</span></div>`).join('')}</div>`).join('');
 V.agenda = () => {
   const t = today(); S.dia = S.dia || t; S.wk = S.wk || lunesDe(S.dia);
@@ -296,7 +301,7 @@ V.agenda = () => {
       <details class="ses"><summary>Ver ejercicios</summary>${sesHTML(r)}</details>` : `<div class="small muted">${past ? 'Clase en Titanium' : 'Franco te asigna la rutina en la clase.'}</div>`}
       ${ej}
       ${S.dia === t && r && !past ? '<button class="btn pri" data-go="rutina">Entrenar ahora</button>' : ''}
-      ${nv >= 0 ? `<button class="btn" data-novoy="${nv}">No puedo ir</button>` : ''}</section>`; };
+      ${nv >= 0 ? noVoyBtn(nv, S.dia, x.h) : ''}</section>`; };
   return `<div class="row" style="align-items:center"><h1>Agenda</h1>${S.dia !== t ? '<button class="chip" data-hoy="1">Hoy</button>' : ''}</div>
   <div class="wknav"><button data-wk="-7" aria-label="Semana anterior">‹</button><b class="small">${esc(titulo)}</b><button data-wk="7" aria-label="Semana siguiente">›</button></div>
   <div class="wk">${dias.map(f => { const its = clasesDia(f); const done = its.some(x => x.rec?.asis === 'presente'); const ne = evDia(f).length;
@@ -329,7 +334,7 @@ document.addEventListener('click', async ev => {
   const wn = ev.target.closest('[data-wk]'); if (wn) { S.wk = addDays(S.wk, Number(wn.dataset.wk)); const t = today(); S.dia = (t >= S.wk && t <= addDays(S.wk, 6)) ? t : S.wk; render(); return; }
   if (ev.target.closest('[data-hoy]')) { S.dia = today(); S.wk = lunesDe(S.dia); render(); return; }
   const rp = ev.target.closest('[data-rpe]'); if (rp) { S.rpe = Number(rp.dataset.rpe); document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', b === rp)); return; }
-  const nv = ev.target.closest('[data-novoy]'); if (nv) { const x = proximas(4)[Number(nv.dataset.novoy)]; if (x && await solicitar('no_voy', { fecha: x.f, hora: x.h })) nv.disabled = true; return; }
+  const nv = ev.target.closest('[data-novoy]'); if (nv) { const x = proximas(4)[Number(nv.dataset.novoy)]; if (x && await solicitar('no_voy', { fecha: x.f, hora: x.h })) { nv.disabled = true; nv.style.opacity = '.6'; } return; }
   if (ev.target.id === 'recuperar') { const v = $('#pref').value.trim(); if (!v) { toast('Escribe qué día te acomoda.'); return; } if (await solicitar('recuperar', { prefiere: v })) $('#pref').value = ''; return; }
   if (ev.target.id === 'avisarPago') { const v = $('#pmonto').value.trim(); if (await solicitar('pago', { monto: v ? clp(v.replace(/\D/g, '')) : 'sin monto' })) $('#pmonto').value = ''; return; }
   if (ev.target.id === 'guardar') {
