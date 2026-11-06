@@ -605,7 +605,33 @@ const LESIONES = [
 const DEPORTES = [['running', 'Running / trail', 'Prehab · Tobillo, pie y rodilla para trail y running'], ['mtb', 'MTB / ciclismo', 'Prehab · Cadera, rodilla y espalda para MTB'], ['fuerza', 'Fuerza / híbrido / HYROX', 'Prehab · Hombro y columna para fuerza e híbrido'], ['futbol', 'Fútbol', null]];
 const OBJETIVOS = ['Bajar grasa', 'Ganar músculo', 'Fuerza', 'Rendimiento deportivo', 'Salud y movilidad', 'Volver de una lesión'];
 const PARQ = ['¿Algún médico le ha dicho que tiene un problema al corazón o presión alta?', '¿Siente dolor en el pecho en reposo, en su día a día o al hacer actividad física?', '¿Ha perdido el equilibrio por mareos o perdido la conciencia en el último año?', '¿Tiene diagnosticada otra enfermedad crónica (diabetes, cáncer, etc.)?', '¿Toma medicamentos recetados para una enfermedad crónica?', '¿Tiene un problema óseo, articular o de tejido blando que empeore con la actividad física?', '¿Algún médico le ha dicho que solo debe hacer actividad física supervisada?'];
-const lesionCorta = a => (a.ingreso?.lesiones || []).map(k => (LESIONES.find(l => l[0] === k) || [])[1]).filter(Boolean).map(x => x.split(' (')[0].split(' / ')[0]);
+// junta la ficha de ingreso del coach con la ficha que completa el alumno en su app
+const ingDe = a => { const i = a.ingreso || {}, f = a.perfil?.ficha || {}; const u = (x, y) => [...new Set([...(x || []), ...(y || [])])];
+  return Object.assign({}, i, {objetivo: i.objetivo || f.objetivo || null, lesiones: u(i.lesiones, f.lesiones), parq: u(i.parq, f.parq).sort((x, y) => x - y)}); };
+const F_ENF_L = {hta: 'Presión alta', diabetes: 'Diabetes', asma: 'Asma', corazon: 'Enfermedad al corazón', tiroides: 'Tiroides', colesterol: 'Colesterol alto', epilepsia: 'Epilepsia', artrosis: 'Artrosis / artritis', hernia: 'Hernia', embarazo: 'Embarazo o posparto'};
+function fichaAlumnoHTML(a) { const f = a.perfil?.ficha; if (!f) return '';
+  const e = f.emerg || {}, telE = String(e.tel || '').replace(/[^\d+]/g, '');
+  const les = (f.lesiones || []).map(k => (LESIONES.find(l => l[0] === k) || [])[1] || k);
+  const enf = (f.enfermedades || []).map(k => F_ENF_L[k] || k).concat(f.enfOtra ? [f.enfOtra] : []);
+  const fila = (l, v) => v ? `<div class="li"><span class="muted" style="min-width:130px">${l}</span><span class="grow">${v}</span></div>` : '';
+  return `<details class="sec" ${(f.parq || []).length || les.length || enf.length ? 'open' : ''}>
+    <summary>🩺 Ficha completada por el alumno <span class="pill muted">${esc(fmtDY(f.fecha))}</span>${(f.parq || []).length ? '<span class="pill crit">PAR-Q: ' + f.parq.length + ' «sí»</span>' : ''}</summary>
+    <div class="list small" style="margin-top:6px">
+      ${fila('Emergencia', e.nombre || e.tel ? esc([e.nombre, e.rel ? '(' + e.rel + ')' : ''].filter(Boolean).join(' ')) + (e.tel ? ` · <a href="tel:${esc(telE)}">${esc(e.tel)}</a>` : '') : '')}
+      ${fila('Teléfono', f.tel ? esc(f.tel) : '')}
+      ${fila('Previsión', esc(f.prevision || ''))}
+      ${fila('Estatura', f.estatura ? esc(f.estatura) + ' cm' : '')}
+      ${fila('Ocupación', esc(f.ocupacion || ''))}
+      ${fila('Objetivo', esc(f.objetivo || ''))}
+      ${fila('Experiencia', esc(f.experiencia || ''))}
+      ${fila('Lesiones', les.length ? `<b style="color:var(--warn)">${esc(les.join(', '))}</b>` : '<span class="muted">Ninguna marcada</span>')}
+      ${fila('Detalle lesiones', esc(f.lesDetalle || ''))}
+      ${fila('Enfermedades', enf.length ? `<b style="color:var(--warn)">${esc(enf.join(', '))}</b>` : '<span class="muted">Ninguna marcada</span>')}
+      ${fila('Medicamentos', esc(f.medicamentos || ''))}
+      ${fila('Alergias', esc(f.alergias || ''))}
+      ${fila('PAR-Q «sí»', (f.parq || []).length ? f.parq.map(i => esc(PARQ[i] || '')).join('<br>') : '<span class="muted">Todas «no»</span>')}
+    </div></details>`; }
+const lesionCorta = a => (ingDe(a).lesiones || []).map(k => (LESIONES.find(l => l[0] === k) || [])[1]).filter(Boolean).map(x => x.split(' (')[0].split(' / ')[0]);
 function sugerencias(ing) {
   const out = [];
   (ing?.lesiones || []).forEach(k => { const l = LESIONES.find(x => x[0] === k); if (l && familiaExiste(l[2])) out.push([l[2], 'por ' + l[1].toLowerCase()]); });
@@ -1047,7 +1073,7 @@ VIEWS.alumnos = () => {
   if (F === 'sinprog') list = list.filter(a => !progEstado(a));
   if (F === 'progfin') list = list.filter(a => progEstado(a)?.terminado);
   if (F === 'progpronto') list = list.filter(a => { const fin = progFin(a), t = today(); return fin && fin >= t && diffDays(t, fin) <= 7; });
-  if (F === 'lesion') list = list.filter(a => (a.ingreso?.lesiones || []).length || (a.ingreso?.parq || []).length);
+  if (F === 'lesion') list = list.filter(a => { const i = ingDe(a); return i.lesiones.length || i.parq.length || (a.perfil?.ficha?.enfermedades || []).length; });
   if (q) list = list.filter(a => norm(a.nombre).includes(q) || norm(a.codigo).includes(q));
   return `
   <div class="vhead">
@@ -1283,9 +1309,9 @@ function fichaAlumno(code) {
     </div>
     <div class="f"><span class="small muted" style="font-weight:600">Bloques fijos en el horario</span>${grid}</div>
     <label class="f">Notas · lesiones, objetivos, preferencias<textarea id="fa-notas" rows="3">${esc(a.notas)}</textarea></label>
-    ${(() => { const ing = a.ingreso || {}; const sug = sugerencias(ing); return `
+    ${(() => { const ing = a.ingreso || {}; const sug = sugerencias(ingDe(a)); return `
     <details class="sec" ${isNew || !a.ingreso ? 'open' : ''}>
-      <summary>Ficha de ingreso ${ing.parq?.length ? '<span class="pill crit">PAR-Q: pedir autorización médica</span>' : ''}${lesionCorta(a).length ? `<span class="pill warn">${esc(lesionCorta(a).join(', '))}</span>` : ''}${!a.ingreso ? '<span class="pill muted">Pendiente</span>' : ''}</summary>
+      <summary>Ficha de ingreso ${ingDe(a).parq.length ? '<span class="pill crit">PAR-Q: pedir autorización médica</span>' : ''}${lesionCorta(a).length ? `<span class="pill warn">${esc(lesionCorta(a).join(', '))}</span>` : ''}${!a.ingreso ? '<span class="pill muted">Pendiente</span>' : ''}</summary>
       <div style="display:grid;gap:12px">
         <div class="frow">
           <label class="f">Fecha de nacimiento<input type="date" id="fa-nac" value="${esc(a.nacimiento || '')}"></label>
@@ -1312,7 +1338,8 @@ function fichaAlumno(code) {
   `;
   const fichaExistente = () => `
     ${a.perfil ? `<div style="display:flex;gap:12px;align-items:center">${a.perfil.avatar && fotoURL(a.perfil.avatar) ? `<img src="${fotoURL(a.perfil.avatar)}" alt="" data-act="foto-zoom" style="width:52px;height:52px;border-radius:50%;object-fit:cover;cursor:zoom-in">` : ''}<div>${a.perfil.apodo ? `<b>«${esc(a.perfil.apodo)}»</b>` : ''}${a.perfil.meta ? `<div class="small muted">🎯 Su objetivo: ${esc(a.perfil.meta)}</div>` : ''}<div class="small muted">${[a.perfil.nac ? '🎂 ' + fmtDY(a.perfil.nac) : '', a.perfil.ig ? `<a href="https://instagram.com/${esc(a.perfil.ig)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;background:linear-gradient(45deg,#f58529,#dd2a7b,#8134af);color:#fff;text-decoration:none;font-weight:600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="vertical-align:-3px"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg> @${esc(a.perfil.ig)}</a>` : '', (a.perfil.deportes || []).length ? '🏅 ' + esc(a.perfil.deportes.join(', ')) : ''].filter(Boolean).join(' · ')}</div></div></div>` : ''}
-    ${(() => { const ing = a.ingreso || {}; const al = [];
+    ${fichaAlumnoHTML(a)}
+    ${(() => { const ing = ingDe(a); const al = [];
       if (ing.parq?.length) al.push(`<span class="pill crit">PAR-Q: pedir autorización médica</span>`);
       if (lesionCorta(a).length) al.push(`<span class="pill warn">⚠ ${esc(lesionCorta(a).join(', '))}</span>`);
       if (ing.objetivo) al.push(`<span class="pill info">🎯 ${esc(ing.objetivo)}</span>`);
@@ -1358,9 +1385,9 @@ function fichaAlumno(code) {
     <details class="sec" ${isNew ? 'open' : ''}><summary>Horario fijo <span class="small muted" style="font-weight:500">· ${esc(bloquesTexto(a))}</span></summary>
       ${grid}
     </details>
-    ${(() => { const ing = a.ingreso || {}; const sug = sugerencias(ing); return `
+    ${(() => { const ing = a.ingreso || {}; const sug = sugerencias(ingDe(a)); return `
     <details class="sec" ${!a.ingreso ? 'open' : ''}>
-      <summary>Ficha de ingreso ${ing.parq?.length ? '<span class="pill crit">PAR-Q: pedir autorización médica</span>' : ''}${lesionCorta(a).length ? `<span class="pill warn">${esc(lesionCorta(a).join(', '))}</span>` : ''}${!a.ingreso ? '<span class="pill muted">Pendiente</span>' : ''}</summary>
+      <summary>Ficha de ingreso ${ingDe(a).parq.length ? '<span class="pill crit">PAR-Q: pedir autorización médica</span>' : ''}${lesionCorta(a).length ? `<span class="pill warn">${esc(lesionCorta(a).join(', '))}</span>` : ''}${!a.ingreso ? '<span class="pill muted">Pendiente</span>' : ''}</summary>
       <div style="display:grid;gap:12px">
         <div class="frow">
           <label class="f">Fecha de nacimiento<input type="date" id="fa-nac" value="${esc(a.nacimiento || '')}"></label>
@@ -1612,7 +1639,7 @@ function progresoModal(code) {
     return `<tr><td><b>${esc(n)}</b><span class="sub">${xs.length} registro${xs.length === 1 ? '' : 's'} · desde ${fmtD(xs[0].f)}</span></td><td class="num">${esc(fmtSet(last))}<span class="sub">${fmtD(last.f)}</span></td><td class="num">${best ? esc(fmtSet(best)) : '—'}</td><td>${spark(xs.map(x => x.kg))}</td><td class="r num">${first && last.kg != null && xs.length > 1 ? pctTxt(last.kg, first.kg) : '<span class="muted">—</span>'}</td></tr>`; }).join('');
   const med = a.medidas || [];
   const lg = logrosDe(a), hechos = lg.filter(x => x.ok).length;
-  const ing = a.ingreso || {};
+  const ing = ingDe(a);
   openModal(`Progreso · ${a.nombre}`, `
     ${ing.parq?.length ? `<div class="confirm">PAR-Q con ${ing.parq.length} respuesta${ing.parq.length === 1 ? '' : 's'} "sí": pide autorización médica antes de subir la intensidad.</div>` : ''}
     ${lesionCorta(a).length ? `<div class="small"><b>Lesiones informadas:</b> ${esc(lesionCorta(a).join(', '))}</div>` : ''}

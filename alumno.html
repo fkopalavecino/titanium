@@ -395,6 +395,64 @@ function perfilCard() { const pf = S.perfil || {};
       <label class="field"><span>${IGI} Instagram</span><input id="pf-ig" maxlength="31" placeholder="@usuario" autocapitalize="off" value="${pf.ig ? '@' + esc(pf.ig) : ''}"></label></div>
     <div class="field">Deportes que practico<div class="chips" style="flex-wrap:wrap">${DEPS.map(d => `<button type="button" class="chip" data-dep="${esc(d)}" aria-pressed="${(S.pfDeps || pf.deportes || []).includes(d)}">${DEPI[d] || ''} ${esc(d)}</button>`).join('')}</div></div>
     <button class="btn pri" id="pf-ok">Guardar perfil</button></div></details></section>`; }
+
+/* ---------- ficha de salud que completa el alumno (se guarda en perfil.ficha) ---------- */
+const F_LES = [['hombro', 'Hombro / manguito rotador'], ['lumbar', 'Zona lumbar'], ['cuello', 'Cuello / cervical'], ['rodilla-pf', 'Rodilla (dolor al frente)'], ['rotuliano', 'Tendón rotuliano'], ['tobillo', 'Tobillo (esguinces)'], ['aquiles', 'Tendón de Aquiles'], ['isquios', 'Isquiotibiales'], ['ingle', 'Ingle / aductores'], ['codo', 'Codo']];
+const F_ENF = [['hta', 'Presión alta'], ['diabetes', 'Diabetes'], ['asma', 'Asma'], ['corazon', 'Enfermedad al corazón'], ['tiroides', 'Tiroides'], ['colesterol', 'Colesterol alto'], ['epilepsia', 'Epilepsia'], ['artrosis', 'Artrosis / artritis'], ['hernia', 'Hernia'], ['embarazo', 'Embarazo o posparto']];
+const F_OBJ = ['Bajar grasa', 'Ganar músculo', 'Fuerza', 'Rendimiento deportivo', 'Salud y movilidad', 'Volver de una lesión'];
+const F_EXP = ['Nunca he entrenado', 'Menos de 6 meses', '6 meses a 2 años', 'Más de 2 años'];
+const F_PREV = ['Fonasa', 'Isapre', 'Otra', 'Ninguna'];
+const F_PARQ = ['¿Algún médico te ha dicho que tienes un problema al corazón o presión alta?', '¿Sientes dolor en el pecho en reposo, en tu día a día o al hacer actividad física?', '¿Has perdido el equilibrio por mareos o perdido la conciencia en el último año?', '¿Tienes diagnosticada otra enfermedad crónica (diabetes, cáncer, etc.)?', '¿Tomas medicamentos recetados para una enfermedad crónica?', '¿Tienes un problema óseo, articular o de tejido blando que empeore con la actividad física?', '¿Algún médico te ha dicho que solo debes hacer actividad física supervisada?'];
+const fOpt = (lst, v) => '<option value="">Elegir…</option>' + lst.map(o => `<option ${v === o ? 'selected' : ''}>${esc(o)}</option>`).join('');
+const fChips = (grupo, lst, sel) => `<div class="chips" style="flex-wrap:wrap">${lst.map(([k, l]) => `<button type="button" class="chip" data-fx="${grupo}" data-k="${esc(k)}" aria-pressed="${(sel || []).includes(k)}">${esc(l)}</button>`).join('')}</div>`;
+function fichaCard() { const f = S.perfil?.ficha || {}; const e = f.emerg || {}; const pq = f.parqResp || {};
+  const estado = f.fecha ? `<span class="small ok">Actualizada el ${esc(fmtD(f.fecha))}</span>` : `<span class="small warn" style="font-weight:700">Pendiente · complétala antes de entrenar</span>`;
+  return `<details class="card blk" data-sec="ficha" ${secAbiertos.has('ficha') ? 'open' : ''}><summary><div><h2>🩺 Mi ficha de salud</h2>${estado}</div><span class="chev" aria-hidden="true">›</span></summary>
+  <div style="display:grid;gap:14px;margin-top:12px">
+    <div class="note small">Esto lo ve solo Franco. Sirve para adaptar tu entrenamiento y saber qué hacer en una emergencia. Actualízala cada vez que algo cambie.</div>
+    <h3 style="margin:4px 0 0">Mis datos</h3>
+    <div class="grid2"><label class="field">Mi teléfono<input id="fx-tel" type="tel" inputmode="tel" placeholder="+56 9 …" value="${esc(f.tel || S.a.telefono || '')}"></label>
+      <label class="field">Estatura (cm)<input id="fx-est" type="number" inputmode="numeric" min="100" max="230" value="${esc(f.estatura || '')}"></label></div>
+    <div class="grid2"><label class="field">Ocupación<input id="fx-ocu" maxlength="60" placeholder="Ej: oficina, pie todo el día" value="${esc(f.ocupacion || '')}"></label>
+      <label class="field">Previsión de salud<select id="fx-prev">${fOpt(F_PREV, f.prevision)}</select></label></div>
+    <h3 style="margin:4px 0 0">Contacto de emergencia</h3>
+    <div class="grid2"><label class="field">Nombre<input id="fx-en" maxlength="60" value="${esc(e.nombre || '')}"></label>
+      <label class="field">Parentesco<input id="fx-er" maxlength="30" placeholder="Ej: pareja, mamá" value="${esc(e.rel || '')}"></label></div>
+    <label class="field">Teléfono de emergencia<input id="fx-et" type="tel" inputmode="tel" placeholder="+56 9 …" value="${esc(e.tel || '')}"></label>
+    <h3 style="margin:4px 0 0">Entrenamiento</h3>
+    <div class="grid2"><label class="field">Objetivo principal<select id="fx-obj">${fOpt(F_OBJ, f.objetivo)}</select></label>
+      <label class="field">Experiencia entrenando<select id="fx-exp">${fOpt(F_EXP, f.experiencia)}</select></label></div>
+    <h3 style="margin:4px 0 0">Lesiones o molestias</h3>
+    <div class="small muted">Marca las actuales o de los últimos 12 meses.</div>
+    ${fChips('les', F_LES, f.lesiones)}
+    <label class="field">Detalle, otras lesiones u operaciones<textarea id="fx-lesd" rows="3" maxlength="600" placeholder="Ej: operado de rodilla derecha 2022, dolor al correr">${esc(f.lesDetalle || '')}</textarea></label>
+    <h3 style="margin:4px 0 0">Enfermedades y salud</h3>
+    ${fChips('enf', F_ENF, f.enfermedades)}
+    <label class="field">Otras enfermedades<input id="fx-enfo" maxlength="200" value="${esc(f.enfOtra || '')}"></label>
+    <label class="field">Medicamentos que tomas<input id="fx-med" maxlength="200" placeholder="Nombre y para qué" value="${esc(f.medicamentos || '')}"></label>
+    <label class="field">Alergias<input id="fx-ale" maxlength="200" value="${esc(f.alergias || '')}"></label>
+    <h3 style="margin:4px 0 0">Cuestionario PAR-Q</h3>
+    <div class="small muted">Responde las 7 preguntas.</div>
+    ${F_PARQ.map((q, i) => `<div style="display:grid;gap:6px"><div class="small">${i + 1}. ${esc(q)}</div><div class="chips"><button type="button" class="chip" data-pq="${i}" data-val="si" aria-pressed="${pq[i] === 'si'}">Sí</button><button type="button" class="chip" data-pq="${i}" data-val="no" aria-pressed="${pq[i] === 'no'}">No</button></div></div>`).join('')}
+    <label class="small" style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" id="fx-ok" style="width:22px;height:22px;flex:none;margin:0" ${f.fecha ? 'checked' : ''}><span>Declaro que la información es verdadera y le avisaré a Franco si cambia algo de mi salud.</span></label>
+    <button class="btn pri" id="fx-save">Guardar mi ficha</button></div></details>`; }
+async function guardarFicha(btn) {
+  const v = id => ($('#' + id)?.value || '').trim();
+  const sel = g => [...document.querySelectorAll(`[data-fx="${g}"][aria-pressed=true]`)].map(b => b.dataset.k);
+  const resp = {}; document.querySelectorAll('[data-pq][aria-pressed=true]').forEach(b => { resp[b.dataset.pq] = b.dataset.val; });
+  if (Object.keys(resp).length < F_PARQ.length) { toast('Responde las 7 preguntas del PAR-Q.'); return; }
+  if (!$('#fx-ok').checked) { toast('Marca la declaración para guardar.'); return; }
+  if (!v('fx-et')) { toast('Agrega un teléfono de emergencia.'); $('#fx-et').focus(); return; }
+  const ficha = { tel: v('fx-tel') || null, estatura: Number(v('fx-est')) || null, ocupacion: v('fx-ocu') || null, prevision: v('fx-prev') || null,
+    emerg: { nombre: v('fx-en') || null, rel: v('fx-er') || null, tel: v('fx-et') || null },
+    objetivo: v('fx-obj') || null, experiencia: v('fx-exp') || null,
+    lesiones: sel('les'), lesDetalle: v('fx-lesd') || null, enfermedades: sel('enf'), enfOtra: v('fx-enfo') || null,
+    medicamentos: v('fx-med') || null, alergias: v('fx-ale') || null,
+    parqResp: resp, parq: Object.keys(resp).filter(k => resp[k] === 'si').map(Number).sort((a, b) => a - b), fecha: today() };
+  btn.disabled = true;
+  if (await guardarPerfil({ ficha })) { secAbiertos.delete('ficha'); render(); toast(ficha.parq.length ? 'Ficha guardada ✓ Por tus respuestas, Franco te pedirá un pase médico.' : 'Ficha guardada ✓'); }
+  else btn.disabled = false;
+}
 const fmtN = (v, dec) => v == null ? '—' : (dec ? (Math.round(v * 10) / 10).toFixed(1) : String(Math.round(v))).replace('.', ',');
 
 /* ---------- vistas ---------- */
@@ -418,6 +476,7 @@ V.hoy = () => {
   <div style="display:flex;justify-content:center;padding:2px 0 6px;border-bottom:1px solid var(--line)">${TL_LOGO}</div>
   <div class="row" style="align-items:center;justify-content:flex-start;gap:12px"><button data-go="plan" aria-label="Mi perfil" style="background:none;border:0;padding:0;cursor:pointer">${avatarHTML('')}</button><div style="flex:1"><div class="eyebrow">${esc(longD(t))}</div><h1>Hola, ${esc(nombreC)}</h1>${S.perfil?.meta ? `<div class="small muted">🎯 ${esc(S.perfil.meta)}</div>` : ''}</div>
 </div>
+  ${!S.perfil?.ficha?.fecha ? `<section class="card" style="border-color:var(--red)"><div><h2 style="margin:0">🩺 Completa tu ficha de salud</h2><div class="small muted">Lesiones, enfermedades y contacto de emergencia. Toma 3 minutos.</div></div><button class="btn pri" data-go="plan" data-ficha="1">Completar mi ficha</button></section>` : ''}
   <section class="card">
     <div class="row"><span class="eyebrow red">${rd.hoy ? 'Tu clase de hoy' : 'Tu próxima clase'}</span><span class="small muted">${prox ? esc((prox.f === t ? 'Hoy' : DL[dayKey(prox.f)] + ' ' + fmtD(prox.f)) + ' · ' + prox.h) : 'Sin clases agendadas'}</span></div>
     ${rd.r ? `<div><div class="disp" style="font-size:28px;line-height:1.05">${esc(rd.r.tipo || 'Rutina')}</div><div class="small muted">${esc(rd.r.familia || '')} · ${esc(rd.r.nivel || '')}</div></div>` : `<div class="muted">Franco te asigna la rutina en la clase.</div>`}
@@ -618,10 +677,10 @@ V.progreso = () => {
   <section class="card"><h2>Tus mejores marcas</h2>${best.length ? best.slice(0, 8).map(([n, b]) => `<div class="row small"><span>${esc(n.replace(/^\d+[ab]? · /, ''))}</span><b>${esc(fmtSet(b))}</b></div>`).join('') : '<div class="small muted">Cuando anotes tus series en «Rutina», aquí verás tus récords.</div>'}</section>`;
 };
 V.plan = () => {
-  const p = planActual(); if (!p) return `<h1>Mi perfil</h1>${perfilCard()}${avisosCard()}<div class="card"><div class="muted">Todavía no tienes un plan registrado. Habla con Franco.</div></div><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
+  const p = planActual(); if (!p) return `<h1>Mi perfil</h1>${perfilCard()}${fichaCard()}${avisosCard()}<div class="card"><div class="muted">Todavía no tienes un plan registrado. Habla con Franco.</div></div><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
   const usadas = presentes(p.inicio, p.fin); const tot = p.clases || S.a.clases || 0; const ab = abonado(p); const saldo = Math.max(0, (p.monto || 0) - ab);
   const dias = (S.a.bloques || []).map(k => DL[k.split('-')[0]] + ' ' + k.split('-')[1]).join(' · ');
-  return `<h1>Mi perfil</h1>${perfilCard()}${avisosCard()}<details class="card blk" data-sec="plan" ${secAbiertos.has('plan') ? 'open' : ''}><summary><div><h2>Mi plan</h2><div class="small ${saldo ? 'warn' : 'muted'}">Plan ${tot || ''} clases · ${saldo ? 'Pendiente' : 'Pagado'} · renueva ${esc(fmtD(p.fin))}</div></div><span class="chev" aria-hidden="true">›</span></summary>
+  return `<h1>Mi perfil</h1>${perfilCard()}${fichaCard()}${avisosCard()}<details class="card blk" data-sec="plan" ${secAbiertos.has('plan') ? 'open' : ''}><summary><div><h2>Mi plan</h2><div class="small ${saldo ? 'warn' : 'muted'}">Plan ${tot || ''} clases · ${saldo ? 'Pendiente' : 'Pagado'} · renueva ${esc(fmtD(p.fin))}</div></div><span class="chev" aria-hidden="true">›</span></summary>
   <div class="row" style="align-items:center"><div><div class="disp" style="font-size:26px">Plan ${tot || ''} clases</div><div class="small muted">${esc(fmtD(p.inicio))} → ${esc(fmtD(p.fin))}${dias ? ' · ' + esc(dias) : ''}</div></div>
     <span class="small ${saldo ? 'warn' : 'ok'}" style="font-weight:700">${saldo ? 'Pendiente' : 'Pagado'}</span></div>
     <div class="row small"><span class="muted">Clases usadas</span><b>${usadas} de ${tot || '—'}</b></div>${tot ? `<div class="bar"><i style="width:${Math.min(100, Math.round(usadas / tot * 100))}%"></i></div>` : ''}
@@ -743,6 +802,10 @@ document.addEventListener('click', async ev => {
   const pt = ev.target.closest('[data-pushtest]'); if (pt) { probarPush(pt); return; }
   if (ev.target.closest('[data-pushoff]')) { desactivarPush(); return; }
   if (ev.target.closest('[data-pushx]')) { try { localStorage.setItem('tl-pushx', '1'); } catch (_) {} render(); return; }
+  if (ev.target.closest('[data-ficha]')) secAbiertos.add('ficha');
+  const fx = ev.target.closest('[data-fx]'); if (fx) { fx.setAttribute('aria-pressed', String(fx.getAttribute('aria-pressed') !== 'true')); return; }
+  const pqb = ev.target.closest('[data-pq]'); if (pqb) { document.querySelectorAll(`[data-pq="${pqb.dataset.pq}"]`).forEach(b => b.setAttribute('aria-pressed', String(b === pqb))); return; }
+  if (ev.target.id === 'fx-save') { guardarFicha(ev.target); return; }
   const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.v = go.dataset.go || go.dataset.v; S.evalFirst = false; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
   const chk = ev.target.closest('[data-chk]'); if (chk) { const row = chk.closest('.set'); const ins = [...row.querySelectorAll('input')];
     if (row.dataset.ok) { delete row.dataset.ok; finDescanso(); return; }

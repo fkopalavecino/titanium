@@ -230,7 +230,7 @@
 #tl-agp .hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
 #tl-agp h3{margin:0;font:800 22px Barlow,system-ui,sans-serif;letter-spacing:.01em}
 #tl-agp .x{width:44px;height:44px;border-radius:12px;border:1px solid #2f2a2e;background:#161317;color:#f2eef0;font-size:18px;cursor:pointer}
-#tl-agp .seg{display:grid;grid-template-columns:1fr 1fr;background:#161317;border:1px solid #2f2a2e;border-radius:12px;padding:3px}
+#tl-agp .seg{display:grid;grid-template-columns:1fr 1fr 1fr;background:#161317;border:1px solid #2f2a2e;border-radius:12px;padding:3px}
 #tl-agp .seg button{height:40px;border:0;border-radius:9px;background:transparent;color:#a69ea3;font:700 15px Barlow,sans-serif;cursor:pointer}
 #tl-agp .seg button[aria-selected=true]{background:#d71f30;color:#fff}
 #tl-agp .bd{overflow:auto;-webkit-overflow-scrolling:touch;padding:16px 18px;display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:16px;flex:1;overscroll-behavior:contain}
@@ -276,6 +276,10 @@
 #tl-agp .it .mt{color:#a69ea3;font-size:13px}
 #tl-agp .it .del{width:44px;height:44px;border:0;border-radius:10px;background:none;color:#ff8a94;font-size:18px;cursor:pointer;flex:none}
 #tl-agp .empty{color:#a69ea3;text-align:center;padding:30px 0}
+#tl-agp #tl-ag-hist{gap:8px}
+#tl-agp #tl-ag-hist .it{border-left-color:#4a4247}
+#tl-agp .it .ed{width:44px;height:44px;border:0;border-radius:10px;background:none;color:#f2eef0;font-size:17px;cursor:pointer;flex:none}
+#tl-agp .cx{height:44px;border-radius:12px;border:1px solid #2f2a2e;background:transparent;color:#a69ea3;font:700 15px Barlow,sans-serif;cursor:pointer}
 @media (max-width:640px){
   #tl-agb{height:44px;padding:0 14px;font-size:14px}
   #tl-agp{align-items:flex-end;padding:env(safe-area-inset-top) 0 0}
@@ -307,10 +311,10 @@
     const { data: al } = await sb.from('alumnos').select('codigo,nombre,estado').order('nombre');
     const act = (al || []).filter(a => a.estado !== 'inactivo');
     const nom = Object.fromEntries((al || []).map(a => [a.codigo, a.nombre]));
-    let tipo = 'Reunión', vista = 'nuevo', eventos = [];
+    let tipo = 'Reunión', vista = 'nuevo', eventos = [], pasados = [], editId = null, editAdj = null, quitarAdj = false;
     p.innerHTML = `<div class="sh" role="dialog" aria-modal="true" aria-labelledby="tl-ag-h">
       <header><div class="hd"><h3 id="tl-ag-h">Agenda de alumnos</h3><button class="x" data-x="1" aria-label="Cerrar">✕</button></div>
-        <div class="seg" role="tablist"><button role="tab" data-v="nuevo" aria-selected="true">＋ Nuevo</button><button role="tab" data-v="prox" aria-selected="false">Próximos <span id="tl-ag-n"></span></button></div></header>
+        <div class="seg" role="tablist"><button role="tab" data-v="nuevo" aria-selected="true" id="tl-ag-tabn">＋ Nuevo</button><button role="tab" data-v="prox" aria-selected="false">Próximos <span id="tl-ag-n"></span></button><button role="tab" data-v="hist" aria-selected="false">Historial</button></div></header>
       <div class="bd" id="tl-ag-nuevo">
         <label class="lb">¿Para quién?<select id="tl-ag-al"><option value="">👥 Todos los alumnos</option>${act.map(a => `<option value="${escA(a.codigo)}">${escA(a.nombre)}</option>`).join('')}</select></label>
         <div class="lb">Tipo<div class="tipos">${TIPOS.map(t => `<button type="button" data-t="${t}" aria-pressed="${t === tipo}"><span>${TICO[t]}</span>${t}</button>`).join('')}</div></div>
@@ -323,31 +327,54 @@
           <label class="lb"><span>Enlace <small>(Drive, Zoom, Meet, video)</small></span><input id="tl-ag-link" type="url" inputmode="url" placeholder="https://…" autocomplete="off"></label></div></details>
       </div>
       <div class="bd" id="tl-ag-prox" hidden></div>
-      <footer id="tl-ag-foot"><div class="msg" id="tl-ag-msg" role="status"></div><button class="ok" id="tl-ag-ok">Guardar en la agenda</button></footer></div>`;
+      <div class="bd" id="tl-ag-hist" hidden></div>
+      <footer id="tl-ag-foot"><div class="msg" id="tl-ag-msg" role="status"></div><button class="ok" id="tl-ag-ok">Guardar en la agenda</button><button class="cx" id="tl-ag-cx" type="button" hidden>Cancelar edición</button></footer></div>`;
     const $ = id => document.getElementById(id);
     const msg = (t, c) => { $('tl-ag-msg').style.color = c || '#6fd39a'; $('tl-ag-msg').textContent = t; };
     const marcaQuick = () => { const f = $('tl-ag-fecha').value; p.querySelectorAll('[data-q]').forEach(b => b.setAttribute('aria-pressed', b.dataset.q === 'h' ? String(!$('tl-ag-hora').value) : String(f === masDias(+b.dataset.q)))); };
+    const item = e => `<div class="it"><span class="ic" aria-hidden="true">${TICO[e.tipo] || '📌'}</span><div class="tx"><b>${escA(e.titulo)}</b><div class="mt">${e.hora ? escA(e.hora.slice(0, 5)) : 'Todo el día'} · ${escA(e.alumno ? (nom[e.alumno] || e.alumno) : 'Todos')}${e.adjunto ? ' · 📎' : ''}${e.link ? ' · 🔗' : ''}</div></div><button class="ed" data-ed="${e.id}" aria-label="Editar ${escA(e.titulo)}">✏️</button><button class="del" data-del="${e.id}" data-adj="${escA(e.adjunto || '')}" aria-label="Borrar ${escA(e.titulo)}">🗑</button></div>`;
+    const grupos = (lst, vacio) => { if (!lst.length) return '<div class="empty">' + vacio + '</div>';
+      const g = {}, orden = []; lst.forEach(e => { if (!g[e.fecha]) { g[e.fecha] = []; orden.push(e.fecha); } g[e.fecha].push(e); });
+      return orden.map(f => `<div class="day">${escA(diaLargo(f))}</div>` + g[f].map(item).join('')).join(''); };
     const pintar = () => {
       $('tl-ag-n').textContent = eventos.length ? '(' + eventos.length + ')' : '';
-      const g = {}; eventos.forEach(e => (g[e.fecha] = g[e.fecha] || []).push(e));
-      $('tl-ag-prox').innerHTML = eventos.length ? Object.keys(g).map(f => `<div class="day">${escA(diaLargo(f))}</div>` + g[f].map(e => `<div class="it"><span class="ic" aria-hidden="true">${TICO[e.tipo] || '📌'}</span><div class="tx"><b>${escA(e.titulo)}</b><div class="mt">${e.hora ? escA(e.hora.slice(0, 5)) : 'Todo el día'} · ${escA(e.alumno ? (nom[e.alumno] || e.alumno) : 'Todos')}${e.adjunto ? ' · 📎' : ''}${e.link ? ' · 🔗' : ''}</div></div><button class="del" data-del="${e.id}" data-adj="${escA(e.adjunto || '')}" aria-label="Borrar ${escA(e.titulo)}">🗑</button></div>`).join('')).join('')
-        : '<div class="empty">Nada agendado todavía.<br>Usa «＋ Nuevo» para agregar.</div>';
+      $('tl-ag-prox').innerHTML = grupos(eventos, 'Nada agendado todavía.<br>Usa «＋ Nuevo» para agregar.');
+      $('tl-ag-hist').innerHTML = grupos(pasados, 'Todavía no hay eventos pasados.');
     };
-    const lista = async () => { const { data } = await sb.from('eventos').select('*').gte('fecha', iso).order('fecha').order('hora', { nullsFirst: true }).limit(60); eventos = data || []; pintar(); };
+    const lista = async () => {
+      const [a, b] = await Promise.all([
+        sb.from('eventos').select('*').gte('fecha', iso).order('fecha').order('hora', { nullsFirst: true }).limit(60),
+        sb.from('eventos').select('*').lt('fecha', iso).order('fecha', { ascending: false }).order('hora', { nullsFirst: true }).limit(100)]);
+      eventos = a.data || []; pasados = b.data || []; pintar(); };
     const ver = v => { vista = v; p.querySelectorAll('[data-v]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.v === v)));
-      $('tl-ag-nuevo').hidden = v !== 'nuevo'; $('tl-ag-prox').hidden = v !== 'prox'; $('tl-ag-foot').hidden = v !== 'nuevo'; };
-    const limpiarArchivo = () => { $('tl-ag-file').value = ''; $('tl-ag-fn').textContent = 'Elegir PDF o imagen (máx. 15 MB)'; $('tl-ag-rm').hidden = true; };
+      $('tl-ag-nuevo').hidden = v !== 'nuevo'; $('tl-ag-prox').hidden = v !== 'prox'; $('tl-ag-hist').hidden = v !== 'hist'; $('tl-ag-foot').hidden = v !== 'nuevo'; };
+    const conAdj = () => editAdj && !quitarAdj;
+    const limpiarArchivo = () => { $('tl-ag-file').value = ''; $('tl-ag-fn').textContent = conAdj() ? '📎 Archivo actual (elige otro para reemplazarlo)' : 'Elegir PDF o imagen (máx. 15 MB)'; $('tl-ag-rm').hidden = !conAdj(); };
+    const setTipo = t => { tipo = TIPOS.includes(t) ? t : 'Otro'; p.querySelectorAll('[data-t]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.t === tipo))); $('tl-ag-tit').placeholder = TEJ[tipo]; };
+    const salirEdicion = () => { editId = null; editAdj = null; quitarAdj = false;
+      $('tl-ag-tit').value = ''; $('tl-ag-det').value = ''; $('tl-ag-link').value = ''; $('tl-ag-al').value = ''; $('tl-ag-adj').open = false; limpiarArchivo();
+      $('tl-ag-ok').textContent = 'Guardar en la agenda'; $('tl-ag-tabn').textContent = '＋ Nuevo'; $('tl-ag-cx').hidden = true; };
+    const editar = e => { editId = e.id; editAdj = e.adjunto || null; quitarAdj = false;
+      const sel = $('tl-ag-al'); if (e.alumno && !sel.querySelector('option[value="' + CSS.escape(e.alumno) + '"]')) { const o = document.createElement('option'); o.value = e.alumno; o.textContent = nom[e.alumno] || e.alumno; sel.appendChild(o); }
+      sel.value = e.alumno || ''; setTipo(e.tipo);
+      $('tl-ag-fecha').value = e.fecha; $('tl-ag-hora').value = e.hora ? e.hora.slice(0, 5) : '';
+      $('tl-ag-tit').value = e.titulo || ''; $('tl-ag-det').value = e.detalle || ''; $('tl-ag-link').value = e.link || '';
+      $('tl-ag-adj').open = !!(e.adjunto || e.link); limpiarArchivo(); marcaQuick();
+      $('tl-ag-ok').textContent = 'Guardar cambios'; $('tl-ag-tabn').textContent = '✏️ Editando'; $('tl-ag-cx').hidden = false; msg('');
+      ver('nuevo'); $('tl-ag-tit').focus(); };
     $('tl-ag-file').onchange = () => { const f = $('tl-ag-file').files[0]; if (!f) return limpiarArchivo(); $('tl-ag-fn').textContent = f.name; $('tl-ag-rm').hidden = false; };
+    $('tl-ag-cx').onclick = () => { salirEdicion(); msg(''); ver('prox'); };
     $('tl-ag-fecha').oninput = marcaQuick; $('tl-ag-hora').oninput = marcaQuick; marcaQuick();
     p.onclick = async ev => {
       if (ev.target === p || ev.target.closest('[data-x]')) return cerrar();
       const tv = ev.target.closest('[data-v]'); if (tv) return ver(tv.dataset.v);
-      const tt = ev.target.closest('[data-t]'); if (tt) { tipo = tt.dataset.t; p.querySelectorAll('[data-t]').forEach(b => b.setAttribute('aria-pressed', String(b === tt))); $('tl-ag-tit').placeholder = TEJ[tipo];
+      const tt = ev.target.closest('[data-t]'); if (tt) { setTipo(tt.dataset.t);
         if (tipo === 'Documento' || tipo === 'Nutrición') $('tl-ag-adj').open = true; return; }
       const q = ev.target.closest('[data-q]'); if (q) { if (q.dataset.q === 'h') $('tl-ag-hora').value = ''; else $('tl-ag-fecha').value = masDias(+q.dataset.q); marcaQuick(); return; }
-      if (ev.target.closest('#tl-ag-rm')) { ev.preventDefault(); return limpiarArchivo(); }
+      if (ev.target.closest('#tl-ag-rm')) { ev.preventDefault(); if (!$('tl-ag-file').files[0] && editAdj) quitarAdj = true; return limpiarArchivo(); }
+      const ed = ev.target.closest('[data-ed]'); if (ed) { const e = eventos.concat(pasados).find(x => String(x.id) === ed.dataset.ed); if (e) editar(e); return; }
       const d = ev.target.closest('[data-del]'); if (d) { if (!confirm('¿Borrar este evento de la agenda?')) return;
-        await sb.from('eventos').delete().eq('id', d.dataset.del); if (d.dataset.adj) await sb.storage.from('fotos').remove([d.dataset.adj]); lista(); return; }
+        await sb.from('eventos').delete().eq('id', d.dataset.del); if (d.dataset.adj) await sb.storage.from('fotos').remove([d.dataset.adj]); if (String(editId) === d.dataset.del) salirEdicion(); lista(); return; }
       if (ev.target.closest('#tl-ag-ok')) {
         const v = id => $(id).value.trim(); const ok = $('tl-ag-ok');
         if (!v('tl-ag-tit')) { msg('Ponle un título al evento.', '#ff8a94'); $('tl-ag-tit').focus(); return; }
@@ -361,7 +388,17 @@
             const up = await sb.storage.from('fotos').upload(adjunto, f, { contentType: f.type });
             if (up.error) { msg('No se pudo subir el archivo: ' + up.error.message, '#ff8a94'); return; } }
           msg('Guardando…', '#a69ea3');
-          const { error } = await sb.from('eventos').insert({ alumno: v('tl-ag-al') || null, tipo, fecha: v('tl-ag-fecha'), hora: v('tl-ag-hora') || null, titulo: v('tl-ag-tit'), detalle: v('tl-ag-det') || null, link: link || null, adjunto });
+          const fila = { alumno: v('tl-ag-al') || null, tipo, fecha: v('tl-ag-fecha'), hora: v('tl-ag-hora') || null, titulo: v('tl-ag-tit'), detalle: v('tl-ag-det') || null, link: link || null };
+          if (editId) {
+            const viejo = editAdj; fila.adjunto = adjunto || (quitarAdj ? null : viejo);
+            const { data: upd, error: e1 } = await sb.from('eventos').update(fila).eq('id', editId).select('id');
+            const error = e1 || (!(upd || []).length ? { message: 'no hay permiso para editar o el evento ya no existe' } : null);
+            if (error) { if (adjunto) await sb.storage.from('fotos').remove([adjunto]); msg('No se pudo guardar: ' + error.message, '#ff8a94'); return; }
+            if (viejo && fila.adjunto !== viejo) await sb.storage.from('fotos').remove([viejo]);
+            salirEdicion(); msg('Cambios guardados ✓'); lista(); return;
+          }
+          fila.adjunto = adjunto;
+          const { error } = await sb.from('eventos').insert(fila);
           if (error) { msg('No se pudo guardar: ' + error.message, '#ff8a94'); return; }
           const para = v('tl-ag-al') ? (nom[v('tl-ag-al')] || '').split(' ')[0] : 'todos';
           msg('Guardado ✓ Ya aparece en la agenda de ' + para + '.');
