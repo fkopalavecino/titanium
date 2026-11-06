@@ -65,6 +65,13 @@ nav.tabs button[aria-current=page]{color:var(--red-t)}
 .wknav button{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--fg);font-size:20px;cursor:pointer}
 details.ses summary{cursor:pointer;color:var(--red-t);font-weight:600;font-size:14px;list-style:none}
 details.ses summary::-webkit-details-marker{display:none}
+.ph-cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ph-cmp figure{margin:0;display:flex;flex-direction:column;gap:6px}
+.ph-cmp img,.ph-th img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;background:var(--sunk);cursor:zoom-in}
+.ph-cmp select{min-height:40px;border-radius:8px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);font:600 14px Barlow,sans-serif;padding:0 8px}
+.ph-th{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+#lightbox{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:16px}
+#lightbox img{max-width:100%;max-height:100%;border-radius:10px}
 .center{min-height:70vh;display:flex;align-items:center;justify-content:center;text-align:center;flex-direction:column;gap:12px}
 </style>
 </head>
@@ -101,7 +108,7 @@ const clp = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
 const hm = s => { const [h, m] = String(s).split(':').map(Number); return h * 60 + (m || 0); };
 const nowM = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
 const toast = m => { const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2800); };
-const S = { v: 'hoy', wk: null, dia: null, a: null, planes: [], clases: [], rutinas: new Map(), cfg: {}, sel: null, eventos: [] };
+const S = { v: 'hoy', wk: null, dia: null, a: null, planes: [], clases: [], rutinas: new Map(), cfg: {}, sel: null, eventos: [], fotos: [], medidas: [], urls: {}, fang: 'frente' };
 
 await window.tlSession();
 const { data: codigo, error: e1 } = await sb.rpc('vincular_alumno');
@@ -130,6 +137,10 @@ async function load() {
   if (ids.size) qs.push(sb.from('rutinas').select('id,data').in('id', [...ids]));
   const rs = await Promise.all(qs);
   rs.forEach(r => (r.data || []).forEach(x => S.rutinas.set(x.id, x.data)));
+  S.fotos = (Array.isArray(S.a.fotos) ? S.a.fotos : []).filter(x => x && (x.frente || x.perfil || x.espalda)).sort((x, y) => x.f.localeCompare(y.f));
+  S.medidas = Array.isArray(S.a.medidas) ? S.a.medidas : [];
+  const fids = S.fotos.flatMap(x => [x.frente, x.perfil, x.espalda]).filter(id => id && !S.urls[id]);
+  if (fids.length) { const { data: su } = await sb.storage.from('fotos').createSignedUrls(fids, 3600 * 12); (su || []).forEach(x => { if (x.signedUrl) S.urls[x.path] = x.signedUrl; }); }
 }
 await load();
 
@@ -180,6 +191,20 @@ function historial() { // {nombre: [{f, kg, r}]}
 const nSer = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? Math.min(6, Number(m[1])) : 1; };
 const fmtSet = s => s ? (s.kg != null ? String(s.kg).replace('.', ',') + ' kg' : '') + (s.r != null ? ' × ' + s.r : '') : '';
 
+/* ---------- borrador de la sesión (no se pierde si se cierra la app) ---------- */
+const DKEY = () => 'tl-draft-' + codigo + '-' + today();
+const getDraft = () => { try { return JSON.parse(localStorage.getItem(DKEY()) || 'null') || { sets: {} }; } catch (e) { return { sets: {} }; } };
+const putDraft = d => { try { localStorage.setItem(DKEY(), JSON.stringify(d)); } catch (e) {} };
+const clearDraft = () => { try { localStorage.removeItem(DKEY()); Object.keys(localStorage).filter(k => k.startsWith('tl-draft-' + codigo + '-') && k !== DKEY()).forEach(k => localStorage.removeItem(k)); } catch (e) {} };
+function applyDraft() { if (S.v !== 'rutina') return; const d = getDraft();
+  document.querySelectorAll('.set input').forEach(i => { const v = d.sets?.[i.dataset.n]?.[i.dataset.i]?.[i.dataset.f]; if (v != null && v !== '') i.value = v; });
+  document.querySelectorAll('.set').forEach(box => box.classList.toggle('done', [...box.querySelectorAll('input')].some(i => i.value.trim() !== '')));
+  if (d.carga != null && $('#carga')) $('#carga').value = d.carga;
+  if (d.rpe != null) { S.rpe = d.rpe; document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.rpe) === String(d.rpe))); } }
+document.addEventListener('input', ev => { const i = ev.target; const d = getDraft();
+  if (i.matches('.set input')) { const n = i.dataset.n; ((d.sets[n] = d.sets[n] || {})[i.dataset.i] = d.sets[n][i.dataset.i] || {})[i.dataset.f] = i.value; i.closest('.set')?.classList.toggle('done', [...i.closest('.set').querySelectorAll('input')].some(x => x.value.trim() !== '')); putDraft(d); }
+  else if (i.id === 'carga') { d.carga = i.value; putDraft(d); } });
+
 /* ---------- vistas ---------- */
 const V = {};
 V.hoy = () => {
@@ -203,7 +228,7 @@ V.hoy = () => {
     <div class="card kpi"><div class="small muted">Clases del plan</div><div class="v">${usadas} <span class="muted" style="font-size:18px">de ${tot || '—'}</span></div>${tot ? `<div class="bar"><i style="width:${Math.min(100, Math.round(usadas / tot * 100))}%"></i></div>` : ''}</div>
     <div class="card kpi"><div class="small muted">Renueva</div><div class="v">${p ? esc(fmtD(p.fin)) : '—'}</div><div class="small ${saldo ? 'warn' : 'ok'}">${p ? (saldo ? 'Saldo ' + clp(saldo) : 'Al día ✓') : ''}</div></div>
   </div>
-  <button class="btn" data-go="agenda">Ver mi agenda</button>
+  <section class="card"><div class="row"><span class="eyebrow">Esta semana</span><button class="chip" data-go="agenda">Ver agenda</button></div>${weekStrip(lunesDe(t), t, 'data-goday')}</section>
   <section class="card"><div class="small">Este mes llevas <b>${delMes} clase${delMes === 1 ? '' : 's'}</b>. ${delMes >= 8 ? '¡Vas excelente!' : 'Cada clase suma.'}</div></section>
   <div class="small muted" style="text-align:center;font-style:italic">«${esc(S.cfg.lema || 'El que abandona pierde')}» · ${esc(S.cfg.gimnasio || 'Titanium Sport')}</div>`;
 };
@@ -242,10 +267,27 @@ V.progreso = () => {
     const pts = Object.entries(byF).sort(); if (pts.length >= 2) { const mn = Math.min(...pts.map(p => p[1])), mx = Math.max(...pts.map(p => p[1])); const W = 320, Hh = 110;
       const xy = pts.map(([f, v], i) => [10 + i * (W - 20) / (pts.length - 1), Hh - 10 - (mx === mn ? 0.5 : (v - mn) / (mx - mn)) * (Hh - 30)]);
       chart = `<svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="${esc(top[0])}: de ${mn} a ${mx} kg"><polyline points="${xy.map(p => p.join(',')).join(' ')}" fill="none" stroke="#d71f30" stroke-width="3" stroke-linejoin="round"/>${xy.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#d71f30"/>`).join('')}<text x="${W - 4}" y="14" text-anchor="end" fill="#f2eef0" font-size="13" font-weight="700">${String(mx).replace('.', ',')} kg</text></svg>`; } }
+  const ANG = [['frente', 'Frente'], ['perfil', 'Perfil'], ['espalda', 'Espalda']]; const ang = S.fang || 'frente';
+  const conAng = S.fotos.filter(x => x[ang] && S.urls[x[ang]]); const A = conAng[0], B = conAng[conAng.length - 1];
+  const fotosCard = S.fotos.length ? `<section class="card"><div class="row"><h2>Fotos de progreso</h2><span class="small muted">${S.fotos.length} sesión${S.fotos.length === 1 ? '' : 'es'}</span></div>
+    <div class="chips">${ANG.map(([k, l]) => `<button class="chip" data-fang="${k}" aria-pressed="${ang === k}">${l}</button>`).join('')}</div>
+    ${A ? (A !== B ? `<div class="ph-cmp"><figure><img src="${esc(S.urls[A[ang]])}" data-zoom="1" alt="Antes, ${esc(fmtD(A.f))}"><figcaption class="small muted">Antes · ${esc(fmtD(A.f))}</figcaption></figure><figure><img src="${esc(S.urls[B[ang]])}" data-zoom="1" alt="Ahora, ${esc(fmtD(B.f))}"><figcaption class="small muted">Ahora · ${esc(fmtD(B.f))}</figcaption></figure></div><div class="small muted" style="text-align:center">${diffDays(A.f, B.f)} días de diferencia</div>`
+      : `<div class="ph-cmp"><figure><img src="${esc(S.urls[A[ang]])}" data-zoom="1" alt="${esc(fmtD(A.f))}"><figcaption class="small muted">${esc(fmtD(A.f))} · tu punto de partida</figcaption></figure></div>`) : '<div class="small muted">No hay foto de este ángulo todavía.</div>'}
+    ${S.fotos.length > 2 ? `<details class="ses"><summary>Ver todas las sesiones</summary>${S.fotos.slice().reverse().map(x => `<div class="small muted" style="margin-top:8px">${esc(fmtD(x.f))}</div><div class="ph-th">${ANG.map(([k, l]) => x[k] && S.urls[x[k]] ? `<img src="${esc(S.urls[x[k]])}" data-zoom="1" alt="${l} ${esc(fmtD(x.f))}" loading="lazy">` : '<div></div>').join('')}</div>`).join('')}</details>` : ''}
+    <div class="small muted">Las fotos las sube Franco en tus evaluaciones. Solo tú y él pueden verlas.</div></section>`
+    : `<section class="card"><h2>Fotos de progreso</h2><div class="small muted">Aún no tienes fotos. Franco las toma en tus evaluaciones y aquí podrás comparar tu antes y después.</div></section>`;
+  const md = S.medidas.filter(m => m.peso || m.grasa || m.cintura); const m0 = md[0], m1 = md[md.length - 1];
+  const dlt = (k, u) => m0 && m1 && m0 !== m1 && m0[k] != null && m1[k] != null ? ` <span class="small ${m1[k] <= m0[k] ? 'ok' : 'warn'}">${m1[k] - m0[k] > 0 ? '+' : ''}${String(Math.round((m1[k] - m0[k]) * 10) / 10).replace('.', ',')}${u}</span>` : '';
+  const medCard = md.length ? `<section class="card"><h2>Evolución corporal</h2><div class="grid3">
+    <div class="kpi"><div class="small muted">Peso</div><div class="v">${m1.peso != null ? String(m1.peso).replace('.', ',') : '—'}<span class="small muted"> kg</span></div>${dlt('peso', ' kg')}</div>
+    <div class="kpi"><div class="small muted">% grasa</div><div class="v">${m1.grasa != null ? String(m1.grasa).replace('.', ',') : '—'}</div>${dlt('grasa', ' %')}</div>
+    <div class="kpi"><div class="small muted">Cintura</div><div class="v">${m1.cintura != null ? String(m1.cintura).replace('.', ',') : '—'}<span class="small muted"> cm</span></div>${dlt('cintura', ' cm')}</div></div>
+    <div class="small muted">Última medición ${esc(fmtD(m1.f))}${md.length > 1 ? ' · comparado con ' + esc(fmtD(m0.f)) : ''}</div></section>` : '';
   return `<h1>Mi progreso</h1>
   <div class="grid3"><div class="card kpi"><div class="small muted">Clases mes</div><div class="v">${delMes}</div></div>
     <div class="card kpi"><div class="small muted">Asistencia</div><div class="v">${marcadas ? Math.round(delMes / marcadas * 100) + '%' : '—'}</div></div>
     <div class="card kpi"><div class="small muted">Ejercicios</div><div class="v red">${best.length}</div></div></div>
+  ${fotosCard}${medCard}
   ${top ? `<section class="card"><div class="row"><h2>${esc(top[0].replace(/^\d+[ab]? · /, ''))}</h2><span class="small muted">mejor ${esc(fmtSet(top[1]))}</span></div>${chart || '<div class="small muted">Anota más sesiones para ver tu gráfico.</div>'}</section>` : ''}
   <section class="card"><h2>Tus mejores marcas</h2>${best.length ? best.slice(0, 8).map(([n, b]) => `<div class="row small"><span>${esc(n.replace(/^\d+[ab]? · /, ''))}</span><b>${esc(fmtSet(b))}</b></div>`).join('') : '<div class="small muted">Cuando anotes tus series en «Rutina», aquí verás tus récords.</div>'}</section>`;
 };
@@ -266,6 +308,9 @@ V.plan = () => {
     <button class="btn pri" id="avisarPago">Avisar que pagué</button></section>
   <section class="card"><h2>Pagos registrados</h2>${(p.pagos || []).length ? p.pagos.map(x => `<div class="row small"><span>${esc(fmtD(x.fecha))} · ${esc(x.medio || '')}</span><b>${clp(x.monto)}</b></div>`).join('') : '<div class="small muted">Sin pagos registrados en este plan.</div>'}</section><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
 };
+function weekStrip(wk, sel, attr) { const t = today();
+  return `<div class="wk">${Array.from({ length: 7 }, (_, i) => addDays(wk, i)).map(f => { const its = clasesDia(f); const done = its.some(x => x.rec?.asis === 'presente'); const ne = evDia(f).length;
+    return `<button ${attr}="${f}" aria-pressed="${f === sel}" class="${f === t ? 'today' : ''}" aria-label="${esc(longD(f))}${its.length ? ', con clase' : ''}${ne ? ', con actividad' : ''}">${DL[dayKey(f)].charAt(0)}<b>${pad(parseISO(f).getDate())}</b><span class="dots">${its.length ? `<i class="${done ? 'ok' : ''}"></i>` : ''}${ne ? '<i class="ev"></i>' : ''}</span></button>`; }).join('')}</div>`; }
 const lunesDe = f => addDays(f, -((parseISO(f).getDay() + 6) % 7));
 function prediccion() { const m = new Map(); const pe = progEstado(); const t = today(); let i = 0;
   for (let d = 0; d < 70; d++) { const f = addDays(t, d);
@@ -305,8 +350,7 @@ V.agenda = () => {
       ${nv >= 0 ? noVoyBtn(nv, S.dia, x.h) : ''}</section>`; };
   return `<div class="row" style="align-items:center"><h1>Agenda</h1>${S.dia !== t ? '<button class="chip" data-hoy="1">Hoy</button>' : ''}</div>
   <div class="wknav"><button data-wk="-7" aria-label="Semana anterior">‹</button><b class="small">${esc(titulo)}</b><button data-wk="7" aria-label="Semana siguiente">›</button></div>
-  <div class="wk">${dias.map(f => { const its = clasesDia(f); const done = its.some(x => x.rec?.asis === 'presente'); const ne = evDia(f).length;
-    return `<button data-dia="${f}" aria-pressed="${f === S.dia}" class="${f === t ? 'today' : ''}" aria-label="${esc(longD(f))}${its.length ? ', con clase' : ''}${ne ? ', con actividad' : ''}">${DL[dayKey(f)].charAt(0)}<b>${pad(parseISO(f).getDate())}</b><span class="dots">${its.length ? `<i class="${done ? 'ok' : ''}"></i>` : ''}${ne ? '<i class="ev"></i>' : ''}</span></button>`; }).join('')}</div>
+  ${weekStrip(S.wk, S.dia, 'data-dia')}
   <div class="legend"><span><i style="background:var(--red)"></i>Clase</span><span><i style="background:var(--ok)"></i>Asististe</span><span><i style="background:var(--ev)"></i>Actividad</span></div>
   <div class="eyebrow">${esc(longD(S.dia))}</div>
   ${items.length || evs.length ? [...items.map(x => ({ k: x.h, html: card(x) })), ...evs.map(e => ({ k: e.hora || '00:00', html: evHTML(e) }))].sort((a, b) => a.k.localeCompare(b.k)).map(x => x.html).join('') : `<div class="card"><div class="muted">${S.dia < t ? 'No tuviste clase este día.' : 'No tienes nada agendado este día. ¡Descansa o muévete libre!'}</div></div>`}`;
@@ -324,6 +368,7 @@ function render() {
   $('#app').innerHTML = V[S.v]();
   $('#tabs').hidden = false;
   document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.v === S.v || (S.v === 'clases' && b.dataset.v === 'agenda') ? 'page' : 'false'));
+  applyDraft();
   window.scrollTo(0, 0); requestAnimationFrame(() => window.scrollTo(0, 0));
 }
 async function solicitar(tipo, data) {
@@ -332,10 +377,13 @@ async function solicitar(tipo, data) {
 }
 document.addEventListener('click', async ev => {
   const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.v = go.dataset.go || go.dataset.v; render(); return; }
+  const gd = ev.target.closest('[data-goday]'); if (gd) { S.dia = gd.dataset.goday; S.wk = lunesDe(S.dia); S.v = 'agenda'; render(); return; }
+  const zf = ev.target.closest('[data-zoom]'); if (zf) { const lb = document.createElement('div'); lb.id = 'lightbox'; lb.innerHTML = `<img src="${zf.getAttribute('src')}" alt="Foto ampliada">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); return; }
+  const fa = ev.target.closest('[data-fang]'); if (fa) { S.fang = fa.dataset.fang; render(); return; }
   const wd = ev.target.closest('[data-dia]'); if (wd) { S.dia = wd.dataset.dia; render(); return; }
   const wn = ev.target.closest('[data-wk]'); if (wn) { S.wk = addDays(S.wk, Number(wn.dataset.wk)); const t = today(); S.dia = (t >= S.wk && t <= addDays(S.wk, 6)) ? t : S.wk; render(); return; }
   if (ev.target.closest('[data-hoy]')) { S.dia = today(); S.wk = lunesDe(S.dia); render(); return; }
-  const rp = ev.target.closest('[data-rpe]'); if (rp) { S.rpe = Number(rp.dataset.rpe); document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', b === rp)); return; }
+  const rp = ev.target.closest('[data-rpe]'); if (rp) { S.rpe = Number(rp.dataset.rpe); { const d = getDraft(); d.rpe = S.rpe; putDraft(d); } document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', b === rp)); return; }
   const nv = ev.target.closest('[data-novoy]'); if (nv) { const x = proximas(4)[Number(nv.dataset.novoy)]; if (x && await solicitar('no_voy', { fecha: x.f, hora: x.h })) { nv.disabled = true; nv.style.opacity = '.6'; } return; }
   if (ev.target.id === 'recuperar') { const v = $('#pref').value.trim(); if (!v) { toast('Escribe qué día te acomoda.'); return; } if (await solicitar('recuperar', { prefiere: v })) $('#pref').value = ''; return; }
   if (ev.target.id === 'avisarPago') { const v = $('#pmonto').value.trim(); if (await solicitar('pago', { monto: v ? clp(v.replace(/\D/g, '')) : 'sin monto' })) $('#pmonto').value = ''; return; }
@@ -349,7 +397,7 @@ document.addEventListener('click', async ev => {
     const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: today(), p_hora: rd.hora, p_ej: ej, p_carga: $('#carga').value.trim() || null, p_rpe: rpe });
     btn.disabled = false;
     if (error) { toast('No se pudo guardar: ' + error.message); return; }
-    await load(); toast('Entrenamiento guardado 💪'); render();
+    clearDraft(); await load(); toast('Entrenamiento guardado 💪'); render();
   }
 });
 render();
