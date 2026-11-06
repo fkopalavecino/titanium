@@ -233,13 +233,15 @@ function avisoBanner() { const e = pushEstado(); let x = null; try { x = localSt
 
 async function load() {
   const desde = addDays(today(), -120);
-  const [a, p, c, cf, ev] = await Promise.all([
+  const [a, p, c, cf, ev, cfm] = await Promise.all([
     sb.from('alumnos').select('*').eq('codigo', codigo).single(),
     sb.from('planes').select('*').eq('alumno', codigo),
     sb.from('clases').select('*').eq('alumno', codigo).gte('fecha', desde).order('fecha'),
     sb.from('config').select('data').eq('id', 1).maybeSingle(),
     sb.from('eventos').select('*').gte('fecha', desde).order('fecha'),
+    sb.from('confirmaciones').select('fecha,hora,estado').eq('alumno', codigo).gte('fecha', today()),
   ]);
+  S.conf = new Map((cfm.data || []).map(r => [r.fecha + '_' + r.hora, r.estado]));
   S.eventos = (ev.data || []).sort((x, y) => (x.fecha + (x.hora || '')).localeCompare(y.fecha + (y.hora || '')));
   S.a = a.data; S.planes = (p.data || []).sort((x, y) => String(x.inicio || '').localeCompare(String(y.inicio || '')));
   S.clases = c.data || []; S.cfg = cf.data?.data || {};
@@ -482,6 +484,7 @@ V.hoy = () => {
     ${rd.r ? `<div><div class="disp" style="font-size:28px;line-height:1.05">${esc(rd.r.tipo || 'Rutina')}</div><div class="small muted">${esc(rd.r.familia || '')} · ${esc(rd.r.nivel || '')}</div></div>` : `<div class="muted">Franco te asigna la rutina en la clase.</div>`}
     ${linea ? `<div class="note"><b class="red">Semana ${Math.min(rd.pe.semana, rd.pe.total)} de ${rd.pe.total}</b> · ${esc(linea.replace(/^Semana \d+ · /, ''))}</div>` : ''}
     ${rd.r ? `<button class="btn pri" data-go="rutina">Ver mi rutina</button>` : ''}
+    ${prox ? `<div class="small muted" style="margin-top:4px">¿Vienes ${esc(prox.f === t ? 'hoy' : DL[dayKey(prox.f)].toLowerCase() + ' ' + fmtD(prox.f))} a las ${esc(prox.h)}?</div>${asisBtns(prox.f, prox.h)}` : ''}
   </section>
   ${(() => { const nac = S.perfil?.nac || S.a.nacimiento; return nac && nac.slice(5) === t.slice(5) ? `<section class="card" style="background:linear-gradient(135deg,#d71f30,#7a0f1a);border-color:#d71f30;text-align:center"><div style="font-size:40px">🎂</div><div class="disp" style="font-size:28px;color:#fff">¡Feliz cumpleaños, ${esc(nombreC)}!</div><div style="color:#ffe3e6">Todo el equipo Titanium te desea un gran día. Hoy celebra… y entrena con todo 💪</div></section>` : ''; })()}
   ${(() => { const [tit, txt] = fraseDelDia(); return `<section class="card" style="background:linear-gradient(135deg,#2a0d12,#1b181c 60%);border-color:#4a1d24"><div class="row"><span class="eyebrow red">Pensamiento del día</span><span class="small muted">${esc(tit)}</span></div><div style="font:600 19px/1.35 Barlow,sans-serif">«${esc(txt)}»</div><div class="small muted">Inspirado en los principios de Napoleon Hill · <i>Piense y hágase rico</i> y <i>Más astuto que el diablo</i></div></section>`; })()}
@@ -744,6 +747,18 @@ function abrirEvento(id) { const e = S.eventos.find(x => String(x.id) === String
   sh.addEventListener('click', ev => { if (ev.target === sh || ev.target.closest('[data-close]')) sh.remove(); else if (ev.target.closest('[data-evgo]')) sh.remove(); });
   document.body.appendChild(sh); }
 const waNum = () => String(S.cfg.whatsapp || '').replace(/\D/g, '');
+/* ---------- confirmar asistencia: ✅ Voy / ❌ No puedo ir ---------- */
+const waNoVoy = (f, h) => { const n = waNum(); if (!n) return ''; const nom = String(S.perfil?.apodo || S.a.nombre || '').split(' ')[0];
+  return `https://wa.me/${n}?text=${encodeURIComponent(`Hola Franco, soy ${nom}. No puedo ir a mi clase del ${longD(f).toLowerCase()} a las ${h}.`)}`; };
+function asisBtns(f, h) { const k = f + '_' + h, e = S.conf?.get(k), wa = waNoVoy(f, h);
+  const waBtn = (txt, extra) => wa ? `<a class="btn" ${extra || ''} href="${wa}" target="_blank" rel="noopener" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">${txt}</a>` : `<button class="btn" ${extra || ''}>${txt}</button>`;
+  if (e === 'voy') return `<div class="note small" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b class="ok">✅ Confirmaste que vienes</b><button class="chip" data-nov="${k}">No puedo ir</button></div>`;
+  if (e === 'no_voy') return `<div class="note small" style="display:grid;gap:8px"><b class="warn">❌ Avisaste que no vienes</b><div class="grid2">${waBtn('Escribirle a Franco')}<button class="btn" data-voy="${k}">Al final sí voy</button></div></div>`;
+  return `<div class="grid2"><button class="btn pri" data-voy="${k}">✅ Voy</button>${waBtn('❌ No puedo ir', `data-nov="${k}"`)}</div>`; }
+async function confirmar(k, estado) { const [f, h] = k.split('_');
+  const { error } = await sb.rpc('confirmar_clase', { p_fecha: f, p_hora: h, p_estado: estado });
+  if (error) { toast('No se pudo enviar: ' + error.message); return false; }
+  S.conf = S.conf || new Map(); S.conf.set(k, estado); toast(estado === 'voy' ? '¡Te esperamos! 💪 Franco ya sabe que vienes.' : 'Listo, Franco ya sabe que no vienes.'); render(); return true; }
 function noVoyBtn(i, f, h) { const n = waNum(); const nom = String(S.a.nombre || '').split(' ')[0];
   const msg = `Hola Franco, soy ${nom}. No puedo ir a mi clase del ${longD(f).toLowerCase()} a las ${h}.`;
   return n ? `<a class="btn" data-novoy="${i}" href="https://wa.me/${n}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">No puedo ir · avisar por WhatsApp</a>`
@@ -766,7 +781,7 @@ V.agenda = () => {
       <details class="ses"><summary>Ver ejercicios</summary>${sesHTML(r)}</details>` : `<div class="small muted">${past ? 'Clase en Titanium' : 'Franco te asigna la rutina en la clase.'}</div>`}
       ${ej}
       ${S.dia === t && r && !past ? '<button class="btn pri" data-go="rutina">Entrenar ahora</button>' : ''}
-      ${nv >= 0 ? noVoyBtn(nv, S.dia, x.h) : ''}</section>`; };
+      ${nv >= 0 ? asisBtns(S.dia, x.h) : ''}</section>`; };
   return `<div class="row" style="align-items:center"><h1>Agenda</h1>${S.dia !== t ? '<button class="chip" data-hoy="1">Hoy</button>' : ''}</div>
   <div class="wknav"><button data-wk="-7" aria-label="Semana anterior">‹</button><b class="small">${esc(titulo)}</b><button data-wk="7" aria-label="Semana siguiente">›</button></div>
   ${weekStrip(S.wk, S.dia, 'data-dia')}
@@ -828,6 +843,8 @@ document.addEventListener('click', async ev => {
   const wn = ev.target.closest('[data-wk]'); if (wn) { S.wk = addDays(S.wk, Number(wn.dataset.wk)); const t = today(); S.dia = (t >= S.wk && t <= addDays(S.wk, 6)) ? t : S.wk; render(); return; }
   if (ev.target.closest('[data-hoy]')) { S.dia = today(); S.wk = lunesDe(S.dia); render(); return; }
   const rp = ev.target.closest('[data-rpe]'); if (rp) { S.rpe = Number(rp.dataset.rpe); { const d = getDraft(); d.rpe = S.rpe; putDraft(d); } document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', b === rp)); return; }
+  const vy = ev.target.closest('[data-voy]'); if (vy) { vy.disabled = true; if (!(await confirmar(vy.dataset.voy, 'voy'))) vy.disabled = false; return; }
+  const nvy = ev.target.closest('[data-nov]'); if (nvy) { confirmar(nvy.dataset.nov, 'no_voy'); return; }
   const nv = ev.target.closest('[data-novoy]'); if (nv) { const x = proximas(4)[Number(nv.dataset.novoy)]; if (x && await solicitar('no_voy', { fecha: x.f, hora: x.h })) { nv.disabled = true; nv.style.opacity = '.6'; } return; }
   if (ev.target.id === 'recuperar') { const v = $('#pref').value.trim(); if (!v) { toast('Escribe qué día te acomoda.'); return; } if (await solicitar('recuperar', { prefiere: v })) $('#pref').value = ''; return; }
   if (ev.target.id === 'avisarPago') { const v = $('#pmonto').value.trim(); if (await solicitar('pago', { monto: v ? clp(v.replace(/\D/g, '')) : 'sin monto' })) $('#pmonto').value = ''; return; }
@@ -856,9 +873,14 @@ async function irAEvento(id) {
 }
 async function avisoPendiente() { if (!('caches' in window)) return null;
   try { const c = await caches.open('tl-push'); const r = await c.match('pending'); if (!r) return null; await c.delete('pending'); const p = await r.json(); return Date.now() - p.t < 15 * 60e3 ? p.ev : null; } catch (_) { return null; } }
-const revisarAviso = async () => { const id = await avisoPendiente(); if (id) irAEvento(id); };
-const evq = new URLSearchParams(location.search).get('ev');
-if (evq) { history.replaceState(null, '', location.pathname); avisoPendiente(); irAEvento(evq); } else revisarAviso();
+async function irAClase(k, r) { if (!/^\d{4}-\d\d-\d\d_\d\d:\d\d$/.test(k || '')) return; const [f] = k.split('_');
+  document.getElementById('sheet')?.remove(); S.v = 'agenda'; S.dia = f; S.wk = lunesDe(f); render();
+  if (r === 'voy') await confirmar(k, 'voy'); else if (r === 'no') await confirmar(k, 'no_voy'); }
+const revisarAviso = async () => { const id = await avisoPendiente(); if (!id) return; if (String(id).startsWith('clase|')) { const [, k, r] = String(id).split('|'); irAClase(k, r); } else irAEvento(id); };
+const qs0 = new URLSearchParams(location.search); const evq = qs0.get('ev'), clq = qs0.get('clase');
+if (evq) { history.replaceState(null, '', location.pathname); avisoPendiente(); irAEvento(evq); }
+else if (clq) { history.replaceState(null, '', location.pathname); avisoPendiente(); irAClase(clq, qs0.get('r')); }
+else revisarAviso();
 let ocultaDesde = 0;
 document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') { ocultaDesde = Date.now(); return; } revisarAviso();
   const quieto = !(document.activeElement && document.activeElement.matches('input,textarea'));

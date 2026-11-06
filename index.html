@@ -857,7 +857,7 @@ function studentCard(f, hora, code, ruts) {
         <button class="st-name" data-act="ficha" data-id="${esc(code)}" style="border:0;background:none;padding:0;cursor:pointer;text-align:left">${esc(a.nombre)}</button>
         <div class="small muted num">${tot ? `${usadas} de ${tot} clases usadas · ${Math.max(0,tot-usadas)} disponibles` : 'Plan sin clases definidas'}</div>
       </div>
-      <div class="chips">${r.extra ? '<span class="pill info" title="Agendado solo para esta fecha">↻ Clase reagendada</span>' : ''}${(() => { const cu = cumple(a, f); return cu && cu.dias === 0 ? '<span class="pill warn">🎂 Cumpleaños</span>' : ''; })()}${a.ingreso?.parq?.length ? '<span class="pill crit">PAR-Q</span>' : ''}${lesionCorta(a).length ? `<span class="pill warn" title="Lesiones informadas">⚠ ${esc(lesionCorta(a).join(', '))}</span>` : ''}${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}<button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button></div>
+      <div class="chips">${(() => { const cf = S.conf?.get(f + '|' + hora + '|' + code); return cf === 'voy' ? '<span class="pill ok" title="Confirmó desde su app">✅ Confirmó</span>' : cf === 'no_voy' ? '<span class="pill crit" title="Avisó desde su app">❌ No viene</span>' : ''; })()}${r.extra ? '<span class="pill info" title="Agendado solo para esta fecha">↻ Clase reagendada</span>' : ''}${(() => { const cu = cumple(a, f); return cu && cu.dias === 0 ? '<span class="pill warn">🎂 Cumpleaños</span>' : ''; })()}${a.ingreso?.parq?.length ? '<span class="pill crit">PAR-Q</span>' : ''}${lesionCorta(a).length ? `<span class="pill warn" title="Lesiones informadas">⚠ ${esc(lesionCorta(a).join(', '))}</span>` : ''}${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}<button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button></div>
     </div>
     ${pg ? `<div class="small" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="pill ${pg.terminado ? 'warn' : 'info'}">${esc(progTexto(pg))}</span><span class="muted num">Semana ${Math.min(pg.semana, pg.total)} de ${pg.total} · sesión ${pg.idx + 1} de ${pg.ses.length}${pg.terminado ? ' · programa terminado' : ''}</span>${sug ? `<span style="color:var(--red);font-weight:600">Le toca: ${esc(S.rutinas.get(sug)?.tipo || '')}</span>` : ''}</div>` : ''}
     ${pg && rut && !pg.terminado && progLinea(rut, pg.semana) ? `<div class="small" style="border-left:3px solid var(--red);padding:4px 8px;background:var(--bg-2, rgba(255,255,255,.04));border-radius:4px">📈 ${esc(progLinea(rut, pg.semana))}</div>` : ''}
@@ -2014,6 +2014,11 @@ route();
   db.collection('alumnos').onSnapshot(s => { S.alumnos = new Map(s.docs.map(d => [d.id, clone(d.data())])); S.loaded.alumnos = true; schedule(); }, fail);
   db.collection('rutinas').onSnapshot(s => { S.rutinas = new Map(s.docs.map(d => [d.id, clone(d.data())])); S.loaded.rutinas = true; schedule(); maybeMigrateLib(); }, fail);
   db.collection('dias').onSnapshot(s => { S.dias = new Map(s.docs.map(d => [d.id, clone(d.data())])); S.loaded.dias = true; schedule(); }, fail);
+  // confirmaciones de asistencia que marcan los alumnos en su app (✅ / ❌ en Clase de hoy)
+  const sbc = window.__sb;
+  if (sbc) { const cargarConf = async () => { const { data } = await sbc.from('confirmaciones').select('fecha,hora,alumno,estado').gte('fecha', addDays(today(), -1));
+      S.conf = new Map((data || []).map(r => [r.fecha + '|' + r.hora + '|' + r.alumno, r.estado])); schedule(); };
+    cargarConf(); sbc.channel('tl-conf').on('postgres_changes', { event: '*', schema: 'public', table: 'confirmaciones' }, cargarConf).subscribe(); }
   db.doc('config/general').onSnapshot(d => { S.cfg = d.exists ? clone(d.data()) : null; S.loaded.cfg = true; schedule(); maybeMigrateLib(); }, fail);
 })();
 })();
