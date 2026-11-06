@@ -1308,6 +1308,7 @@ function fichaAlumno(code) {
       if (ing.objetivo) al.push(`<span class="pill info">🎯 ${esc(ing.objetivo)}</span>`);
       const cu = cumple(a, today()); if (cu && cu.dias <= 14) al.push(`<span class="pill warn">🎂 ${cu.dias === 0 ? 'Cumple hoy' : 'Cumple en ' + cu.dias + ' d'}</span>`);
       return al.length ? `<div class="chips">${al.join('')}</div>` : ''; })()}
+    <div data-tl-acceso="${esc(code)}"></div>
     <div class="card pad" style="display:grid;gap:6px;box-shadow:none;background:var(--sunk)">
       <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>Plan actual</b><div class="chips">${pill(vigencia(a,p))}${p ? pill(pagoEstado(p)) : ''}</div></div>
       ${p ? `<div class="small num">${clp(p.monto)} · abonado ${clp(abonado(p))} · ${fmtDY(p.inicio)} → ${fmtDY(p.fin)} · ${p.clases || '—'} clases</div>` : '<div class="small muted">Sin plan registrado.</div>'}
