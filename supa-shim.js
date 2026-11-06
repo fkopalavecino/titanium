@@ -323,7 +323,7 @@
         <label class="lb">Título<input id="tl-ag-tit" placeholder="${TEJ[tipo]}" autocomplete="off"></label>
         <label class="lb"><span>Detalle <small>(opcional)</small></span><textarea id="tl-ag-det" rows="3" placeholder="Qué traer, dónde, indicaciones…"></textarea></label>
         <details id="tl-ag-adj"><summary>📎 Adjuntar archivo o enlace</summary><div class="in">
-          <label class="file"><span aria-hidden="true">📄</span><span class="nm" id="tl-ag-fn">Elegir PDF o imagen (máx. 15 MB)</span><button type="button" class="rm" id="tl-ag-rm" hidden aria-label="Quitar archivo">✕</button><input id="tl-ag-file" type="file" accept="application/pdf,image/*"></label>
+          <div style="position:relative"><label class="file" for="tl-ag-file" style="padding-right:48px"><input id="tl-ag-file" type="file" accept="application/pdf,image/*"><span aria-hidden="true">📄</span><span class="nm" id="tl-ag-fn">Elegir PDF o imagen (máx. 15 MB)</span></label><button type="button" class="rm" id="tl-ag-rm" hidden aria-label="Quitar archivo" style="position:absolute;right:6px;top:50%;transform:translateY(-50%)">✕</button></div>
           <label class="lb"><span>Enlace <small>(Drive, Zoom, Meet, video)</small></span><input id="tl-ag-link" type="url" inputmode="url" placeholder="https://…" autocomplete="off"></label></div></details>
       </div>
       <div class="bd" id="tl-ag-prox" hidden></div>
