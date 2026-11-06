@@ -210,7 +210,7 @@
   }
 
   /* ---------- agenda de alumnos: reuniones, actividades, eventos ---------- */
-  const TIPOS = ['Reunión', 'Evaluación', 'Actividad', 'Evento', 'Nutrición', 'Otro'];
+  const TIPOS = ['Reunión', 'Evaluación', 'Nutrición', 'Documento', 'Actividad', 'Evento', 'Otro'];
   const escA = x => String(x == null ? '' : x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function agendaBtn() {
     if (document.getElementById('tl-agb')) return;
@@ -233,6 +233,8 @@
       <label style="display:grid;gap:4px;color:#a69ea3">Fecha<input id="tl-ag-fecha" type="date" value="${iso}" style="${inp}"></label>
       <label style="display:grid;gap:4px;color:#a69ea3">Título<input id="tl-ag-tit" placeholder="Ej: Evaluación BodyGo" style="${inp}"></label>
       <label style="display:grid;gap:4px;color:#a69ea3">Detalle (opcional)<textarea id="tl-ag-det" rows="2" style="${inp};height:auto;padding:8px 10px"></textarea></label>
+      <label style="display:grid;gap:4px;color:#a69ea3">Enlace (opcional)<input id="tl-ag-link" type="url" placeholder="https://… (Drive, Zoom, Meet, video)" style="${inp}"></label>
+      <label style="display:grid;gap:4px;color:#a69ea3">Adjuntar archivo (opcional · PDF o imagen)<input id="tl-ag-file" type="file" accept="application/pdf,image/*" style="color:#a69ea3"></label>
       <button id="tl-ag-ok" style="height:44px;border-radius:10px;border:0;background:#d71f30;color:#fff;font:700 15px Barlow,sans-serif;cursor:pointer">Guardar en su agenda</button>
       <div id="tl-ag-msg" style="color:#6fd39a;min-height:16px"></div>
       <b style="font-size:15px">Próximos</b><div id="tl-ag-list" style="display:grid;gap:6px"></div>`;
@@ -241,18 +243,25 @@
     const lista = async () => {
       const { data } = await sb.from('eventos').select('*').gte('fecha', iso).order('fecha').order('hora', { nullsFirst: true }).limit(40);
       const l = document.getElementById('tl-ag-list'); if (!l) return;
-      l.innerHTML = (data || []).length ? data.map(e => `<div style="display:flex;justify-content:space-between;gap:8px;border-top:1px solid #2f2a2e;padding-top:6px"><div><b>${escA(e.titulo)}</b><div style="color:#a69ea3;font-size:13px">${escA(e.fecha.split('-').reverse().join('/'))}${e.hora ? ' · ' + escA(e.hora) : ''} · ${escA(e.tipo)} · ${escA(e.alumno ? (nom[e.alumno] || e.alumno) : 'Todos')}</div></div><button data-del="${e.id}" style="background:none;border:0;color:#ff8a94;cursor:pointer" aria-label="Borrar">Borrar</button></div>`).join('') : '<div style="color:#a69ea3">Nada agendado todavía.</div>';
+      l.innerHTML = (data || []).length ? data.map(e => `<div style="display:flex;justify-content:space-between;gap:8px;border-top:1px solid #2f2a2e;padding-top:6px"><div><b>${escA(e.titulo)}</b><div style="color:#a69ea3;font-size:13px">${escA(e.fecha.split('-').reverse().join('/'))}${e.hora ? ' · ' + escA(e.hora) : ''} · ${escA(e.tipo)} · ${escA(e.alumno ? (nom[e.alumno] || e.alumno) : 'Todos')}${e.adjunto ? ' · 📎' : ''}${e.link ? ' · 🔗' : ''}</div></div><button data-del="${e.id}" data-adj="${escA(e.adjunto || '')}" style="background:none;border:0;color:#ff8a94;cursor:pointer" aria-label="Borrar">Borrar</button></div>`).join('') : '<div style="color:#a69ea3">Nada agendado todavía.</div>';
     };
     p.onclick = async ev => {
       if (ev.target.id === 'tl-agx') { p.remove(); return; }
-      const d = ev.target.closest('[data-del]'); if (d) { if (!confirm('¿Borrar este evento?')) return; await sb.from('eventos').delete().eq('id', d.dataset.del); lista(); return; }
+      const d = ev.target.closest('[data-del]'); if (d) { if (!confirm('¿Borrar este evento?')) return; await sb.from('eventos').delete().eq('id', d.dataset.del); if (d.dataset.adj) await sb.storage.from('fotos').remove([d.dataset.adj]); lista(); return; }
       if (ev.target.id === 'tl-ag-ok') {
         const v = id => document.getElementById(id).value.trim(); const msg = document.getElementById('tl-ag-msg');
         if (!v('tl-ag-tit') || !v('tl-ag-fecha')) { msg.style.color = '#ff8a94'; msg.textContent = 'Falta el título o la fecha.'; return; }
-        const { error } = await sb.from('eventos').insert({ alumno: v('tl-ag-al') || null, tipo: v('tl-ag-tipo'), fecha: v('tl-ag-fecha'), hora: v('tl-ag-hora') || null, titulo: v('tl-ag-tit'), detalle: v('tl-ag-det') || null });
+        let link = v('tl-ag-link'); if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
+        const f = document.getElementById('tl-ag-file').files[0]; let adjunto = null;
+        if (f) { if (f.size > 15 * 1024 * 1024) { msg.style.color = '#ff8a94'; msg.textContent = 'El archivo pesa más de 15 MB.'; return; }
+          const ext = f.type === 'application/pdf' ? 'pdf' : (f.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+          adjunto = 'docs/' + crypto.randomUUID() + '.' + ext; msg.style.color = '#a69ea3'; msg.textContent = 'Subiendo archivo…';
+          const up = await sb.storage.from('fotos').upload(adjunto, f, { contentType: f.type });
+          if (up.error) { msg.style.color = '#ff8a94'; msg.textContent = 'No se pudo subir el archivo: ' + up.error.message; return; } }
+        const { error } = await sb.from('eventos').insert({ alumno: v('tl-ag-al') || null, tipo: v('tl-ag-tipo'), fecha: v('tl-ag-fecha'), hora: v('tl-ag-hora') || null, titulo: v('tl-ag-tit'), detalle: v('tl-ag-det') || null, link: link || null, adjunto });
         if (error) { msg.style.color = '#ff8a94'; msg.textContent = 'No se pudo guardar: ' + error.message; return; }
         msg.style.color = '#6fd39a'; msg.textContent = 'Guardado ✓ Ya aparece en la agenda del alumno.';
-        document.getElementById('tl-ag-tit').value = ''; document.getElementById('tl-ag-det').value = ''; lista();
+        document.getElementById('tl-ag-tit').value = ''; document.getElementById('tl-ag-det').value = ''; document.getElementById('tl-ag-link').value = ''; document.getElementById('tl-ag-file').value = ''; lista();
       }
     };
     lista();
