@@ -392,12 +392,12 @@
   function respaldoBtn() {
     if (document.getElementById('tl-bk')) return;
     const b = document.createElement('button'); b.id = 'tl-bk'; b.title = 'Descargar respaldo'; b.setAttribute('aria-label', 'Descargar respaldo de datos');
-    b.style.cssText = 'position:fixed;left:max(16px,env(safe-area-inset-left));bottom:calc(72px + env(safe-area-inset-bottom));z-index:900;width:44px;height:44px;border-radius:22px;border:1px solid #2f2a2e;background:#0e0c0f;color:#fff;font-size:20px;box-shadow:0 6px 18px rgba(0,0,0,.3);cursor:pointer';
-    const pintar = () => { const d = bkDias(); b.innerHTML = '💾' + (d > 7 ? '<span style="position:absolute;top:2px;right:2px;width:11px;height:11px;border-radius:50%;background:#d71f30;border:2px solid #0e0c0f"></span>' : ''); };
+    b.style.cssText = 'display:block;margin:8px auto calc(96px + env(safe-area-inset-bottom));background:none;border:0;padding:8px 12px;color:#8a8287;font:500 13px Barlow,system-ui,sans-serif;cursor:pointer;text-decoration:underline;text-underline-offset:3px';
+    const pintar = () => { const d = bkDias(); b.textContent = '💾 Descargar respaldo de datos · ' + (d === Infinity ? 'nunca descargado' : 'último hace ' + Math.floor(d) + ' día(s)'); b.style.color = d > 30 ? '#d71f30' : '#8a8287'; };
     b.onclick = async () => {
       if (b.disabled) return; const d = bkDias();
       if (!confirm('¿Descargar un respaldo con todos los datos de Titanium?\n\n' + (d === Infinity ? 'Nunca has descargado uno.' : 'Último respaldo: hace ' + Math.floor(d) + ' día(s).') + '\n\nGuarda el archivo en un lugar seguro (iCloud, Drive o tu computador).')) return;
-      b.disabled = true; b.textContent = '⏳';
+      b.disabled = true; b.textContent = '⏳ Preparando respaldo…';
       try {
         const out = { app: 'Titanium Sport', fecha: new Date().toISOString(), tablas: {} };
         for (const t of ['alumnos', 'planes', 'clases', 'rutinas', 'eventos', 'solicitudes', 'config', 'coaches']) {
