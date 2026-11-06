@@ -362,6 +362,20 @@
     lista();
   }
 
+  /* ---------- acceso de cada alumno a su app (ficha) ---------- */
+  async function pintarAcceso(el) {
+    const code = el.dataset.tlAcceso; el.dataset.done = '1';
+    const { data: a } = await sb.from('alumnos').select('acceso,user_id,email').eq('codigo', code).maybeSingle(); if (!a) return;
+    const on = a.acceso !== false;
+    const est = !on ? '🔒 Sin acceso a la app' : a.user_id ? '📱 Usa la app' : a.email ? '📱 Con acceso · aún no entra' : '📱 Con acceso · falta su correo en Datos';
+    el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;border:1px solid var(--line,#2f2a2e);border-radius:10px;font-size:14px"><span>${est}</span><button type="button" data-tl-acc="${on ? 'off' : 'on'}" style="min-height:36px;padding:0 12px;border-radius:8px;border:1px solid ${on ? '#ff8a94' : '#17804a'};background:transparent;color:${on ? '#ff8a94' : '#6fd39a'};font:600 14px Barlow,sans-serif;cursor:pointer">${on ? 'Quitar acceso' : 'Dar acceso'}</button></div>`;
+    el.querySelector('[data-tl-acc]').onclick = async ev => { const btn = ev.currentTarget, v = btn.dataset.tlAcc === 'on';
+      if (!v && !confirm('¿Quitar el acceso a la app? Se cerrará su sesión y no podrá entrar hasta que le des acceso de nuevo. Sus datos se mantienen.')) return;
+      btn.disabled = true; const { error } = await sb.rpc('set_acceso', { p_codigo: code, p_on: v });
+      if (error) { alert('No se pudo cambiar: ' + error.message); btn.disabled = false; return; } pintarAcceso(el); };
+  }
+  new MutationObserver(() => document.querySelectorAll('[data-tl-acceso]:not([data-done])').forEach(pintarAcceso)).observe(document.documentElement, { childList: true, subtree: true });
+
   let ready = null;
   async function boot() {
     const s = await ensureSession();
