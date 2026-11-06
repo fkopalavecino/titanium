@@ -379,13 +379,45 @@
   }
   new MutationObserver(() => document.querySelectorAll('[data-tl-acceso]:not([data-done])').forEach(pintarAcceso)).observe(document.documentElement, { childList: true, subtree: true });
 
+  /* ---------- respaldo: descarga todos los datos en un archivo ---------- */
+  const BK = 'tl-respaldo';
+  const bkDias = () => { try { const t = Number(localStorage.getItem(BK)); return t ? (Date.now() - t) / 864e5 : Infinity; } catch (e) { return Infinity; } };
+  function respaldoBtn() {
+    if (document.getElementById('tl-bk')) return;
+    const b = document.createElement('button'); b.id = 'tl-bk'; b.title = 'Descargar respaldo'; b.setAttribute('aria-label', 'Descargar respaldo de datos');
+    b.style.cssText = 'position:fixed;left:max(16px,env(safe-area-inset-left));bottom:calc(72px + env(safe-area-inset-bottom));z-index:900;width:44px;height:44px;border-radius:22px;border:1px solid #2f2a2e;background:#0e0c0f;color:#fff;font-size:20px;box-shadow:0 6px 18px rgba(0,0,0,.3);cursor:pointer';
+    const pintar = () => { const d = bkDias(); b.innerHTML = '💾' + (d > 7 ? '<span style="position:absolute;top:2px;right:2px;width:11px;height:11px;border-radius:50%;background:#d71f30;border:2px solid #0e0c0f"></span>' : ''); };
+    b.onclick = async () => {
+      if (b.disabled) return; const d = bkDias();
+      if (!confirm('¿Descargar un respaldo con todos los datos de Titanium?\n\n' + (d === Infinity ? 'Nunca has descargado uno.' : 'Último respaldo: hace ' + Math.floor(d) + ' día(s).') + '\n\nGuarda el archivo en un lugar seguro (iCloud, Drive o tu computador).')) return;
+      b.disabled = true; b.textContent = '⏳';
+      try {
+        const out = { app: 'Titanium Sport', fecha: new Date().toISOString(), tablas: {} };
+        for (const t of ['alumnos', 'planes', 'clases', 'rutinas', 'eventos', 'solicitudes', 'config', 'coaches']) {
+          const rows = []; for (let i = 0; ; i += 1000) { const { data, error } = await sb.from(t).select('*').range(i, i + 999); if (error) throw new Error(t + ': ' + error.message); rows.push(...data); if (data.length < 1000) break; }
+          out.tablas[t] = rows;
+        }
+        const f = new Date(); const nom = 'titanium-respaldo-' + f.getFullYear() + '-' + String(f.getMonth() + 1).padStart(2, '0') + '-' + String(f.getDate()).padStart(2, '0') + '.json';
+        const blob = new Blob([JSON.stringify(out, null, 1)], { type: 'application/json' });
+        const file = new File([blob], nom, { type: 'application/json' });
+        const bajar = () => { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = nom; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); };
+        let ok = false; if (navigator.canShare && navigator.canShare({ files: [file] }) && /iP(hone|ad)|Android/.test(navigator.userAgent)) { ok = await navigator.share({ files: [file], title: nom }).then(() => true, e => e && e.name === 'AbortError'); }
+        if (!ok) bajar();
+        try { localStorage.setItem(BK, String(Date.now())); } catch (e) {}
+        alert('Respaldo listo ✓\n' + Object.entries(out.tablas).map(([k, v]) => k + ': ' + v.length).join(' · ') + '\n\nLas fotos y documentos siguen guardados en Supabase.');
+      } catch (e) { alert('No se pudo crear el respaldo: ' + e.message); }
+      b.disabled = false; pintar();
+    };
+    pintar(); document.body.appendChild(b);
+  }
+
   let ready = null;
   async function boot() {
     const s = await ensureSession();
     const { data: esCoach, error: eC } = await sb.rpc('is_coach');
     if (!esCoach && !eC) { location.replace('alumno.html' + location.search); return new Promise(() => {}); }
     const hide = document.getElementById('tl-hide'); if (hide) hide.remove();
-    solicitudes(); agendaBtn(); sb.channel('tl-sol').on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes' }, () => solicitudes()).subscribe();
+    solicitudes(); agendaBtn(); respaldoBtn(); sb.channel('tl-sol').on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes' }, () => solicitudes()).subscribe();
     return s;
   }
   window.claude = {
