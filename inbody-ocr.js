@@ -32,7 +32,7 @@
   const num = s => Number(String(s).replace(',', '.'));
 
   function extraer(texto) {
-    const t = norm(texto); const out = {};
+    const t = norm(texto); const out = {}; const colas = {};
     for (const [k, , , syn, [mn, mx]] of CAMPOS) {
       for (const label of syn) {
         let from = 0, found = null;
@@ -41,11 +41,16 @@
           const tail = t.slice(i + label.length, i + label.length + 60);
           const nums = [...tail.matchAll(/(\d{1,4}(?:[.,]\d{1,2})?)/g)].map(m => num(m[1]));
           const v = nums.find(n => n >= mn && n <= mx);
-          if (v != null) found = v; else from = i + label.length;
+          if (v != null) { found = v; colas[k] = nums; } else from = i + label.length;
         }
         if (found != null) { out[k] = found; break; }
       }
     }
+    // BodyGo/InBody: la fila «Grasa corporal» trae primero los kg y después el %. Si el valor leído
+    // coincide con kg (≈ % × peso), se usa el número de la misma fila que corresponde al porcentaje.
+    if (out.peso && out.pgc && colas.pgc) { const pct = out.pgc / out.peso * 100;
+      const alt = colas.pgc.find(n => n !== out.pgc && Math.abs(n - pct) <= 0.6);
+      if (alt != null) { out.mgc = out.pgc; out.pgc = alt; } }
     // coherencia: si hay peso y % grasa pero no masa grasa, se calcula
     if (out.peso && out.pgc && !out.mgc) out.mgc = Math.round(out.peso * out.pgc) / 100;
     if (out.peso && out.mgc && !out.pgc) out.pgc = Math.round(out.mgc / out.peso * 1000) / 10;
