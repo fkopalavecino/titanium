@@ -69,12 +69,12 @@
   const A2R = a => ({ codigo: a.codigo, nombre: a.nombre || a.codigo, email: a.email ? String(a.email).trim().toLowerCase() : null, telefono: a.telefono || null,
     estado: a.estado || 'activo', bloques: a.bloques || [], clases: a.clases == null || a.clases === '' ? null : Number(a.clases),
     nacimiento: a.nacimiento || null, notas: a.notas || null, ingreso: a.ingreso || null, programa: a.programa || null,
-    programas_hechos: a.programasHechos || [], fotos: a.fotos || [], updated_at: new Date().toISOString() });
+    programas_hechos: a.programasHechos || [], fotos: a.fotos || [], medidas: a.medidas || [], updated_at: new Date().toISOString() });
   const R2A = (r, planes) => { const a = { codigo: r.codigo, nombre: r.nombre, telefono: r.telefono || '', estado: r.estado, bloques: r.bloques || [], clases: r.clases,
     notas: r.notas || '', planes: planes || [] };
     if (r.email) a.email = r.email; if (r.nacimiento) a.nacimiento = r.nacimiento; if (r.ingreso) a.ingreso = r.ingreso;
     if (r.programa !== undefined) a.programa = r.programa; if (r.programas_hechos && r.programas_hechos.length) a.programasHechos = r.programas_hechos;
-    if (r.fotos && r.fotos.length) a.fotos = r.fotos; if (r.user_id) a.vinculado = true; return a; };
+    if (r.fotos && r.fotos.length) a.fotos = r.fotos; if (r.medidas && r.medidas.length) a.medidas = r.medidas; if (r.user_id) a.vinculado = true; return a; };
   const P2R = (code, p) => ({ id: p.id, alumno: code, mes: p.mes || null, inicio: p.inicio || null, fin: p.fin || null,
     clases: p.clases == null || p.clases === '' ? null : Number(p.clases), monto: Number(p.monto) || 0, pagos: p.pagos || [], updated_at: new Date().toISOString() });
   const R2P = r => ({ id: r.id, mes: r.mes, inicio: r.inicio, fin: r.fin, clases: r.clases, monto: r.monto, pagos: r.pagos || [] });
@@ -89,11 +89,25 @@
 
   async function all(table, q) { let out = [], from = 0; for (;;) { let qq = sb.from(table).select(q || '*').range(from, from + 999); const { data, error } = await qq; if (error) throw error; out = out.concat(data); if (data.length < 1000) return out; from += 1000; } }
 
+  /* ---------- fotos (Supabase Storage, bucket privado) ---------- */
+  const URLS = {};
+  async function firmarFotos(ids) { const need = [...new Set(ids.filter(id => id && !URLS[id]))];
+    for (let i = 0; i < need.length; i += 100) { const { data } = await sb.storage.from('fotos').createSignedUrls(need.slice(i, i + 100), 3600 * 24 * 6);
+      (data || []).forEach(x => { if (x.signedUrl) URLS[x.path] = x.signedUrl; }); } }
+  window.tlFotoURL = id => URLS[id] || '';
+  const assets = {
+    upload: async blob => { const id = (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2)) + '.jpg';
+      const { error } = await sb.storage.from('fotos').upload(id, blob, { contentType: 'image/jpeg', upsert: false }); if (error) throw error;
+      await firmarFotos([id]); return { id }; },
+    delete: async id => { await sb.storage.from('fotos').remove([id]); delete URLS[id]; },
+  };
+
   /* ---------- colecciones ---------- */
   const loaders = {
     alumnos: async () => { const [al, pl] = await Promise.all([all('alumnos'), all('planes')]);
       const byA = {}; pl.forEach(p => (byA[p.alumno] = byA[p.alumno] || []).push(R2P(p)));
       Object.values(byA).forEach(l => l.sort((x, y) => String(x.inicio || x.mes || '').localeCompare(String(y.inicio || y.mes || ''))));
+      await firmarFotos(al.flatMap(r => (Array.isArray(r.fotos) ? r.fotos : []).flatMap(x => [x.frente, x.perfil, x.espalda])));
       return al.map(r => [r.codigo, R2A(r, byA[r.codigo])]); },
     rutinas: async () => (await all('rutinas')).map(r => [r.id, r.data]),
     dias: async () => { const rows = await all('clases'); const m = {};
@@ -255,6 +269,6 @@
   }
   window.claude = {
     use: async name => { ready = ready || boot(); await ready;
-      if (name === 'db') return db; if (name === 'downloads') return downloads; return null; },
+      if (name === 'db') return db; if (name === 'downloads') return downloads; if (name === 'assets') return assets; return null; },
   };
 })();
