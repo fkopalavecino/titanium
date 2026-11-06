@@ -100,6 +100,8 @@ details.ses summary::-webkit-details-marker{display:none}
 .av-up{position:relative;cursor:pointer;display:inline-block}
 .av-up input{position:absolute;inset:0;opacity:0;cursor:pointer}
 .av-up .cam{position:absolute;right:-2px;bottom:-2px;background:var(--fg);color:var(--ink);border-radius:50%;width:30px;height:30px;display:grid;place-items:center;font-size:15px}
+#sheet{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
+#sheet .in{background:var(--surface);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:85vh;overflow:auto;padding:18px 18px calc(18px + env(safe-area-inset-bottom));display:grid;gap:12px}
 .center{min-height:70vh;display:flex;align-items:center;justify-content:center;text-align:center;flex-direction:column;gap:12px}
 </style>
 </head>
@@ -170,6 +172,8 @@ async function load() {
   S.medidas = Array.isArray(S.a.medidas) ? S.a.medidas : [];
   S.inbody = (Array.isArray(S.a.inbody) ? S.a.inbody : []).filter(x => x && (x.img || x.peso)).sort((x, y) => x.f.localeCompare(y.f));
   S.perfil = (S.a.perfil && typeof S.a.perfil === 'object') ? S.a.perfil : {};
+  const docs = S.eventos.map(e => e.adjunto).filter(id => id && !S.urls[id]);
+  if (docs.length) { const { data: sd } = await sb.storage.from('fotos').createSignedUrls(docs, 3600 * 12); (sd || []).forEach(x => { if (x.signedUrl) S.urls[x.path] = x.signedUrl; }); }
   const fids = S.fotos.flatMap(x => [x.frente, x.perfil, x.espalda]).concat(S.inbody.map(x => x.img).filter(Boolean)).concat(S.perfil.avatar ? [S.perfil.avatar] : []).filter(id => id && !S.urls[id]);
   if (fids.length) { const { data: su } = await sb.storage.from('fotos').createSignedUrls(fids, 3600 * 12); (su || []).forEach(x => { if (x.signedUrl) S.urls[x.path] = x.signedUrl; }); }
 }
@@ -461,9 +465,30 @@ function clasesDia(f) { const t = today();
   const hs = bloquesDe(f); const recs = S.clases.filter(r => r.fecha === f && !r.quitado && !hs.includes(r.hora) && (r.asis || r.ej));
   return [...hs.map(h => ({ h, rec: recOf(f, h) })), ...recs.map(r => ({ h: r.hora, rec: r }))].sort((a, b) => a.h.localeCompare(b.h)); }
 const evDia = f => S.eventos.filter(e => e.fecha === f);
-const EVI = { 'Reunión': '👥', 'Evaluación': '📋', 'Actividad': '🏃', 'Evento': '⭐', 'Nutrición': '🥗', 'Otro': '📌' };
-const evDestino = e => /evaluaci|inbody|body ?go|bioimped|medici|foto/i.test((e.tipo || '') + ' ' + (e.titulo || '')) ? 'progreso' : /nutrici|pauta|alimenta/i.test((e.tipo || '') + ' ' + (e.titulo || '')) ? null : null;
-const evHTML = e => { const dst = evDestino(e); return `<section class="card" style="border-color:var(--ev);border-left-width:5px${dst ? ';cursor:pointer' : ''}" ${dst ? `data-evgo="${dst}" role="button" tabindex="0"` : ''}><div class="row"><div class="disp" style="font-size:22px">${e.hora ? esc(e.hora) : 'Todo el día'}</div><span class="chip" style="cursor:inherit;background:var(--ev);border-color:var(--ev);color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span></div><b>${esc(e.titulo)}</b>${e.detalle ? `<div class="small muted" style="white-space:pre-line">${esc(e.detalle)}</div>` : ''}${dst === 'progreso' ? '<div class="small" style="color:var(--ev);font-weight:700">Ver mis evaluaciones y subir mi InBody ›</div>' : ''}</section>`; };
+const EVI = { 'Reunión': '👥', 'Evaluación': '📋', 'Actividad': '🏃', 'Evento': '⭐', 'Nutrición': '🥗', 'Documento': '📄', 'Otro': '📌' };
+const EVA = { 'Evaluación': 'Ver mis evaluaciones ›', 'Nutrición': 'Ver mi pauta ›', 'Reunión': 'Ver detalle y agendar ›', 'Documento': 'Abrir documento ›' };
+const evHTML = e => `<section class="card" style="border-color:var(--ev);border-left-width:5px;cursor:pointer" data-evid="${esc(e.id)}" role="button" tabindex="0"><div class="row"><div class="disp" style="font-size:22px">${e.hora ? esc(e.hora) : 'Todo el día'}</div><span class="chip" style="cursor:inherit;background:var(--ev);border-color:var(--ev);color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span></div><b>${esc(e.titulo)}</b>${e.detalle ? `<div class="small muted" style="white-space:pre-line;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(e.detalle)}</div>` : ''}<div class="small" style="color:var(--ev);font-weight:700">${(e.adjunto || e.link) ? '📎 ' : ''}${esc(EVA[e.tipo] || 'Ver detalle ›')}</div></section>`;
+function icsDe(e) { const d = e.fecha.replace(/-/g, ''); const h = e.hora ? e.hora.replace(':', '') + '00' : null; const fin = h ? String(Number(h.slice(0, 2)) + 1).padStart(2, '0') + h.slice(2) : null;
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Titanium Sport//ES', 'BEGIN:VEVENT', 'UID:' + e.id + '@titanium', h ? 'DTSTART;TZID=America/Santiago:' + d + 'T' + h : 'DTSTART;VALUE=DATE:' + d, h ? 'DTEND;TZID=America/Santiago:' + d + 'T' + fin : 'DTEND;VALUE=DATE:' + addDays(e.fecha, 1).replace(/-/g, ''),
+    'SUMMARY:' + (e.titulo || '').replace(/[,;\n]/g, ' ') + ' · Titanium', 'DESCRIPTION:' + (e.detalle || '').replace(/\n/g, '\\n').replace(/[,;]/g, ' '), 'LOCATION:Titanium Sport', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  return URL.createObjectURL(new Blob([ics], { type: 'text/calendar' })); }
+function abrirEvento(id) { const e = S.eventos.find(x => String(x.id) === String(id)); if (!e) return;
+  const n = waNum(); const nom = String(S.perfil?.apodo || S.a.nombre || '').split(' ')[0];
+  const doc = e.adjunto && S.urls[e.adjunto]; const esPdf = /\.pdf$/i.test(e.adjunto || '');
+  const acts = [];
+  if (doc) acts.push(`<a class="btn pri" href="${esc(doc)}" target="_blank" rel="noopener">${esPdf ? '📄 Abrir documento' : '🖼️ Ver imagen'}</a>`);
+  if (e.link) acts.push(`<a class="btn ${doc ? '' : 'pri'}" href="${esc(e.link)}" target="_blank" rel="noopener">🔗 Abrir enlace</a>`);
+  if (e.tipo === 'Evaluación') acts.push(`<button class="btn ${doc || e.link ? '' : 'pri'}" data-evgo="progreso">📋 Ir a mis evaluaciones</button>`);
+  if (e.fecha >= today()) acts.push(`<a class="btn" href="${icsDe(e)}" download="titanium-${esc(e.fecha)}.ics">📅 Agregar a mi calendario</a>`);
+  if (n) acts.push(`<a class="btn" href="https://wa.me/${n}?text=${encodeURIComponent(`Hola Franco, soy ${nom}. Te escribo por: ${e.titulo} (${longD(e.fecha).toLowerCase()}${e.hora ? ' a las ' + e.hora : ''}).`)}" target="_blank" rel="noopener" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">💬 Escribir a Franco</a>`);
+  const sh = document.createElement('div'); sh.id = 'sheet';
+  sh.innerHTML = `<div class="in" role="dialog" aria-modal="true" aria-label="${esc(e.titulo)}"><div class="row"><span class="chip" style="cursor:default;background:var(--ev);border-color:var(--ev);color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span><button class="btn" data-close="1" style="width:auto;min-height:36px" aria-label="Cerrar">✕</button></div>
+    <h2 style="font-size:26px">${esc(e.titulo)}</h2><div class="small muted">${esc(longD(e.fecha))}${e.hora ? ' · ' + esc(e.hora) : ' · todo el día'}${e.alumno ? '' : ' · para todo Titanium'}</div>
+    ${e.detalle ? `<div class="note" style="white-space:pre-line">${esc(e.detalle)}</div>` : ''}
+    ${doc && !esPdf ? `<img src="${esc(doc)}" alt="${esc(e.titulo)}" data-zoom="1" style="width:100%;max-height:300px;object-fit:contain;border-radius:10px;background:var(--sunk)">` : ''}
+    ${acts.join('')}</div>`;
+  sh.addEventListener('click', ev => { if (ev.target === sh || ev.target.closest('[data-close]')) sh.remove(); else if (ev.target.closest('[data-evgo]')) sh.remove(); });
+  document.body.appendChild(sh); }
 const waNum = () => String(S.cfg.whatsapp || '').replace(/\D/g, '');
 function noVoyBtn(i, f, h) { const n = waNum(); const nom = String(S.a.nombre || '').split(' ')[0];
   const msg = `Hola Franco, soy ${nom}. No puedo ir a mi clase del ${longD(f).toLowerCase()} a las ${h}.`;
@@ -528,6 +553,7 @@ document.addEventListener('click', async ev => {
   const ibi = ev.target.closest('[data-ibi]'); if (ibi) { S.ibInfo = ibi.dataset.ibi; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'fup-open') { S.fotoUp = !S.fotoUp; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'ib-cancel') { if (S.ibNew?.prev) URL.revokeObjectURL(S.ibNew.prev); S.ibNew = null; render(); return; }
+  const ei = ev.target.closest('[data-evid]'); if (ei) { abrirEvento(ei.dataset.evid); return; }
   const eg = ev.target.closest('[data-evgo]'); if (eg) { S.v = eg.dataset.evgo; render(); setTimeout(() => document.getElementById('ib-card')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 60); return; }
   const gd = ev.target.closest('[data-goday]'); if (gd) { S.dia = gd.dataset.goday; S.wk = lunesDe(S.dia); S.v = 'agenda'; render(); return; }
   const zf = ev.target.closest('[data-zoom]'); if (zf) { const lb = document.createElement('div'); lb.id = 'lightbox'; lb.innerHTML = `<img src="${zf.getAttribute('src')}" alt="Foto ampliada">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); return; }
