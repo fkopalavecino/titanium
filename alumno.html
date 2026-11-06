@@ -87,6 +87,7 @@ details.ses summary::-webkit-details-marker{display:none}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.TL_MODE = 'alumno';</script>
 <script src="supa-shim.js"></script>
+<script src="inbody-ocr.js"></script>
 <script>
 (async () => {
 const sb = window.__sb;
@@ -139,8 +140,8 @@ async function load() {
   rs.forEach(r => (r.data || []).forEach(x => S.rutinas.set(x.id, x.data)));
   S.fotos = (Array.isArray(S.a.fotos) ? S.a.fotos : []).filter(x => x && (x.frente || x.perfil || x.espalda)).sort((x, y) => x.f.localeCompare(y.f));
   S.medidas = Array.isArray(S.a.medidas) ? S.a.medidas : [];
-  S.inbody = (Array.isArray(S.a.inbody) ? S.a.inbody : []).filter(x => x && x.img).sort((x, y) => x.f.localeCompare(y.f));
-  const fids = S.fotos.flatMap(x => [x.frente, x.perfil, x.espalda]).concat(S.inbody.map(x => x.img)).filter(id => id && !S.urls[id]);
+  S.inbody = (Array.isArray(S.a.inbody) ? S.a.inbody : []).filter(x => x && (x.img || x.peso)).sort((x, y) => x.f.localeCompare(y.f));
+  const fids = S.fotos.flatMap(x => [x.frente, x.perfil, x.espalda]).concat(S.inbody.map(x => x.img).filter(Boolean)).filter(id => id && !S.urls[id]);
   if (fids.length) { const { data: su } = await sb.storage.from('fotos').createSignedUrls(fids, 3600 * 12); (su || []).forEach(x => { if (x.signedUrl) S.urls[x.path] = x.signedUrl; }); }
 }
 await load();
@@ -211,13 +212,26 @@ function achicar(file, max) { return new Promise((res, rej) => { const u = URL.c
   img.onload = () => { const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); c.toBlob(b => b ? res(b) : rej(new Error('blob')), 'image/jpeg', 0.85); };
   img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('img')); }; img.src = u; }); }
+const IBC = () => window.TL_INBODY_CAMPOS || [];
 document.addEventListener('change', async ev => { const f = ev.target; if (f.id !== 'inb-file' || !f.files?.[0]) return;
-  const lbl = f.closest('label'); if (lbl) { lbl.style.opacity = '.6'; lbl.firstChild.textContent = 'Subiendo…'; }
-  try { const blob = await achicar(f.files[0], 2000); const id = 'inbody/' + codigo + '/' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()) + '.jpg';
+  const file = f.files[0]; S.ibNew = { file, estado: 'leyendo', vals: {}, f: today(), prev: URL.createObjectURL(file) }; S.v = 'progreso'; render();
+  document.getElementById('ib-card')?.scrollIntoView({ block: 'start' });
+  try { const r = await window.tlInbodyLeer(file, pct => { const e = document.getElementById('ib-pct'); if (e) e.textContent = pct + ' %'; });
+    S.ibNew.vals = Object.fromEntries(Object.entries(r.vals).map(([k, v]) => [k, String(v).replace('.', ',')])); S.ibNew.leidos = Object.keys(r.vals).length;
+  } catch (e) { S.ibNew.leidos = 0; }
+  if (S.ibNew) { S.ibNew.estado = 'confirmar'; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); } });
+document.addEventListener('input', ev => { const i = ev.target; if (i.dataset?.ibk && S.ibNew) S.ibNew.vals[i.dataset.ibk] = i.value; if (i.id === 'ib-f' && S.ibNew) S.ibNew.f = i.value; });
+async function guardarInbody(btn) { const n = S.ibNew; if (!n) return; btn.disabled = true; btn.textContent = 'Guardando…';
+  try { const d = {}; for (const [k] of IBC()) { const v = String(n.vals[k] ?? '').trim().replace(',', '.'); if (v !== '' && !isNaN(v)) d[k] = Number(v); }
+    const blob = await achicar(n.file, 2000); const id = 'inbody/' + codigo + '/' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()) + '.jpg';
     const { error: e1 } = await sb.storage.from('fotos').upload(id, blob, { contentType: 'image/jpeg' }); if (e1) throw e1;
-    const { error: e2 } = await sb.rpc('agregar_mi_inbody', { p_id: id, p_f: today() }); if (e2) throw e2;
-    await load(); toast('InBody guardado ✓'); render();
-  } catch (e) { toast('No se pudo subir: ' + (e.message || 'intenta de nuevo')); if (lbl) { lbl.style.opacity = ''; lbl.firstChild.textContent = '＋ Subir pantallazo del InBody'; } } });
+    const { error: e2 } = await sb.rpc('agregar_mi_inbody', { p_id: id, p_f: n.f || today(), p_datos: d }); if (e2) throw e2;
+    URL.revokeObjectURL(n.prev); S.ibNew = null; await load(); toast('InBody guardado ✓'); render();
+  } catch (e) { toast('No se pudo guardar: ' + (e.message || 'intenta de nuevo')); btn.disabled = false; btn.textContent = 'Guardar InBody'; } }
+const spark = (vals, w = 120, h = 30) => { const v = vals.filter(x => x != null); if (v.length < 2) return ''; const mn = Math.min(...v), mx = Math.max(...v);
+  const pts = v.map((y, i) => [4 + i * (w - 8) / (v.length - 1), h - 4 - (mx === mn ? .5 : (y - mn) / (mx - mn)) * (h - 8)]);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="#d71f30" stroke-width="2.5" stroke-linejoin="round"/><circle cx="${pts[pts.length - 1][0]}" cy="${pts[pts.length - 1][1]}" r="3" fill="#d71f30"/></svg>`; };
+const fmtN = (v, dec) => v == null ? '—' : (dec ? (Math.round(v * 10) / 10).toFixed(1) : String(Math.round(v))).replace('.', ',');
 
 /* ---------- vistas ---------- */
 const V = {};
@@ -297,12 +311,28 @@ V.progreso = () => {
     <div class="kpi"><div class="small muted">% grasa</div><div class="v">${m1.grasa != null ? String(m1.grasa).replace('.', ',') : '—'}</div>${dlt('grasa', ' %')}</div>
     <div class="kpi"><div class="small muted">Cintura</div><div class="v">${m1.cintura != null ? String(m1.cintura).replace('.', ',') : '—'}<span class="small muted"> cm</span></div>${dlt('cintura', ' cm')}</div></div>
     <div class="small muted">Última medición ${esc(fmtD(m1.f))}${md.length > 1 ? ' · comparado con ' + esc(fmtD(m0.f)) : ''}</div></section>` : '';
-  const ib = S.inbody.filter(x => S.urls[x.img]); const ibL = ib[ib.length - 1];
-  const inbCard = `<section class="card"><div class="row"><h2>InBody</h2><span class="small muted">${ib.length ? ib.length + ' informe' + (ib.length === 1 ? '' : 's') : ''}</span></div>
-    ${ibL ? `<figure style="margin:0;display:grid;gap:6px"><img src="${esc(S.urls[ibL.img])}" data-zoom="1" alt="Último InBody, ${esc(fmtD(ibL.f))}" style="width:100%;border-radius:10px;background:var(--sunk);cursor:zoom-in"><figcaption class="small muted">Último informe · ${esc(fmtD(ibL.f))}</figcaption></figure>
-      ${ib.length > 1 ? `<details class="ses"><summary>Ver informes anteriores</summary><div class="ph-th" style="margin-top:8px">${ib.slice(0, -1).reverse().map(x => `<figure style="margin:0"><img src="${esc(S.urls[x.img])}" data-zoom="1" alt="InBody ${esc(fmtD(x.f))}" loading="lazy"><figcaption class="small muted">${esc(fmtD(x.f))}</figcaption></figure>`).join('')}</div></details>` : ''}`
-      : '<div class="small muted">Sube el pantallazo o una foto de tu informe InBody para llevar tu historial.</div>'}
-    <label class="btn" style="position:relative;overflow:hidden">＋ Subir pantallazo del InBody<input type="file" accept="image/*" id="inb-file" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label></section>`;
+  const C = IBC(); const ib = S.inbody; const ibL = ib[ib.length - 1];
+  const upBtn = (txt, pri) => `<label class="btn ${pri ? 'pri' : ''}" style="position:relative;overflow:hidden">${txt}<input type="file" accept="image/*" id="inb-file" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label>`;
+  let inbCard;
+  if (S.ibNew && S.ibNew.estado === 'leyendo') inbCard = `<section class="card" id="ib-card"><h2>InBody</h2><div class="row" style="align-items:center;gap:14px"><img src="${S.ibNew.prev}" alt="" style="width:64px;height:84px;object-fit:cover;border-radius:8px"><div><b>Leyendo tus datos…</b><div class="small muted">Esto toma unos segundos · <span id="ib-pct">0 %</span></div></div></div></section>`;
+  else if (S.ibNew) { const n = S.ibNew;
+    inbCard = `<section class="card" id="ib-card"><h2>Revisa tus datos</h2>
+      <div class="small ${n.leidos ? 'muted' : 'warn'}">${n.leidos ? `Leímos ${n.leidos} dato${n.leidos === 1 ? '' : 's'} del informe. Revisa que coincidan y corrige si hace falta.` : 'No pudimos leer los números de la imagen. Escríbelos mirando tu informe.'}</div>
+      <div class="row" style="gap:12px;align-items:flex-start"><img src="${n.prev}" data-zoom="1" alt="Tu informe" style="width:84px;height:112px;object-fit:cover;border-radius:8px;cursor:zoom-in"><label class="field" style="flex:1">Fecha del InBody<input type="date" id="ib-f" value="${esc(n.f)}"></label></div>
+      <div class="grid2">${C.map(([k, l, u]) => `<label class="field">${esc(l)}${u ? ` <span class="small">(${esc(u)})</span>` : ''}<input inputmode="decimal" data-ibk="${k}" value="${esc(n.vals[k] ?? '')}" placeholder="—"></label>`).join('')}</div>
+      <button class="btn pri" id="ib-ok">Guardar InBody</button><button class="btn" id="ib-cancel">Cancelar</button></section>`; }
+  else if (!ibL) inbCard = `<section class="card" id="ib-card"><h2>InBody</h2><div class="small muted">Sube la foto o el pantallazo de tu informe InBody o BodyGo. Leemos los datos automáticamente y vas viendo tu evolución.</div>${upBtn('＋ Subir mi InBody', true)}</section>`;
+  else { const prevOf = k => { for (let i = ib.length - 2; i >= 0; i--) if (ib[i][k] != null) return ib[i]; return null; };
+    const tiles = C.filter(([k]) => ibL[k] != null).map(([k, l, u, , , dec, mejor]) => { const pv = prevOf(k); const d = pv ? ibL[k] - pv[k] : null;
+      const cls = d == null || Math.abs(d) < 0.05 || !mejor ? 'muted' : ((mejor === 'baja') === (d < 0) ? 'ok' : 'warn');
+      return `<div class="card kpi" style="padding:12px;gap:2px"><div class="small muted">${esc(l)}</div><div class="v" style="font-size:26px">${fmtN(ibL[k], dec)}<span class="small muted"> ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</span></div>${d != null ? `<div class="small ${cls}">${d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= '}${fmtN(Math.abs(d), dec)} ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</div>` : '<div class="small muted">primera medición</div>'}</div>`; }).join('');
+    const trend = ib.length >= 2 ? [['pgc', '% Grasa'], ['mme', 'Masa muscular'], ['peso', 'Peso']].filter(([k]) => ib.filter(x => x[k] != null).length >= 2).slice(0, 2).map(([k, l]) => `<div><div class="small muted">${l}</div>${spark(ib.map(x => x[k]))}</div>`).join('') : '';
+    inbCard = `<section class="card" id="ib-card"><div class="row"><h2>InBody</h2><span class="small muted">${esc(fmtD(ibL.f))}${ib.length > 1 ? ' · vs ' + esc(fmtD(ib[ib.length - 2].f)) : ''}</span></div>
+      ${tiles ? `<div class="grid2">${tiles}</div>` : '<div class="small muted">Este informe no tiene datos anotados.</div>'}
+      ${trend ? `<div class="row" style="justify-content:flex-start;gap:24px">${trend}</div>` : ''}
+      ${ib.length > 1 ? `<details class="ses"><summary>Historial (${ib.length})</summary><div style="display:grid;gap:6px;margin-top:8px">${ib.slice().reverse().map(x => `<div class="row small"><span>${esc(fmtD(x.f))}</span><span class="muted">${[['peso', 'kg'], ['pgc', '% grasa'], ['mme', 'kg músc.']].filter(([k]) => x[k] != null).map(([k, u]) => fmtN(x[k], 1) + ' ' + u).join(' · ') || 'sin datos'}</span></div>`).join('')}</div></details>` : ''}
+      ${S.urls[ibL.img] ? `<details class="ses"><summary>Ver informe original</summary><img src="${esc(S.urls[ibL.img])}" data-zoom="1" alt="Informe InBody ${esc(fmtD(ibL.f))}" style="margin-top:8px;width:100%;max-height:280px;object-fit:contain;border-radius:10px;background:var(--sunk);cursor:zoom-in"></details>` : ''}
+      ${upBtn('＋ Subir nuevo InBody', false)}</section>`; }
   return `<h1>Mi progreso</h1>
   <div class="grid3"><div class="card kpi"><div class="small muted">Clases mes</div><div class="v">${delMes}</div></div>
     <div class="card kpi"><div class="small muted">Asistencia</div><div class="v">${marcadas ? Math.round(delMes / marcadas * 100) + '%' : '—'}</div></div>
@@ -397,6 +427,8 @@ async function solicitar(tipo, data) {
 }
 document.addEventListener('click', async ev => {
   const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.v = go.dataset.go || go.dataset.v; render(); return; }
+  if (ev.target.id === 'ib-ok') { guardarInbody(ev.target); return; }
+  if (ev.target.id === 'ib-cancel') { if (S.ibNew?.prev) URL.revokeObjectURL(S.ibNew.prev); S.ibNew = null; render(); return; }
   const gd = ev.target.closest('[data-goday]'); if (gd) { S.dia = gd.dataset.goday; S.wk = lunesDe(S.dia); S.v = 'agenda'; render(); return; }
   const zf = ev.target.closest('[data-zoom]'); if (zf) { const lb = document.createElement('div'); lb.id = 'lightbox'; lb.innerHTML = `<img src="${zf.getAttribute('src')}" alt="Foto ampliada">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); return; }
   const fa = ev.target.closest('[data-fang]'); if (fa) { S.fang = fa.dataset.fang; render(); return; }
