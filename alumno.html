@@ -318,16 +318,16 @@ const spark = (vals, w = 120, h = 30) => { const v = vals.filter(x => x != null)
   const pts = v.map((y, i) => [4 + i * (w - 8) / (v.length - 1), h - 4 - (mx === mn ? .5 : (y - mn) / (mx - mn)) * (h - 8)]);
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="#d71f30" stroke-width="2.5" stroke-linejoin="round"/><circle cx="${pts[pts.length - 1][0]}" cy="${pts[pts.length - 1][1]}" r="3" fill="#d71f30"/></svg>`; };
 const TONO = { ok: '#2f9e6b', mid: '#d9a23a', warn: '#d9534f' };
-function ibInfoHTML(x) { const C = IBC(); const k = S.ibInfo && x[S.ibInfo] != null ? S.ibInfo : (x.pgc != null ? 'pgc' : C.map(c => c[0]).find(c => x[c] != null)); if (!k) return '';
+function ibInfoHTML(x) { const C = IBC(); const k = S.ibInfo && x[S.ibInfo] != null ? S.ibInfo : null; if (!k) return '';
   const c = C.find(z => z[0] === k); const info = (window.TL_INBODY_INFO || {})[k] || {}; const v = x[k]; const sexo = x.sexo || (S.inbody.slice().reverse().find(e => e.sexo) || {}).sexo;
   const z = info.zona ? info.zona(v, sexo) : null; let bar = '', estado = '';
   if (z) { const span = z.hi - z.lo; let prev = z.lo; const segs = z.zonas.map(([hasta, l, t]) => { const a = Math.max(prev, z.lo), b = Math.min(hasta, z.hi); prev = hasta; return { w: Math.max(0, (b - a) / span * 100), l, t }; }).filter(sg => sg.w > 0);
     const cur = z.zonas.find(([hasta]) => v < hasta) || z.zonas[z.zonas.length - 1]; estado = `<span class="pill" style="background:${TONO[cur[2]]};color:#fff;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:700">${esc(cur[1])}</span>`;
     const pos = Math.min(98, Math.max(2, (v - z.lo) / span * 100));
     bar = `<div class="zbar">${segs.map(sg => `<i style="width:${sg.w}%;background:${TONO[sg.t]}"></i>`).join('')}<span class="mk" style="left:${pos}%">${fmtN(v, c[5])}</span></div><div class="zlab">${segs.map(sg => `<span style="width:${sg.w}%">${esc(sg.l)}</span>`).join('')}</div>`; }
-  else if (k === 'pgc' && !sexo) bar = '<div class="small muted">Indica tu sexo al subir el próximo InBody para ver tu rango de referencia.</div>';
+  else if (k === 'pgc' && !sexo) bar = '<div class="small muted">Indica tu sexo en el próximo InBody para ver tu rango.</div>';
   const extra = k === 'mme' && x.peso ? `<div class="small">Tu músculo es el <b>${fmtN(v / x.peso * 100, 1)} %</b> de tu peso.</div>` : '';
-  return `<div class="note" style="display:grid;gap:8px"><div class="row" style="align-items:center"><b>${esc(c[1])}</b>${estado}</div><div class="small">${esc(info.que || '')}</div>${bar}${extra}${info.tip ? `<div class="small muted">💡 ${esc(info.tip)}</div>` : ''}<div class="small muted">Toca otro dato para ver su explicación.</div></div>`; }
+  return `<div class="note" style="display:grid;gap:8px"><div class="row" style="align-items:center"><b>${esc(c[1])}</b>${estado}</div>${bar}${extra}</div>`; }
 async function subirFotoAlumno(input) { const ang = input.dataset.fang2, f = $('#fu-f')?.value || today(), file = input.files?.[0]; if (!file) return;
   const lbl = input.closest('label'); lbl?.classList.add('busy');
   try { const blob = await achicar(file, 1400); const id = 'alumno/' + codigo + '/' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()) + '.jpg';
@@ -476,13 +476,14 @@ V.progreso = () => {
   else { const prevOf = k => { for (let i = ib.length - 2; i >= 0; i--) if (ib[i][k] != null) return ib[i]; return null; };
     const tiles = C.filter(([k]) => ibL[k] != null).map(([k, l, u, , , dec, mejor]) => { const pv = prevOf(k); const d = pv ? ibL[k] - pv[k] : null;
       const cls = d == null || Math.abs(d) < 0.05 || !mejor ? 'muted' : ((mejor === 'baja') === (d < 0) ? 'ok' : 'warn');
-      return `<div class="card kpi ${S.ibInfo === k ? 'sel' : ''}" data-ibi="${k}" role="button" tabindex="0" style="padding:12px;gap:2px;cursor:pointer"><div class="small muted">${esc(l)} <span style="opacity:.7">ⓘ</span></div><div class="v" style="font-size:26px">${fmtN(ibL[k], dec)}<span class="small muted"> ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</span></div>${d != null ? `<div class="small ${cls}">${d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= '}${fmtN(Math.abs(d), dec)} ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</div>` : '<div class="small muted">primera medición</div>'}</div>`; }).join('');
+      return `<div class="card kpi ${S.ibInfo === k ? 'sel' : ''}" data-ibi="${k}" role="button" tabindex="0" style="padding:10px;gap:2px;cursor:pointer;min-width:0"><div class="small muted" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l)}</div><div class="v" style="font-size:24px">${fmtN(ibL[k], dec)}<span class="small muted"> ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</span></div>${d != null ? `<div class="small ${cls}">${d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= '}${fmtN(Math.abs(d), dec)} ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</div>` : ''}</div>`; }).join('');
     const trend = ib.length >= 2 ? [['pgc', '% Grasa'], ['mme', 'Masa muscular'], ['peso', 'Peso']].filter(([k]) => ib.filter(x => x[k] != null).length >= 2).slice(0, 2).map(([k, l]) => `<div><div class="small muted">${l}</div>${spark(ib.map(x => x[k]))}</div>`).join('') : '';
     inbCard = `<section class="card" id="ib-card"><div class="row"><h2>InBody</h2><span class="small muted">${esc(fmtD(ibL.f))}${ib.length > 1 ? ' · vs ' + esc(fmtD(ib[ib.length - 2].f)) : ''}</span></div>
-      ${tiles ? `<div class="grid2">${tiles}</div>${ibInfoHTML(ibL)}` : '<div class="small muted">Este informe no tiene datos anotados.</div>'}
+      ${tiles ? `<div class="grid3">${tiles}</div>${ibInfoHTML(ibL)}` : '<div class="small muted">Este informe no tiene datos anotados.</div>'}
       ${trend ? `<div class="row" style="justify-content:flex-start;gap:24px">${trend}</div>` : ''}
-      ${ib.length > 1 ? `<details class="ses"><summary>Historial (${ib.length})</summary><div style="display:grid;gap:6px;margin-top:8px">${ib.slice().reverse().map(x => `<div class="row small"><span>${esc(fmtD(x.f))}</span><span class="muted">${[['peso', 'kg'], ['pgc', '% grasa'], ['mme', 'kg músc.']].filter(([k]) => x[k] != null).map(([k, u]) => fmtN(x[k], 1) + ' ' + u).join(' · ') || 'sin datos'}</span></div>`).join('')}</div></details>` : ''}
-      ${S.urls[ibL.img] ? `<details class="ses"><summary>Ver informe original</summary><img src="${esc(S.urls[ibL.img])}" data-zoom="1" alt="Informe InBody ${esc(fmtD(ibL.f))}" style="margin-top:8px;width:100%;max-height:280px;object-fit:contain;border-radius:10px;background:var(--sunk);cursor:zoom-in"></details>` : ''}
+      ${ib.length > 1 || S.urls[ibL.img] ? `<div class="chips">${ib.length > 1 ? `<button class="chip" data-ibv="hist" aria-pressed="${S.ibVer === 'hist'}">Historial (${ib.length})</button>` : ''}${S.urls[ibL.img] ? `<button class="chip" data-ibv="inf" aria-pressed="${S.ibVer === 'inf'}">Ver informe</button>` : ''}</div>` : ''}
+      ${S.ibVer === 'hist' && ib.length > 1 ? `<div style="display:grid;gap:6px">${ib.slice().reverse().map(x => `<div class="row small"><span>${esc(fmtD(x.f))}</span><span class="muted">${[['peso', 'kg'], ['pgc', '%'], ['mme', 'kg músc.']].filter(([k]) => x[k] != null).map(([k, u]) => fmtN(x[k], 1) + ' ' + u).join(' · ') || 'sin datos'}</span></div>`).join('')}</div>` : ''}
+      ${S.ibVer === 'inf' && S.urls[ibL.img] ? `<img src="${esc(S.urls[ibL.img])}" data-zoom="1" alt="Informe InBody ${esc(fmtD(ibL.f))}" style="width:100%;max-height:280px;object-fit:contain;border-radius:10px;background:var(--sunk);cursor:zoom-in">` : ''}
       ${upBtn('＋ Subir nuevo InBody', false)}</section>`; }
   return `<h1>Mi progreso</h1>
   <div class="grid3"><div class="card kpi"><div class="small muted">Clases mes</div><div class="v">${delMes}</div></div>
@@ -612,7 +613,8 @@ document.addEventListener('click', async ev => {
   if (ev.target.id === 'pf-ok') { ev.target.disabled = true; const ig = $('#pf-ig').value.trim().replace(/^@+/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '');
     if (await guardarPerfil({ apodo: $('#pf-apodo').value.trim() || null, meta: $('#pf-meta').value.trim() || null, nac: $('#pf-nac').value || null, ig: ig || null, deportes: S.pfDeps || S.perfil.deportes || [] })) { S.pfDeps = null; toast('Perfil guardado ✓'); } else ev.target.disabled = false; return; }
   if (ev.target.id === 'ib-ok') { guardarInbody(ev.target); return; }
-  const ibi = ev.target.closest('[data-ibi]'); if (ibi) { S.ibInfo = ibi.dataset.ibi; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
+  const ibv = ev.target.closest('[data-ibv]'); if (ibv) { S.ibVer = S.ibVer === ibv.dataset.ibv ? null : ibv.dataset.ibv; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
+  const ibi = ev.target.closest('[data-ibi]'); if (ibi) { S.ibInfo = S.ibInfo === ibi.dataset.ibi ? null : ibi.dataset.ibi; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'fup-open') { S.fotoUp = !S.fotoUp; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'ib-cancel') { if (S.ibNew?.prev) URL.revokeObjectURL(S.ibNew.prev); S.ibNew = null; render(); return; }
   const ei = ev.target.closest('[data-evid]'); if (ei) { abrirEvento(ei.dataset.evid); return; }
