@@ -1513,6 +1513,26 @@ async function subirFoto(code, fecha, ang, file, slot) {
     S.ui.fotosOpen = true; S.ui.fotoFecha = fecha; toast('Foto guardada.'); progresoModal(code);
   } catch(e) { slot?.classList.remove('busy'); toast('No se pudo subir la foto. Intenta de nuevo.', true); }
 }
+async function subirInbody(code, fecha, file, el) {
+  if (!assets) { toast('Las fotos no están disponibles en esta vista.', true); return; }
+  el?.closest('.inb-up')?.classList.add('busy');
+  try { const blob = await achicarFoto(file, 2000); const up = await assets.upload(blob);
+    const a = clone(S.alumnos.get(code)); a.inbody = [...(a.inbody || []), { f: fecha, img: up.id, por: 'coach' }].sort((x, y) => x.f.localeCompare(y.f)); saveAlumno(a);
+    S.ui.inbOpen = true; toast('InBody guardado.'); progresoModal(code);
+  } catch(e) { el?.closest('.inb-up')?.classList.remove('busy'); toast('No se pudo subir el InBody. Intenta de nuevo.', true); }
+}
+function inbodyHTML(a) {
+  const code = a.codigo, ls = (a.inbody || []).filter(x => x && x.img);
+  return `<details class="sec inb" ${S.ui.inbOpen ? 'open' : ''}>
+    <summary>📊 InBody / bioimpedancia <span class="small muted" style="font-weight:500">· ${ls.length ? ls.length + ' informe' + (ls.length === 1 ? '' : 's') + ' · último ' + fmtDY(ls[ls.length - 1].f) : 'sin informes aún'}</span></summary>
+    <div style="display:grid;gap:10px;margin-top:10px">
+      ${!assets ? '<div class="notice">Para subir el InBody abre el Control con tu cuenta.</div>' : `
+      <div class="tools inb-up" style="gap:10px;align-items:end"><label class="f" style="flex-direction:row;align-items:center;gap:6px">Fecha <input type="date" id="inb-fecha" value="${today()}"></label>
+        <label class="btn sm" style="position:relative;overflow:hidden;cursor:pointer">＋ Subir pantallazo<input type="file" accept="image/*" class="inb-in" data-id="${esc(code)}" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label></div>`}
+      ${ls.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px">${ls.map((x, i) => ({ x, i })).reverse().map(({ x, i }) => `<figure style="margin:0;display:grid;gap:4px"><img src="${fotoURL(x.img)}" alt="InBody ${fmtD(x.f)}" data-act="foto-zoom" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;background:var(--sunk);cursor:zoom-in"><figcaption class="small muted" style="display:flex;justify-content:space-between;align-items:center">${fmtD(x.f)}${x.por === 'alumno' ? ' · alumno' : ''}<button type="button" class="btn sm ghost" data-act="inb-del" data-id="${esc(code)}" data-i="${i}" aria-label="Borrar InBody ${fmtD(x.f)}">✕</button></figcaption></figure>`).join('')}</div>` : '<div class="small muted">Sube la foto o pantallazo del informe InBody. El alumno también puede subirlo desde su app.</div>'}
+    </div>
+  </details>`;
+}
 function fotosHTML(a) {
   const code = a.codigo, fs = (a.fotos || []).filter(x => ANG.some(([k]) => x[k]));
   const fecha = S.ui.fotoFecha || today();
@@ -1573,6 +1593,7 @@ function progresoModal(code) {
       <div class="card kpi"><div class="l">Volumen estimado · mes</div><div class="v">${vol ? vol.toLocaleString('es-CL') : '—'}<small style="font-size:14px"> kg</small></div><div class="s">${volAnt ? volAnt.toLocaleString('es-CL') + ' kg el mes pasado ' + pctTxt(vol, volAnt) : 'kg × reps × series de las cargas anotadas'}</div></div>
     </div>
     ${fotosHTML(a)}
+    ${inbodyHTML(a)}
     <div><b>Evolución corporal</b>
       ${med.length ? `<div class="tools" style="margin:6px 0;gap:18px">${med.some(m => m.peso) ? `<div><div class="small muted">Peso</div>${spark(med.map(m => m.peso), 160, 34)}</div>` : ''}${med.some(m => m.grasa) ? `<div><div class="small muted">% grasa</div>${spark(med.map(m => m.grasa), 160, 34)}</div>` : ''}${med.some(m => m.cintura) ? `<div><div class="small muted">Cintura</div>${spark(med.map(m => m.cintura), 160, 34)}</div>` : ''}</div>
       <div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th class="r">Peso</th><th class="r">% grasa</th><th class="r">Cintura</th><th>Nota</th><th></th></tr></thead><tbody>${med.map((m, i) => `<tr><td class="num">${fmtDY(m.f)}</td><td class="r num">${m.peso != null ? String(m.peso).replace('.', ',') + ' kg' : '—'}</td><td class="r num">${m.grasa != null ? String(m.grasa).replace('.', ',') + ' %' : '—'}</td><td class="r num">${m.cintura != null ? String(m.cintura).replace('.', ',') + ' cm' : '—'}</td><td class="small">${esc(m.nota || '')}</td><td class="r"><button type="button" class="btn sm ghost" data-act="del-medida" data-id="${esc(code)}" data-i="${i}" aria-label="Borrar medición">✕</button></td></tr>`).slice().reverse().join('')}</tbody></table></div>` : '<div class="muted small" style="margin-top:4px">Sin mediciones todavía.</div>'}
@@ -1831,6 +1852,7 @@ document.addEventListener('click', e => {
     case 'foto-zoom': { const lb = document.createElement('div'); lb.id = 'lightbox'; lb.innerHTML = `<img src="${el.getAttribute('src')}" alt="">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); break; }
     case 'foto-ang': S.ui.fotoCmp = Object.assign({}, S.ui.fotoCmp?.code === id ? S.ui.fotoCmp : {code: id}, {ang: el.dataset.v}); S.ui.fotosOpen = true; progresoModal(id); break;
     case 'foto-ir': S.ui.fotoFecha = el.dataset.f; S.ui.fotosOpen = true; progresoModal(id); break;
+    case 'inb-del': { e.preventDefault(); if (!confirmarFoto(el)) break; const a = clone(S.alumnos.get(id)); const ls = a.inbody || []; const it = ls[+el.dataset.i]; if (!it) break; a.inbody = ls.filter((_, k) => k !== +el.dataset.i); saveAlumno(a); if (assets && it.img) assets.delete(it.img).catch(() => {}); S.ui.inbOpen = true; toast('InBody borrado.'); progresoModal(id); break; }
     case 'foto-del': { e.preventDefault(); if (!confirmarFoto(el)) break; const a = clone(S.alumnos.get(id)); const row = (a.fotos || []).find(x => x.f === el.dataset.f); if (!row) break; const old = row[el.dataset.ang]; delete row[el.dataset.ang];
       a.fotos = (a.fotos || []).filter(x => ANG.some(([k]) => x[k])); saveAlumno(a); if (old && assets) assets.delete(old).catch(() => {}); S.ui.fotosOpen = true; toast('Foto borrada.'); progresoModal(id); break; }
     case 'del-medida': { const a = clone(S.alumnos.get(id)); a.medidas = (a.medidas || []).filter((_, i) => i !== +el.dataset.i); saveAlumno(a); progresoModal(id); break; }
@@ -1884,7 +1906,8 @@ document.addEventListener('change', e => {
 window.addEventListener('hashchange', route);
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.classList?.contains('foto-in') && t.files?.[0]) { const f = $('#foto-fecha')?.value || today(); subirFoto(t.dataset.id, f, t.dataset.ang, t.files[0], t.closest('.f-slot')); }
+  if (t.classList?.contains('inb-in') && t.files?.[0]) { subirInbody(t.dataset.id, $('#inb-fecha')?.value || today(), t.files[0], t); }
+  else if (t.classList?.contains('foto-in') && t.files?.[0]) { const f = $('#foto-fecha')?.value || today(); subirFoto(t.dataset.id, f, t.dataset.ang, t.files[0], t.closest('.f-slot')); }
   else if (t.id === 'foto-fecha') { S.ui.fotoFecha = t.value || today(); S.ui.fotosOpen = true; const code = t.closest('.fotos')?.querySelector('.foto-in')?.dataset.id; if (code) progresoModal(code); }
   else if (t.id === 'foto-a' || t.id === 'foto-b') { const id = t.dataset.id; S.ui.fotoCmp = Object.assign({}, S.ui.fotoCmp?.code === id ? S.ui.fotoCmp : {code: id}, {[t.id === 'foto-a' ? 'a' : 'b']: t.value}); S.ui.fotosOpen = true; progresoModal(id); }
 });
