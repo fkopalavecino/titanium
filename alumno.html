@@ -82,6 +82,16 @@ details.ses summary::-webkit-details-marker{display:none}
 .ph-cmp img,.ph-th img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;background:var(--sunk);cursor:zoom-in}
 .ph-cmp select{min-height:40px;border-radius:8px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);font:600 14px Barlow,sans-serif;padding:0 8px}
 .ph-th{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.ph-row{display:grid;gap:6px}
+.ph-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.ph3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.ph3 figure{margin:0;display:grid;gap:4px}
+.ph3 img,.ph3 .nf{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;background:var(--sunk);cursor:zoom-in}
+.ph3 .nf{display:grid;place-items:center;border:1px dashed var(--line);color:var(--muted);font-size:12px;cursor:default}
+.ph3 figcaption{font-size:12px;color:var(--muted);text-align:center;font-weight:600}
+.ph-sel{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ph-sel label{display:grid;gap:4px;font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.ph-sel select{min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);font:600 16px Barlow,sans-serif;padding:0 10px;width:100%}
 #lightbox{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:16px}
 #lightbox img{max-width:100%;max-height:100%;border-radius:10px}
 .zbar{display:flex;height:10px;border-radius:5px;overflow:hidden;position:relative;margin-top:22px}
@@ -325,7 +335,7 @@ async function subirFotoAlumno(input) { const ang = input.dataset.fang2, f = $('
     const { error: e2 } = await sb.rpc('agregar_mi_foto', { p_id: id, p_f: f, p_ang: ang }); if (e2) throw e2;
     S.fotoUpF = f; await load(); toast('Foto guardada ✓'); render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' });
   } catch (e) { lbl?.classList.remove('busy'); toast('No se pudo subir la foto: ' + (e.message || 'intenta de nuevo')); } }
-document.addEventListener('change', ev => { if (ev.target.dataset?.fang2) subirFotoAlumno(ev.target); else if (ev.target.id === 'fu-f') { S.fotoUpF = ev.target.value; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); } });
+document.addEventListener('change', ev => { if (ev.target.dataset?.fsel) { S['f' + ev.target.dataset.fsel] = ev.target.value; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; } if (ev.target.dataset?.fang2) subirFotoAlumno(ev.target); else if (ev.target.id === 'fu-f') { S.fotoUpF = ev.target.value; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); } });
 function avatarHTML(cls) { const u = S.perfil?.avatar && S.urls[S.perfil.avatar]; const ini = (S.perfil?.apodo || S.a.nombre || '?').trim().charAt(0).toUpperCase();
   return u ? `<img class="av ${cls}" src="${esc(u)}" alt="Tu foto de perfil">` : `<span class="av ${cls}" aria-hidden="true">${esc(ini)}</span>`; }
 function cuadrado(file, lado) { return new Promise((res, rej) => { const u = URL.createObjectURL(file), img = new Image();
@@ -428,17 +438,21 @@ V.progreso = () => {
       const xy = pts.map(([f, v], i) => [10 + i * (W - 20) / (pts.length - 1), Hh - 10 - (mx === mn ? 0.5 : (v - mn) / (mx - mn)) * (Hh - 30)]);
       chart = `<svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="${esc(top[0])}: de ${mn} a ${mx} kg"><polyline points="${xy.map(p => p.join(',')).join(' ')}" fill="none" stroke="#d71f30" stroke-width="3" stroke-linejoin="round"/>${xy.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#d71f30"/>`).join('')}<text x="${W - 4}" y="14" text-anchor="end" fill="#f2eef0" font-size="13" font-weight="700">${String(mx).replace('.', ',')} kg</text></svg>`; } }
   const ANG = [['frente', 'Frente'], ['perfil', 'Perfil'], ['espalda', 'Espalda']]; const ang = S.fang || 'frente';
-  const conAng = S.fotos.filter(x => x[ang] && S.urls[x[ang]]); const A = conAng[0], B = conAng[conAng.length - 1];
+  const ses = S.fotos.slice().sort((a, b) => a.f < b.f ? -1 : a.f > b.f ? 1 : 0);
+  const fA = ses.find(x => x.f === S.fA) || ses[0], fB = ses.find(x => x.f === S.fB) || ses[ses.length - 1];
+  const celda = (x, k, l) => x && x[k] && S.urls[x[k]] ? `<figure><img src="${esc(S.urls[x[k]])}" data-zoom="1" alt="${l}, ${esc(fmtD(x.f))}" loading="lazy"><figcaption>${l}</figcaption></figure>` : `<figure><div class="nf">Sin foto</div><figcaption>${l}</figcaption></figure>`;
+  const fila = (x, tit) => `<div class="ph-row"><div class="ph-h"><b>${tit}</b><span class="small muted">${esc(fmtD(x.f))}</span></div><div class="ph3">${ANG.map(([k, l]) => celda(x, k, l)).join('')}</div></div>`;
+  const opts = sel => ses.map(x => `<option value="${esc(x.f)}" ${x.f === sel.f ? 'selected' : ''}>${esc(fmtD(x.f))}</option>`).join('');
   const fuF = S.fotoUpF || today(); const fuRow = S.fotos.find(x => x.f === fuF) || {};
   const uploader = S.fotoUp ? `<div style="display:grid;gap:8px"><label class="field">Fecha de las fotos<input type="date" id="fu-f" value="${esc(fuF)}"></label>
     <div class="fup">${ANG.map(([k, l]) => `<label>${fuRow[k] && S.urls[fuRow[k]] ? `<img src="${esc(S.urls[fuRow[k]])}" alt="${l}">` : `＋<br>${l}`}<input type="file" accept="image/*" data-fang2="${k}" aria-label="Subir foto ${l}"></label>`).join('')}</div>
     <div class="small muted">Misma luz, misma distancia y ropa ajustada en cada sesión. Si subes otra foto del mismo ángulo y fecha, reemplaza la anterior.</div></div>` : '';
   const fuBtn = `<button class="btn ${S.fotos.length ? '' : 'pri'}" id="fup-open">${S.fotoUp ? 'Listo' : '＋ Subir mis fotos'}</button>`;
-  const fotosCard = S.fotos.length ? `<section class="card" id="fup-card"><div class="row"><h2>Fotos de progreso</h2><span class="small muted">${S.fotos.length} sesión${S.fotos.length === 1 ? '' : 'es'}</span></div>
-    <div class="chips">${ANG.map(([k, l]) => `<button class="chip" data-fang="${k}" aria-pressed="${ang === k}">${l}</button>`).join('')}</div>
-    ${A ? (A !== B ? `<div class="ph-cmp"><figure><img src="${esc(S.urls[A[ang]])}" data-zoom="1" alt="Antes, ${esc(fmtD(A.f))}"><figcaption class="small muted">Antes · ${esc(fmtD(A.f))}</figcaption></figure><figure><img src="${esc(S.urls[B[ang]])}" data-zoom="1" alt="Ahora, ${esc(fmtD(B.f))}"><figcaption class="small muted">Ahora · ${esc(fmtD(B.f))}</figcaption></figure></div><div class="small muted" style="text-align:center">${diffDays(A.f, B.f)} días de diferencia</div>`
-      : `<div class="ph-cmp"><figure><img src="${esc(S.urls[A[ang]])}" data-zoom="1" alt="${esc(fmtD(A.f))}"><figcaption class="small muted">${esc(fmtD(A.f))} · tu punto de partida</figcaption></figure></div>`) : '<div class="small muted">No hay foto de este ángulo todavía.</div>'}
-    ${S.fotos.length > 2 ? `<details class="ses"><summary>Ver todas las sesiones</summary>${S.fotos.slice().reverse().map(x => `<div class="small muted" style="margin-top:8px">${esc(fmtD(x.f))}</div><div class="ph-th">${ANG.map(([k, l]) => x[k] && S.urls[x[k]] ? `<img src="${esc(S.urls[x[k]])}" data-zoom="1" alt="${l} ${esc(fmtD(x.f))}" loading="lazy">` : '<div></div>').join('')}</div>`).join('')}</details>` : ''}
+  const fotosCard = S.fotos.length ? `<section class="card" id="fup-card"><div class="row"><h2>Fotos de progreso</h2><span class="small muted">${S.fotos.length === 1 ? '1 sesión' : S.fotos.length + ' sesiones'}</span></div>
+    ${ses.length === 1 ? fila(fB, 'Tu punto de partida')
+      : `<div class="ph-sel"><label>Antes<select data-fsel="A">${opts(fA)}</select></label><label>Ahora<select data-fsel="B">${opts(fB)}</select></label></div>
+      ${fila(fA, 'Antes')}${fila(fB, 'Ahora')}${fA.f !== fB.f ? `<div class="small muted" style="text-align:center">${Math.abs(diffDays(fA.f, fB.f))} días de diferencia</div>` : ''}`}
+    ${ses.length > 2 ? `<details class="ses"><summary>Ver todas las sesiones (${ses.length})</summary><div style="display:grid;gap:14px;margin-top:10px">${ses.slice().reverse().map(x => fila(x, '')).join('')}</div></details>` : ''}
     ${uploader}${fuBtn}<div class="small muted">Solo tú y Franco pueden ver tus fotos.</div></section>`
     : `<section class="card" id="fup-card"><h2>Fotos de progreso</h2><div class="small muted">Sube fotos de frente, perfil y espalda para comparar tu antes y después. Solo tú y Franco pueden verlas.</div>${uploader}${fuBtn}</section>`;
   const md = S.medidas.filter(m => m.peso || m.grasa || m.cintura); const m0 = md[0], m1 = md[md.length - 1];
