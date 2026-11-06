@@ -72,6 +72,17 @@ details.ses summary::-webkit-details-marker{display:none}
 .ph-th{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 #lightbox{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:16px}
 #lightbox img{max-width:100%;max-height:100%;border-radius:10px}
+.zbar{display:flex;height:10px;border-radius:5px;overflow:hidden;position:relative;margin-top:22px}
+.zbar i{display:block;height:100%}
+.zbar .mk{position:absolute;top:-20px;transform:translateX(-50%);font:700 12px Barlow,sans-serif;color:var(--fg);white-space:nowrap}
+.zbar .mk::after{content:'';position:absolute;left:50%;top:16px;width:2px;height:16px;margin-left:-1px;background:var(--fg)}
+.zlab{display:flex;font-size:11px;color:var(--muted)}.zlab span{text-align:center;overflow:hidden;white-space:nowrap}
+.kpi.sel{border-color:var(--red)!important}
+.fup{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.fup label{position:relative;aspect-ratio:3/4;border:2px dashed var(--line);border-radius:10px;display:grid;place-items:center;text-align:center;font-size:13px;font-weight:600;color:var(--muted);overflow:hidden;cursor:pointer}
+.fup label img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.fup label input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.fup label.busy{opacity:.5}
 .center{min-height:70vh;display:flex;align-items:center;justify-content:center;text-align:center;flex-direction:column;gap:12px}
 </style>
 </head>
@@ -214,15 +225,15 @@ function achicar(file, max) { return new Promise((res, rej) => { const u = URL.c
   img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('img')); }; img.src = u; }); }
 const IBC = () => window.TL_INBODY_CAMPOS || [];
 document.addEventListener('change', async ev => { const f = ev.target; if (f.id !== 'inb-file' || !f.files?.[0]) return;
-  const file = f.files[0]; S.ibNew = { file, estado: 'leyendo', vals: {}, f: today(), prev: URL.createObjectURL(file) }; S.v = 'progreso'; render();
+  const file = f.files[0]; S.ibNew = { file, estado: 'leyendo', vals: {}, f: today(), prev: URL.createObjectURL(file), sexo: (S.inbody.slice().reverse().find(x => x.sexo) || {}).sexo || '' }; S.v = 'progreso'; render();
   document.getElementById('ib-card')?.scrollIntoView({ block: 'start' });
   try { const r = await window.tlInbodyLeer(file, pct => { const e = document.getElementById('ib-pct'); if (e) e.textContent = pct + ' %'; });
     S.ibNew.vals = Object.fromEntries(Object.entries(r.vals).map(([k, v]) => [k, String(v).replace('.', ',')])); S.ibNew.leidos = Object.keys(r.vals).length;
   } catch (e) { S.ibNew.leidos = 0; }
   if (S.ibNew) { S.ibNew.estado = 'confirmar'; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); } });
-document.addEventListener('input', ev => { const i = ev.target; if (i.dataset?.ibk && S.ibNew) S.ibNew.vals[i.dataset.ibk] = i.value; if (i.id === 'ib-f' && S.ibNew) S.ibNew.f = i.value; });
+document.addEventListener('input', ev => { const i = ev.target; if (i.dataset?.ibk && S.ibNew) S.ibNew.vals[i.dataset.ibk] = i.value; if (i.id === 'ib-f' && S.ibNew) S.ibNew.f = i.value; if (i.id === 'ib-sexo' && S.ibNew) S.ibNew.sexo = i.value; });
 async function guardarInbody(btn) { const n = S.ibNew; if (!n) return; btn.disabled = true; btn.textContent = 'Guardando…';
-  try { const d = {}; for (const [k] of IBC()) { const v = String(n.vals[k] ?? '').trim().replace(',', '.'); if (v !== '' && !isNaN(v)) d[k] = Number(v); }
+  try { const d = {}; for (const [k] of IBC()) { const v = String(n.vals[k] ?? '').trim().replace(',', '.'); if (v !== '' && !isNaN(v)) d[k] = Number(v); } if (n.sexo) d.sexo = n.sexo;
     const blob = await achicar(n.file, 2000); const id = 'inbody/' + codigo + '/' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()) + '.jpg';
     const { error: e1 } = await sb.storage.from('fotos').upload(id, blob, { contentType: 'image/jpeg' }); if (e1) throw e1;
     const { error: e2 } = await sb.rpc('agregar_mi_inbody', { p_id: id, p_f: n.f || today(), p_datos: d }); if (e2) throw e2;
@@ -231,6 +242,25 @@ async function guardarInbody(btn) { const n = S.ibNew; if (!n) return; btn.disab
 const spark = (vals, w = 120, h = 30) => { const v = vals.filter(x => x != null); if (v.length < 2) return ''; const mn = Math.min(...v), mx = Math.max(...v);
   const pts = v.map((y, i) => [4 + i * (w - 8) / (v.length - 1), h - 4 - (mx === mn ? .5 : (y - mn) / (mx - mn)) * (h - 8)]);
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="#d71f30" stroke-width="2.5" stroke-linejoin="round"/><circle cx="${pts[pts.length - 1][0]}" cy="${pts[pts.length - 1][1]}" r="3" fill="#d71f30"/></svg>`; };
+const TONO = { ok: '#2f9e6b', mid: '#d9a23a', warn: '#d9534f' };
+function ibInfoHTML(x) { const C = IBC(); const k = S.ibInfo && x[S.ibInfo] != null ? S.ibInfo : (x.pgc != null ? 'pgc' : C.map(c => c[0]).find(c => x[c] != null)); if (!k) return '';
+  const c = C.find(z => z[0] === k); const info = (window.TL_INBODY_INFO || {})[k] || {}; const v = x[k]; const sexo = x.sexo || (S.inbody.slice().reverse().find(e => e.sexo) || {}).sexo;
+  const z = info.zona ? info.zona(v, sexo) : null; let bar = '', estado = '';
+  if (z) { const span = z.hi - z.lo; let prev = z.lo; const segs = z.zonas.map(([hasta, l, t]) => { const a = Math.max(prev, z.lo), b = Math.min(hasta, z.hi); prev = hasta; return { w: Math.max(0, (b - a) / span * 100), l, t }; }).filter(sg => sg.w > 0);
+    const cur = z.zonas.find(([hasta]) => v < hasta) || z.zonas[z.zonas.length - 1]; estado = `<span class="pill" style="background:${TONO[cur[2]]};color:#fff;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:700">${esc(cur[1])}</span>`;
+    const pos = Math.min(98, Math.max(2, (v - z.lo) / span * 100));
+    bar = `<div class="zbar">${segs.map(sg => `<i style="width:${sg.w}%;background:${TONO[sg.t]}"></i>`).join('')}<span class="mk" style="left:${pos}%">${fmtN(v, c[5])}</span></div><div class="zlab">${segs.map(sg => `<span style="width:${sg.w}%">${esc(sg.l)}</span>`).join('')}</div>`; }
+  else if (k === 'pgc' && !sexo) bar = '<div class="small muted">Indica tu sexo al subir el próximo InBody para ver tu rango de referencia.</div>';
+  const extra = k === 'mme' && x.peso ? `<div class="small">Tu músculo es el <b>${fmtN(v / x.peso * 100, 1)} %</b> de tu peso.</div>` : '';
+  return `<div class="note" style="display:grid;gap:8px"><div class="row" style="align-items:center"><b>${esc(c[1])}</b>${estado}</div><div class="small">${esc(info.que || '')}</div>${bar}${extra}${info.tip ? `<div class="small muted">💡 ${esc(info.tip)}</div>` : ''}<div class="small muted">Toca otro dato para ver su explicación.</div></div>`; }
+async function subirFotoAlumno(input) { const ang = input.dataset.fang2, f = $('#fu-f')?.value || today(), file = input.files?.[0]; if (!file) return;
+  const lbl = input.closest('label'); lbl?.classList.add('busy');
+  try { const blob = await achicar(file, 1400); const id = 'alumno/' + codigo + '/' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()) + '.jpg';
+    const { error: e1 } = await sb.storage.from('fotos').upload(id, blob, { contentType: 'image/jpeg' }); if (e1) throw e1;
+    const { error: e2 } = await sb.rpc('agregar_mi_foto', { p_id: id, p_f: f, p_ang: ang }); if (e2) throw e2;
+    S.fotoUpF = f; await load(); toast('Foto guardada ✓'); render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' });
+  } catch (e) { lbl?.classList.remove('busy'); toast('No se pudo subir la foto: ' + (e.message || 'intenta de nuevo')); } }
+document.addEventListener('change', ev => { if (ev.target.dataset?.fang2) subirFotoAlumno(ev.target); else if (ev.target.id === 'fu-f') { S.fotoUpF = ev.target.value; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); } });
 const fmtN = (v, dec) => v == null ? '—' : (dec ? (Math.round(v * 10) / 10).toFixed(1) : String(Math.round(v))).replace('.', ',');
 
 /* ---------- vistas ---------- */
@@ -297,13 +327,18 @@ V.progreso = () => {
       chart = `<svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="${esc(top[0])}: de ${mn} a ${mx} kg"><polyline points="${xy.map(p => p.join(',')).join(' ')}" fill="none" stroke="#d71f30" stroke-width="3" stroke-linejoin="round"/>${xy.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#d71f30"/>`).join('')}<text x="${W - 4}" y="14" text-anchor="end" fill="#f2eef0" font-size="13" font-weight="700">${String(mx).replace('.', ',')} kg</text></svg>`; } }
   const ANG = [['frente', 'Frente'], ['perfil', 'Perfil'], ['espalda', 'Espalda']]; const ang = S.fang || 'frente';
   const conAng = S.fotos.filter(x => x[ang] && S.urls[x[ang]]); const A = conAng[0], B = conAng[conAng.length - 1];
-  const fotosCard = S.fotos.length ? `<section class="card"><div class="row"><h2>Fotos de progreso</h2><span class="small muted">${S.fotos.length} sesión${S.fotos.length === 1 ? '' : 'es'}</span></div>
+  const fuF = S.fotoUpF || today(); const fuRow = S.fotos.find(x => x.f === fuF) || {};
+  const uploader = S.fotoUp ? `<div style="display:grid;gap:8px"><label class="field">Fecha de las fotos<input type="date" id="fu-f" value="${esc(fuF)}"></label>
+    <div class="fup">${ANG.map(([k, l]) => `<label>${fuRow[k] && S.urls[fuRow[k]] ? `<img src="${esc(S.urls[fuRow[k]])}" alt="${l}">` : `＋<br>${l}`}<input type="file" accept="image/*" data-fang2="${k}" aria-label="Subir foto ${l}"></label>`).join('')}</div>
+    <div class="small muted">Misma luz, misma distancia y ropa ajustada en cada sesión. Si subes otra foto del mismo ángulo y fecha, reemplaza la anterior.</div></div>` : '';
+  const fuBtn = `<button class="btn ${S.fotos.length ? '' : 'pri'}" id="fup-open">${S.fotoUp ? 'Listo' : '＋ Subir mis fotos'}</button>`;
+  const fotosCard = S.fotos.length ? `<section class="card" id="fup-card"><div class="row"><h2>Fotos de progreso</h2><span class="small muted">${S.fotos.length} sesión${S.fotos.length === 1 ? '' : 'es'}</span></div>
     <div class="chips">${ANG.map(([k, l]) => `<button class="chip" data-fang="${k}" aria-pressed="${ang === k}">${l}</button>`).join('')}</div>
     ${A ? (A !== B ? `<div class="ph-cmp"><figure><img src="${esc(S.urls[A[ang]])}" data-zoom="1" alt="Antes, ${esc(fmtD(A.f))}"><figcaption class="small muted">Antes · ${esc(fmtD(A.f))}</figcaption></figure><figure><img src="${esc(S.urls[B[ang]])}" data-zoom="1" alt="Ahora, ${esc(fmtD(B.f))}"><figcaption class="small muted">Ahora · ${esc(fmtD(B.f))}</figcaption></figure></div><div class="small muted" style="text-align:center">${diffDays(A.f, B.f)} días de diferencia</div>`
       : `<div class="ph-cmp"><figure><img src="${esc(S.urls[A[ang]])}" data-zoom="1" alt="${esc(fmtD(A.f))}"><figcaption class="small muted">${esc(fmtD(A.f))} · tu punto de partida</figcaption></figure></div>`) : '<div class="small muted">No hay foto de este ángulo todavía.</div>'}
     ${S.fotos.length > 2 ? `<details class="ses"><summary>Ver todas las sesiones</summary>${S.fotos.slice().reverse().map(x => `<div class="small muted" style="margin-top:8px">${esc(fmtD(x.f))}</div><div class="ph-th">${ANG.map(([k, l]) => x[k] && S.urls[x[k]] ? `<img src="${esc(S.urls[x[k]])}" data-zoom="1" alt="${l} ${esc(fmtD(x.f))}" loading="lazy">` : '<div></div>').join('')}</div>`).join('')}</details>` : ''}
-    <div class="small muted">Las fotos las sube Franco en tus evaluaciones. Solo tú y él pueden verlas.</div></section>`
-    : `<section class="card"><h2>Fotos de progreso</h2><div class="small muted">Aún no tienes fotos. Franco las toma en tus evaluaciones y aquí podrás comparar tu antes y después.</div></section>`;
+    ${uploader}${fuBtn}<div class="small muted">Solo tú y Franco pueden ver tus fotos.</div></section>`
+    : `<section class="card" id="fup-card"><h2>Fotos de progreso</h2><div class="small muted">Sube fotos de frente, perfil y espalda para comparar tu antes y después. Solo tú y Franco pueden verlas.</div>${uploader}${fuBtn}</section>`;
   const md = S.medidas.filter(m => m.peso || m.grasa || m.cintura); const m0 = md[0], m1 = md[md.length - 1];
   const dlt = (k, u) => m0 && m1 && m0 !== m1 && m0[k] != null && m1[k] != null ? ` <span class="small ${m1[k] <= m0[k] ? 'ok' : 'warn'}">${m1[k] - m0[k] > 0 ? '+' : ''}${String(Math.round((m1[k] - m0[k]) * 10) / 10).replace('.', ',')}${u}</span>` : '';
   const medCard = md.length ? `<section class="card"><h2>Evolución corporal</h2><div class="grid3">
@@ -318,17 +353,17 @@ V.progreso = () => {
   else if (S.ibNew) { const n = S.ibNew;
     inbCard = `<section class="card" id="ib-card"><h2>Revisa tus datos</h2>
       <div class="small ${n.leidos ? 'muted' : 'warn'}">${n.leidos ? `Leímos ${n.leidos} dato${n.leidos === 1 ? '' : 's'} del informe. Revisa que coincidan y corrige si hace falta.` : 'No pudimos leer los números de la imagen. Escríbelos mirando tu informe.'}</div>
-      <div class="row" style="gap:12px;align-items:flex-start"><img src="${n.prev}" data-zoom="1" alt="Tu informe" style="width:84px;height:112px;object-fit:cover;border-radius:8px;cursor:zoom-in"><label class="field" style="flex:1">Fecha del InBody<input type="date" id="ib-f" value="${esc(n.f)}"></label></div>
+      <div class="row" style="gap:12px;align-items:flex-start"><img src="${n.prev}" data-zoom="1" alt="Tu informe" style="width:84px;height:112px;object-fit:cover;border-radius:8px;cursor:zoom-in"><div style="flex:1;display:grid;gap:8px"><label class="field">Fecha del InBody<input type="date" id="ib-f" value="${esc(n.f)}"></label><label class="field">Sexo (para tus rangos de referencia)<select id="ib-sexo"><option value="">—</option><option value="h" ${n.sexo === 'h' ? 'selected' : ''}>Hombre</option><option value="m" ${n.sexo === 'm' ? 'selected' : ''}>Mujer</option></select></label></div></div>
       <div class="grid2">${C.map(([k, l, u]) => `<label class="field">${esc(l)}${u ? ` <span class="small">(${esc(u)})</span>` : ''}<input inputmode="decimal" data-ibk="${k}" value="${esc(n.vals[k] ?? '')}" placeholder="—"></label>`).join('')}</div>
       <button class="btn pri" id="ib-ok">Guardar InBody</button><button class="btn" id="ib-cancel">Cancelar</button></section>`; }
   else if (!ibL) inbCard = `<section class="card" id="ib-card"><h2>InBody</h2><div class="small muted">Sube la foto o el pantallazo de tu informe InBody o BodyGo. Leemos los datos automáticamente y vas viendo tu evolución.</div>${upBtn('＋ Subir mi InBody', true)}</section>`;
   else { const prevOf = k => { for (let i = ib.length - 2; i >= 0; i--) if (ib[i][k] != null) return ib[i]; return null; };
     const tiles = C.filter(([k]) => ibL[k] != null).map(([k, l, u, , , dec, mejor]) => { const pv = prevOf(k); const d = pv ? ibL[k] - pv[k] : null;
       const cls = d == null || Math.abs(d) < 0.05 || !mejor ? 'muted' : ((mejor === 'baja') === (d < 0) ? 'ok' : 'warn');
-      return `<div class="card kpi" style="padding:12px;gap:2px"><div class="small muted">${esc(l)}</div><div class="v" style="font-size:26px">${fmtN(ibL[k], dec)}<span class="small muted"> ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</span></div>${d != null ? `<div class="small ${cls}">${d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= '}${fmtN(Math.abs(d), dec)} ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</div>` : '<div class="small muted">primera medición</div>'}</div>`; }).join('');
+      return `<div class="card kpi ${S.ibInfo === k ? 'sel' : ''}" data-ibi="${k}" role="button" tabindex="0" style="padding:12px;gap:2px;cursor:pointer"><div class="small muted">${esc(l)} <span style="opacity:.7">ⓘ</span></div><div class="v" style="font-size:26px">${fmtN(ibL[k], dec)}<span class="small muted"> ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</span></div>${d != null ? `<div class="small ${cls}">${d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= '}${fmtN(Math.abs(d), dec)} ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</div>` : '<div class="small muted">primera medición</div>'}</div>`; }).join('');
     const trend = ib.length >= 2 ? [['pgc', '% Grasa'], ['mme', 'Masa muscular'], ['peso', 'Peso']].filter(([k]) => ib.filter(x => x[k] != null).length >= 2).slice(0, 2).map(([k, l]) => `<div><div class="small muted">${l}</div>${spark(ib.map(x => x[k]))}</div>`).join('') : '';
     inbCard = `<section class="card" id="ib-card"><div class="row"><h2>InBody</h2><span class="small muted">${esc(fmtD(ibL.f))}${ib.length > 1 ? ' · vs ' + esc(fmtD(ib[ib.length - 2].f)) : ''}</span></div>
-      ${tiles ? `<div class="grid2">${tiles}</div>` : '<div class="small muted">Este informe no tiene datos anotados.</div>'}
+      ${tiles ? `<div class="grid2">${tiles}</div>${ibInfoHTML(ibL)}` : '<div class="small muted">Este informe no tiene datos anotados.</div>'}
       ${trend ? `<div class="row" style="justify-content:flex-start;gap:24px">${trend}</div>` : ''}
       ${ib.length > 1 ? `<details class="ses"><summary>Historial (${ib.length})</summary><div style="display:grid;gap:6px;margin-top:8px">${ib.slice().reverse().map(x => `<div class="row small"><span>${esc(fmtD(x.f))}</span><span class="muted">${[['peso', 'kg'], ['pgc', '% grasa'], ['mme', 'kg músc.']].filter(([k]) => x[k] != null).map(([k, u]) => fmtN(x[k], 1) + ' ' + u).join(' · ') || 'sin datos'}</span></div>`).join('')}</div></details>` : ''}
       ${S.urls[ibL.img] ? `<details class="ses"><summary>Ver informe original</summary><img src="${esc(S.urls[ibL.img])}" data-zoom="1" alt="Informe InBody ${esc(fmtD(ibL.f))}" style="margin-top:8px;width:100%;max-height:280px;object-fit:contain;border-radius:10px;background:var(--sunk);cursor:zoom-in"></details>` : ''}
@@ -428,6 +463,8 @@ async function solicitar(tipo, data) {
 document.addEventListener('click', async ev => {
   const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.v = go.dataset.go || go.dataset.v; render(); return; }
   if (ev.target.id === 'ib-ok') { guardarInbody(ev.target); return; }
+  const ibi = ev.target.closest('[data-ibi]'); if (ibi) { S.ibInfo = ibi.dataset.ibi; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
+  if (ev.target.id === 'fup-open') { S.fotoUp = !S.fotoUp; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'ib-cancel') { if (S.ibNew?.prev) URL.revokeObjectURL(S.ibNew.prev); S.ibNew = null; render(); return; }
   const gd = ev.target.closest('[data-goday]'); if (gd) { S.dia = gd.dataset.goday; S.wk = lunesDe(S.dia); S.v = 'agenda'; render(); return; }
   const zf = ev.target.closest('[data-zoom]'); if (zf) { const lb = document.createElement('div'); lb.id = 'lightbox'; lb.innerHTML = `<img src="${zf.getAttribute('src')}" alt="Foto ampliada">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); return; }
