@@ -69,12 +69,12 @@
   const A2R = a => ({ codigo: a.codigo, nombre: a.nombre || a.codigo, email: a.email ? String(a.email).trim().toLowerCase() : null, telefono: a.telefono || null,
     estado: a.estado || 'activo', bloques: a.bloques || [], clases: a.clases == null || a.clases === '' ? null : Number(a.clases),
     nacimiento: a.nacimiento || null, notas: a.notas || null, ingreso: a.ingreso || null, programa: a.programa || null,
-    programas_hechos: a.programasHechos || [], fotos: a.fotos || [], medidas: a.medidas || [], updated_at: new Date().toISOString() });
+    programas_hechos: a.programasHechos || [], fotos: a.fotos || [], medidas: a.medidas || [], inbody: a.inbody || [], updated_at: new Date().toISOString() });
   const R2A = (r, planes) => { const a = { codigo: r.codigo, nombre: r.nombre, telefono: r.telefono || '', estado: r.estado, bloques: r.bloques || [], clases: r.clases,
     notas: r.notas || '', planes: planes || [] };
     if (r.email) a.email = r.email; if (r.nacimiento) a.nacimiento = r.nacimiento; if (r.ingreso) a.ingreso = r.ingreso;
     if (r.programa !== undefined) a.programa = r.programa; if (r.programas_hechos && r.programas_hechos.length) a.programasHechos = r.programas_hechos;
-    if (r.fotos && r.fotos.length) a.fotos = r.fotos; if (r.medidas && r.medidas.length) a.medidas = r.medidas; if (r.user_id) a.vinculado = true; return a; };
+    if (r.fotos && r.fotos.length) a.fotos = r.fotos; if (r.medidas && r.medidas.length) a.medidas = r.medidas; if (r.inbody && r.inbody.length) a.inbody = r.inbody; if (r.user_id) a.vinculado = true; return a; };
   const P2R = (code, p) => ({ id: p.id, alumno: code, mes: p.mes || null, inicio: p.inicio || null, fin: p.fin || null,
     clases: p.clases == null || p.clases === '' ? null : Number(p.clases), monto: Number(p.monto) || 0, pagos: p.pagos || [], updated_at: new Date().toISOString() });
   const R2P = r => ({ id: r.id, mes: r.mes, inicio: r.inicio, fin: r.fin, clases: r.clases, monto: r.monto, pagos: r.pagos || [] });
@@ -107,7 +107,7 @@
     alumnos: async () => { const [al, pl] = await Promise.all([all('alumnos'), all('planes')]);
       const byA = {}; pl.forEach(p => (byA[p.alumno] = byA[p.alumno] || []).push(R2P(p)));
       Object.values(byA).forEach(l => l.sort((x, y) => String(x.inicio || x.mes || '').localeCompare(String(y.inicio || y.mes || ''))));
-      await firmarFotos(al.flatMap(r => (Array.isArray(r.fotos) ? r.fotos : []).flatMap(x => [x.frente, x.perfil, x.espalda])));
+      await firmarFotos(al.flatMap(r => (Array.isArray(r.fotos) ? r.fotos : []).flatMap(x => [x.frente, x.perfil, x.espalda]).concat((Array.isArray(r.inbody) ? r.inbody : []).map(x => x && x.img))));
       return al.map(r => [r.codigo, R2A(r, byA[r.codigo])]); },
     rutinas: async () => (await all('rutinas')).map(r => [r.id, r.data]),
     dias: async () => { const rows = await all('clases'); const m = {};
