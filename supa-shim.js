@@ -226,7 +226,7 @@
 #tl-agp .seg{display:grid;grid-template-columns:1fr 1fr;background:#161317;border:1px solid #2f2a2e;border-radius:12px;padding:3px}
 #tl-agp .seg button{height:40px;border:0;border-radius:9px;background:transparent;color:#a69ea3;font:700 15px Barlow,sans-serif;cursor:pointer}
 #tl-agp .seg button[aria-selected=true]{background:#d71f30;color:#fff}
-#tl-agp .bd{overflow:auto;-webkit-overflow-scrolling:touch;padding:16px 18px;display:grid;gap:16px;flex:1;overscroll-behavior:contain}
+#tl-agp .bd{overflow:auto;-webkit-overflow-scrolling:touch;padding:16px 18px;display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:16px;flex:1;overscroll-behavior:contain}
 #tl-agp .lb{display:grid;gap:6px;color:#a69ea3;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 #tl-agp .lb small{font-weight:500;text-transform:none;letter-spacing:0}
 #tl-agp input:not([type=file]),#tl-agp select,#tl-agp textarea{-webkit-appearance:none;appearance:none;display:block;width:100%;min-height:48px;border-radius:12px;border:1px solid #2f2a2e;background:#161317;color:#f2eef0;padding:0 12px;font:16px Barlow,system-ui,sans-serif;text-transform:none;letter-spacing:0}
@@ -257,6 +257,7 @@
 #tl-agp .ok{height:52px;border-radius:12px;border:0;background:#d71f30;color:#fff;font:800 16px Barlow,sans-serif;cursor:pointer}
 #tl-agp .ok:disabled{opacity:.6}
 #tl-agp .msg{min-height:18px;font-size:14px;text-align:center}
+#tl-agp #tl-ag-prox{gap:8px}
 #tl-agp .day{color:#a69ea3;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px}
 #tl-agp .it{display:flex;align-items:center;gap:12px;background:#161317;border:1px solid #2f2a2e;border-left:4px solid #4da3ff;border-radius:12px;padding:10px 6px 10px 12px}
 #tl-agp .it .ic{font-size:22px}
@@ -306,10 +307,10 @@
         <div class="lb">Cuándo<div class="two"><input id="tl-ag-fecha" type="date" value="${iso}" aria-label="Fecha"><input id="tl-ag-hora" type="time" aria-label="Hora (opcional)"></div>
           <div class="quick"><button type="button" data-q="0" aria-pressed="true">Hoy</button><button type="button" data-q="1" aria-pressed="false">Mañana</button><button type="button" data-q="7" aria-pressed="false">En 1 semana</button><button type="button" data-q="h" aria-pressed="false">Sin hora</button></div></div>
         <label class="lb">Título<input id="tl-ag-tit" placeholder="${TEJ[tipo]}" autocomplete="off"></label>
-        <label class="lb">Detalle <small>(opcional)</small><textarea id="tl-ag-det" rows="3" placeholder="Qué traer, dónde, indicaciones…"></textarea></label>
+        <label class="lb"><span>Detalle <small>(opcional)</small></span><textarea id="tl-ag-det" rows="3" placeholder="Qué traer, dónde, indicaciones…"></textarea></label>
         <details id="tl-ag-adj"><summary>📎 Adjuntar archivo o enlace</summary><div class="in">
           <label class="file"><span aria-hidden="true">📄</span><span class="nm" id="tl-ag-fn">Elegir PDF o imagen (máx. 15 MB)</span><button type="button" class="rm" id="tl-ag-rm" hidden aria-label="Quitar archivo">✕</button><input id="tl-ag-file" type="file" accept="application/pdf,image/*"></label>
-          <label class="lb">Enlace <small>(Drive, Zoom, Meet, video)</small><input id="tl-ag-link" type="url" inputmode="url" placeholder="https://…" autocomplete="off"></label></div></details>
+          <label class="lb"><span>Enlace <small>(Drive, Zoom, Meet, video)</small></span><input id="tl-ag-link" type="url" inputmode="url" placeholder="https://…" autocomplete="off"></label></div></details>
       </div>
       <div class="bd" id="tl-ag-prox" hidden></div>
       <footer id="tl-ag-foot"><div class="msg" id="tl-ag-msg" role="status"></div><button class="ok" id="tl-ag-ok">Guardar en la agenda</button></footer></div>`;
