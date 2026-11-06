@@ -232,7 +232,10 @@
 #tl-agp input:not([type=file]),#tl-agp select,#tl-agp textarea{-webkit-appearance:none;appearance:none;display:block;width:100%;min-height:48px;border-radius:12px;border:1px solid #2f2a2e;background:#161317;color:#f2eef0;padding:0 12px;font:16px Barlow,system-ui,sans-serif;text-transform:none;letter-spacing:0}
 #tl-agp textarea{padding:12px;min-height:84px;resize:vertical}
 #tl-agp select{background-image:linear-gradient(45deg,transparent 50%,#a69ea3 50%),linear-gradient(135deg,#a69ea3 50%,transparent 50%);background-position:calc(100% - 18px) 21px,calc(100% - 13px) 21px;background-size:5px 5px;background-repeat:no-repeat;padding-right:34px}
-#tl-agp input::-webkit-date-and-time-value{text-align:left}
+#tl-agp input[type=date],#tl-agp input[type=time]{height:48px;line-height:48px;padding-top:0;padding-bottom:0;display:flex;align-items:center}
+#tl-agp input::-webkit-date-and-time-value{text-align:left;margin:0;line-height:48px;min-height:48px}
+#tl-agp input::-webkit-datetime-edit{padding:0;line-height:48px}
+#tl-agp .sub{display:grid;gap:4px;font-size:12px;font-weight:600;color:#a69ea3;text-transform:none;letter-spacing:0;min-width:0}
 #tl-agp input:focus,#tl-agp select:focus,#tl-agp textarea:focus{outline:2px solid #d71f30;outline-offset:1px}
 #tl-agp .tipos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 #tl-agp .tipos button{min-height:64px;border-radius:12px;border:1px solid #2f2a2e;background:#161317;color:#f2eef0;font:600 13px Barlow,sans-serif;display:grid;place-items:center;gap:2px;padding:6px 4px;cursor:pointer}
@@ -304,7 +307,7 @@
       <div class="bd" id="tl-ag-nuevo">
         <label class="lb">¿Para quién?<select id="tl-ag-al"><option value="">👥 Todos los alumnos</option>${act.map(a => `<option value="${escA(a.codigo)}">${escA(a.nombre)}</option>`).join('')}</select></label>
         <div class="lb">Tipo<div class="tipos">${TIPOS.map(t => `<button type="button" data-t="${t}" aria-pressed="${t === tipo}"><span>${TICO[t]}</span>${t}</button>`).join('')}</div></div>
-        <div class="lb">Cuándo<div class="two"><input id="tl-ag-fecha" type="date" value="${iso}" aria-label="Fecha"><input id="tl-ag-hora" type="time" aria-label="Hora (opcional)"></div>
+        <div class="lb">Cuándo<div class="two"><label class="sub">Fecha<input id="tl-ag-fecha" type="date" value="${iso}"></label><label class="sub">Hora (opcional)<input id="tl-ag-hora" type="time"></label></div>
           <div class="quick"><button type="button" data-q="0" aria-pressed="true">Hoy</button><button type="button" data-q="1" aria-pressed="false">Mañana</button><button type="button" data-q="7" aria-pressed="false">En 1 semana</button><button type="button" data-q="h" aria-pressed="false">Sin hora</button></div></div>
         <label class="lb">Título<input id="tl-ag-tit" placeholder="${TEJ[tipo]}" autocomplete="off"></label>
         <label class="lb"><span>Detalle <small>(opcional)</small></span><textarea id="tl-ag-det" rows="3" placeholder="Qué traer, dónde, indicaciones…"></textarea></label>
@@ -328,7 +331,7 @@
       $('tl-ag-nuevo').hidden = v !== 'nuevo'; $('tl-ag-prox').hidden = v !== 'prox'; $('tl-ag-foot').hidden = v !== 'nuevo'; };
     const limpiarArchivo = () => { $('tl-ag-file').value = ''; $('tl-ag-fn').textContent = 'Elegir PDF o imagen (máx. 15 MB)'; $('tl-ag-rm').hidden = true; };
     $('tl-ag-file').onchange = () => { const f = $('tl-ag-file').files[0]; if (!f) return limpiarArchivo(); $('tl-ag-fn').textContent = f.name; $('tl-ag-rm').hidden = false; };
-    $('tl-ag-fecha').oninput = marcaQuick; $('tl-ag-hora').oninput = marcaQuick;
+    $('tl-ag-fecha').oninput = marcaQuick; $('tl-ag-hora').oninput = marcaQuick; marcaQuick();
     p.onclick = async ev => {
       if (ev.target === p || ev.target.closest('[data-x]')) return cerrar();
       const tv = ev.target.closest('[data-v]'); if (tv) return ver(tv.dataset.v);
