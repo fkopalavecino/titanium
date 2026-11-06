@@ -388,8 +388,8 @@ V.hoy = () => {
   <section class="card"><div class="small">Este mes llevas <b>${delMes} clase${delMes === 1 ? '' : 's'}</b>. ${delMes >= 8 ? '¡Vas excelente!' : 'Cada clase suma.'}</div></section>
   <div class="small muted" style="text-align:center;font-style:italic">«${esc(S.cfg.lema || 'El que abandona pierde')}» · ${esc(S.cfg.gimnasio || 'Titanium Sport')}</div>`;
 };
-const blkCerrados = () => { try { return JSON.parse(localStorage.getItem('tl-blk') || '[]'); } catch (e) { return []; } };
-document.addEventListener('toggle', ev => { const d = ev.target; if (!d.matches || !d.matches('details.blk')) return; const i = Number(d.dataset.blk); let c = blkCerrados().filter(x => x !== i); if (!d.open) c.push(i); try { localStorage.setItem('tl-blk', JSON.stringify(c)); } catch (e) {} }, true);
+const blkAbiertos = new Set(); // los bloques parten minimizados cada vez que se entra a Rutina
+document.addEventListener('toggle', ev => { const d = ev.target; if (!d.matches || !d.matches('details.blk')) return; const i = Number(d.dataset.blk); if (d.open) blkAbiertos.add(i); else blkAbiertos.delete(i); }, true);
 function prevSets(nombre) { const t = today(); for (let i = S.clases.length - 1; i >= 0; i--) { const r = S.clases[i]; if (r.fecha >= t) continue; const e = (r.ej || []).find(x => x.n === nombre); if (e) return e.sets && e.sets.length ? e.sets : [{ kg: e.kg, r: e.r }]; } return []; }
 V.rutina = () => {
   const rd = rutinaDeHoy(); const r = rd.r;
@@ -399,7 +399,7 @@ V.rutina = () => {
   return `
   <div><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) : ''}</div><h1>${esc(r.tipo || 'Rutina')}</h1></div>
   ${bloques.map((b, bi) => { const isB = /bloque b/i.test(b.titulo || '');
-    const nEj = (b.ejercicios || []).length; const cerrado = blkCerrados().includes(bi);
+    const nEj = (b.ejercicios || []).length; const cerrado = !blkAbiertos.has(bi);
     return `<details class="card blk" data-blk="${bi}" ${cerrado ? '' : 'open'}><summary><div><h2>${esc(b.titulo)}</h2><div class="small muted">${nEj} ejercicio${nEj === 1 ? '' : 's'}</div></div><span class="chev" aria-hidden="true">›</span></summary>${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}
       ${(b.ejercicios || []).map((e, ei) => { const last = (H[e.nombre] || []).filter(x => x.f < today()).slice(-1)[0]; const c = cur[e.nombre];
         const n = isB ? nSer(e.dosis) : 0; const sets = c?.sets || [];
@@ -589,7 +589,7 @@ document.addEventListener('click', async ev => {
   const pt = ev.target.closest('[data-pushtest]'); if (pt) { probarPush(pt); return; }
   if (ev.target.closest('[data-pushoff]')) { desactivarPush(); return; }
   if (ev.target.closest('[data-pushx]')) { try { localStorage.setItem('tl-pushx', '1'); } catch (_) {} render(); return; }
-  const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.v = go.dataset.go || go.dataset.v; render(); return; }
+  const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.v = go.dataset.go || go.dataset.v; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
   const chk = ev.target.closest('[data-chk]'); if (chk) { const row = chk.closest('.set'); const ins = [...row.querySelectorAll('input')];
     if (row.classList.contains('done') && ins.every(i => i.value.trim() !== '')) return;
     ins.forEach(i => { if (i.value.trim() === '' && !/kg|reps/.test(i.placeholder)) { i.value = i.placeholder; i.dispatchEvent(new Event('input', { bubbles: true })); } });
