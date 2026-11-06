@@ -113,6 +113,27 @@ details.ses summary::-webkit-details-marker{display:none}
 #sheet{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
 #sheet .in{background:var(--surface);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:85vh;overflow:auto;padding:18px 18px calc(18px + env(safe-area-inset-bottom));display:grid;gap:12px}
 .brand{height:30px;width:auto;display:block}
+#rest{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom));z-index:45;display:flex;align-items:center;gap:6px;background:#1b181c;border:1px solid var(--line);border-radius:999px;padding:6px 6px 6px 16px;box-shadow:0 10px 30px rgba(0,0,0,.5);font-size:15px;white-space:nowrap}
+#rest b{font:800 20px 'Barlow Condensed',Barlow,sans-serif;margin-left:4px}
+#rest button{min-width:40px;height:36px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);font:600 13px Barlow,sans-serif;cursor:pointer}
+#rest.go{border-color:#17804a;background:#123322;padding-right:6px}
+.tbtn{width:100%;margin-top:4px}
+#tmr{position:fixed;inset:0;z-index:60;background:#0b0a0c;display:flex;align-items:center;justify-content:center;padding:max(24px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom))}
+#tmr .tin{width:100%;max-width:440px;display:grid;gap:14px;text-align:center}
+#tmr .trow{display:flex;justify-content:space-between;align-items:center}
+#tmr .trow button{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--fg);font-size:18px;cursor:pointer}
+#tmr .tname{font:800 24px 'Barlow Condensed',Barlow,sans-serif;letter-spacing:.04em;text-transform:uppercase}
+#tmr .tfase{font:700 16px Barlow,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+#tmr .w .tfase{color:#ff5a6a}#tmr .r .tfase{color:#6fd39a}
+#tmr .tbig{font:800 min(34vw,150px)/1 'Barlow Condensed',Barlow,sans-serif;font-variant-numeric:tabular-nums}
+#tmr .r .tbig{color:#6fd39a}
+#tmr .tsub{font-size:20px;font-weight:700;min-height:26px}
+#tmr .tbar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}#tmr .tbar i{display:block;height:100%;background:var(--red)}
+#tmr .tbtns{display:grid;grid-auto-flow:column;gap:10px}
+#tmr .tcfg{display:grid;grid-template-columns:1fr 48px 64px 48px;align-items:center;gap:8px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+#tmr .tcfg button{height:44px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--fg);font-size:22px;cursor:pointer}
+#tmr .tcfg b{text-align:center;font:800 26px 'Barlow Condensed',Barlow,sans-serif}
+#tmr .tgo{min-height:56px;font-size:18px}
 .nx{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;text-align:left;background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:8px 12px 8px 8px;color:var(--fg);font:inherit;cursor:pointer}
 .nx.c{border-left:4px solid var(--red)}.nx.e{border-left:4px solid var(--ev)}
 .nx .dt{display:grid;place-items:center;gap:2px;line-height:1;border-radius:9px;background:var(--surface);padding:7px 0}
@@ -413,6 +434,87 @@ V.hoy = () => {
 const blkAbiertos = new Set(); // los bloques parten minimizados cada vez que se entra a Rutina
 document.addEventListener('toggle', ev => { const d = ev.target; if (d.dataset && d.dataset.sec) { if (d.open) secAbiertos.add(d.dataset.sec); else secAbiertos.delete(d.dataset.sec); return; } if (!d.matches || !d.matches('details.blk')) return; const i = Number(d.dataset.blk); if (d.open) blkAbiertos.add(i); else blkAbiertos.delete(i); }, true);
 function prevSets(nombre) { const t = today(); for (let i = S.clases.length - 1; i >= 0; i--) { const r = S.clases[i]; if (r.fecha >= t) continue; const e = (r.ej || []).find(x => x.n === nombre); if (e) return e.sets && e.sets.length ? e.sets : [{ kg: e.kg, r: e.r }]; } return []; }
+/* ---------- descanso entre series (bloque de fuerza) ---------- */
+const COMPUESTO = /sentadilla|squat|peso muerto|deadlift|press (banca|banco|militar|plano|inclinado)|bench|hip thrust|dominada|remo con barra|zancada|b[uú]lgara|clean|cargada|arranque|envi[oó]n|trap bar|good morning|fondos/i;
+function descansoDe(e) { const d = String(e.dosis || ''); const ex = d.match(/desc(?:anso)?\.?\s*(\d+)\s*(s|seg|'|min|m)\b/i);
+  if (ex) return /^(min|m|')$/i.test(ex[2]) ? Number(ex[1]) * 60 : Number(ex[1]);
+  const reps = Number((d.match(/×\s*(\d+)/) || [])[1]) || 10; const base = COMPUESTO.test(e.nombre || '') ? 120 : 75;
+  return reps <= 5 ? 180 : reps <= 8 ? Math.max(base, 120) : reps <= 12 ? base : 60; }
+const mmss = s => Math.floor(Math.max(0, s) / 60) + ':' + String(Math.max(0, Math.round(s)) % 60).padStart(2, '0');
+let AC = null; const beep = (f = 880, ms = 140) => { try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); const o = AC.createOscillator(), g = AC.createGain(); o.frequency.value = f; o.connect(g); g.connect(AC.destination); g.gain.setValueAtTime(.25, AC.currentTime); g.gain.exponentialRampToValueAtTime(.001, AC.currentTime + ms / 1000); o.start(); o.stop(AC.currentTime + ms / 1000); } catch (_) {} try { navigator.vibrate && navigator.vibrate(ms); } catch (_) {} };
+let REST = null;
+function iniciarDescanso(seg) { finDescanso(); const el = document.createElement('div'); el.id = 'rest'; let fin = Date.now() + seg * 1000; beep(660, 60);
+  const pintar = () => { const q = (fin - Date.now()) / 1000;
+    if (q <= 0) { el.classList.add('go'); el.innerHTML = '<span>💪 ¡Siguiente serie!</span><button data-rx="1" aria-label="Cerrar">✕</button>'; if (!el.dataset.b) { el.dataset.b = 1; beep(988, 250); setTimeout(() => beep(988, 250), 320); setTimeout(finDescanso, 4000); } return; }
+    if (q <= 3.05 && q > 0 && Math.ceil(q) !== Number(el.dataset.l)) { el.dataset.l = Math.ceil(q); beep(740, 80); }
+    el.innerHTML = `<span>⏱ Descanso <b>${mmss(Math.ceil(q))}</b></span><button data-rm="-15" aria-label="Quitar 15 segundos">−15</button><button data-rm="15" aria-label="Sumar 15 segundos">+15</button><button data-rx="1" aria-label="Saltar descanso">✕</button>`; };
+  el.addEventListener('click', ev => { const b = ev.target.closest('button'); if (!b) return; ev.stopPropagation(); if (b.dataset.rx) return finDescanso(); fin += Number(b.dataset.rm) * 1000; pintar(); });
+  document.body.appendChild(el); pintar(); REST = setInterval(pintar, 250); }
+function finDescanso() { clearInterval(REST); REST = null; document.getElementById('rest')?.remove(); }
+
+/* ---------- temporizador del bloque C (EMOM, AMRAP, Tabata, intervalos, por tiempo…) ---------- */
+function detectarTimer(b) { const t = (b.titulo || '') + ' ' + (b.nota || ''); const tit = b.titulo || '';
+  const min = Number((tit.match(/(\d+)\s*min/i) || [])[1]) || 0; const tope = Number((t.match(/tope\s*(\d+)/i) || [])[1]) || 0;
+  const wr = t.match(/\b(\d{2,3})\s*\/\s*(\d{1,3})\b/); const vueltas = Number((tit.match(/(\d+)\s*(vueltas|rondas)/i) || [])[1]) || 0;
+  const ejs = (b.ejercicios || []).map(e => e.nombre);
+  if (/tabata/i.test(t)) return { modo: 'int', nombre: 'Tabata', w: 20, r: 10, n: 8, ejs };
+  const en = tit.match(/E(\d)MOM/i); if (en) return { modo: 'emom', nombre: `E${en[1]}MOM`, w: Number(en[1]) * 60, n: Math.max(1, Math.round((min || 12) / Number(en[1]))), ejs };
+  if (/emom/i.test(tit)) return { modo: 'emom', nombre: /rotativo/i.test(tit) ? 'EMOM rotativo' : 'EMOM', w: 60, n: min || 10, ejs };
+  if (/e90s/i.test(t)) return { modo: 'emom', nombre: 'E90S', w: 90, n: Math.max(1, Math.round(((min || 12) * 60) / 90)), ejs };
+  const um = tit.match(/(\d+)\s*[×x]\s*(\d+)\s*min/i); if (um) return { modo: 'int', nombre: 'Intervalos', w: Number(um[2]) * 60, r: 60, n: Number(um[1]), ejs };
+  if (wr && Number(wr[1]) <= 300) { const w = Number(wr[1]), r = Number(wr[2]); return { modo: 'int', nombre: 'Intervalos ' + w + '/' + r, w, r, n: Math.max(1, Math.round(((min || 10) * 60) / (w + r))), ejs }; }
+  if (/amrap|escalera|acumulado|tú vas|tu vas/i.test(tit)) return { modo: 'amrap', nombre: /amrap/i.test(tit) ? 'AMRAP' : tit.replace(/^bloque c\s*·\s*/i, '').replace(/\s*·.*$/, ''), total: (min || tope || 12) * 60, ejs };
+  if (/for time|por tiempo|chipper|simulaci|pir[aá]mide|m[aá]quina \+|hyrox/i.test(tit)) return { modo: 'crono', nombre: 'Por tiempo', tope: (tope || min) * 60, vueltas, ejs };
+  if (/intervalo|von|sprint|umbral|airbike|trineo|concurrente/i.test(tit)) return { modo: 'int', nombre: /concurrente/i.test(tit) ? 'Concurrente' : 'Intervalos', w: 40, r: 20, n: Math.max(1, Math.round(((min || 10) * 60) / 60)), ejs };
+  if (vueltas) return { modo: 'crono', nombre: 'Circuito', tope: 0, vueltas, ejs };
+  if (min) return { modo: 'amrap', nombre: 'Cuenta regresiva', total: min * 60, ejs };
+  return { modo: 'crono', nombre: 'Cronómetro', tope: 0, vueltas: 0, ejs }; }
+const segTxt = x => x >= 60 ? mmss(x) : x + 's';
+const timerTxt = c => c.modo === 'emom' ? `${c.nombre} · ${c.n} × ${mmss(c.w)}` : c.modo === 'int' ? `${c.nombre} · ${c.n} × ${segTxt(c.w)} / ${segTxt(c.r)}` : c.modo === 'amrap' ? `${c.nombre} · ${Math.round(c.total / 60)} min` : `${c.nombre}${c.tope ? ' · tope ' + Math.round(c.tope / 60) + ' min' : ''}${c.vueltas ? ' · ' + c.vueltas + ' vueltas' : ''}`;
+let TM = null;
+function abrirTimer(b) { cerrarTimer(); const c = detectarTimer(b); const el = document.createElement('div'); el.id = 'tmr';
+  const st = { c, fase: 'cfg', t0: 0, pausa: 0, pausedAt: 0, vuelta: 0, last: -1 }; let wake = null;
+  const campos = () => c.modo === 'emom' ? [['n', 'Rondas', 1], ['w', 'Cada (seg)', 15]] : c.modo === 'int' ? [['n', 'Rondas', 1], ['w', 'Trabajo (seg)', 5], ['r', 'Descanso (seg)', 5]] : c.modo === 'amrap' ? [['total', 'Minutos', 60]] : [['tope', 'Tope (min, 0 = sin tope)', 60]];
+  const val = (k) => k === 'total' || k === 'tope' ? Math.round(c[k] / 60) : c[k];
+  const total = () => c.modo === 'emom' ? c.n * c.w : c.modo === 'int' ? c.n * (c.w + c.r) - c.r : c.modo === 'amrap' ? c.total : c.tope;
+  const transcurrido = () => st.fase === 'run' ? (Date.now() - st.t0 - st.pausa) / 1000 : st.fase === 'pausa' ? (st.pausedAt - st.t0 - st.pausa) / 1000 : 0;
+  const pintar = () => {
+    if (st.fase === 'cfg') { el.innerHTML = `<div class="tin"><div class="trow"><b class="tname">${esc(c.nombre)}</b><button data-tx="1" aria-label="Cerrar">✕</button></div>
+      <div class="small muted">Revisa los tiempos y toca Comenzar.</div>
+      ${campos().map(([k, l, step]) => `<div class="tcfg"><span>${l}</span><button data-tc="${k}" data-d="-${step}" aria-label="Menos">−</button><b>${val(k)}</b><button data-tc="${k}" data-d="${step}" aria-label="Más">+</button></div>`).join('')}
+      ${c.ejs.length ? `<div class="small muted">${c.ejs.map(esc).join(' · ')}</div>` : ''}
+      <button class="btn pri tgo" data-ts="1">▶ Comenzar</button></div>`; return; }
+    const e = transcurrido(); let big = '', fase = '', sub = '', cls = ''; const T = total();
+    if (c.modo === 'emom') { const r = Math.floor(e / c.w); const q = c.w - (e % c.w); if (r >= c.n) return terminar();
+      big = mmss(Math.ceil(q)); fase = `Ronda ${r + 1} de ${c.n}`; sub = c.ejs.length ? c.ejs[r % c.ejs.length] : ''; cls = 'w';
+      if (r !== st.last) { st.last = r; beep(988, 260); } else if (q <= 3.05 && Math.ceil(q) !== st.lb) { st.lb = Math.ceil(q); beep(740, 80); } }
+    else if (c.modo === 'int') { const cyc = c.w + c.r; const r = Math.floor(e / cyc); const p = e % cyc; if (e >= T) return terminar();
+      const trab = p < c.w; const q = trab ? c.w - p : cyc - p; big = mmss(Math.ceil(q)); fase = (trab ? 'TRABAJO' : 'DESCANSO') + ` · ${r + 1}/${c.n}`; cls = trab ? 'w' : 'r';
+      sub = trab && c.ejs.length ? c.ejs[r % c.ejs.length] : trab ? '' : (c.ejs.length ? 'Sigue: ' + c.ejs[(r + 1) % c.ejs.length] : '');
+      const key = r * 2 + (trab ? 0 : 1); if (key !== st.last) { st.last = key; beep(trab ? 988 : 523, 260); } else if (q <= 3.05 && Math.ceil(q) !== st.lb) { st.lb = Math.ceil(q); beep(740, 80); } }
+    else if (c.modo === 'amrap') { const q = T - e; if (q <= 0) return terminar(); big = mmss(Math.ceil(q)); fase = 'Tiempo restante'; cls = 'w'; if (q <= 3.05 && Math.ceil(q) !== st.lb) { st.lb = Math.ceil(q); beep(740, 80); } }
+    else { if (T && e >= T) return terminar(); big = mmss(Math.floor(e)); fase = T ? `Tope ${mmss(T)}` : 'Cronómetro'; cls = 'w'; sub = c.vueltas || st.vuelta ? `Vuelta ${st.vuelta}${c.vueltas ? ' de ' + c.vueltas : ''}` : ''; }
+    el.innerHTML = `<div class="tin ${cls}"><div class="trow"><b class="tname">${esc(c.nombre)}</b><button data-tx="1" aria-label="Cerrar">✕</button></div>
+      <div class="tfase">${esc(fase)}</div><div class="tbig" aria-live="off">${big}</div><div class="tsub">${esc(sub)}</div>
+      <div class="tbar"><i style="width:${T ? Math.min(100, e / T * 100) : 0}%"></i></div>
+      <div class="tbtns">${c.modo === 'crono' ? '<button class="btn" data-tv="1">+1 vuelta</button>' : ''}<button class="btn" data-tp="1">${st.fase === 'pausa' ? '▶ Seguir' : '⏸ Pausa'}</button><button class="btn pri" data-tf="1">${c.modo === 'crono' ? '■ Terminé' : '■ Terminar'}</button></div></div>`; };
+  const terminar = () => { const e = transcurrido(); clearInterval(TM); TM = null; st.fase = 'fin'; beep(988, 300); setTimeout(() => beep(1175, 400), 350);
+    const res = c.modo === 'crono' ? mmss(Math.floor(e)) + (st.vuelta ? ' · ' + st.vuelta + ' vueltas' : '') : c.modo === 'amrap' ? '' : '';
+    const inp = document.getElementById('carga'); if (res && inp && !inp.value.trim()) { inp.value = res; inp.dispatchEvent(new Event('input', { bubbles: true })); }
+    el.innerHTML = `<div class="tin"><div class="trow"><b class="tname">${esc(c.nombre)}</b><button data-tx="1" aria-label="Cerrar">✕</button></div><div class="tbig">✓</div>
+      <div class="tsub">${res ? 'Tu tiempo: <b>' + esc(res) + '</b> (quedó anotado abajo)' : '¡Bloque terminado! Anota tu resultado abajo.'}</div><button class="btn pri" data-tx="1">Listo</button></div>`;
+    try { wake && wake.release(); } catch (_) {} };
+  el.addEventListener('click', async ev => { const b = ev.target.closest('button'); if (!b) return; ev.stopPropagation();
+    if (b.dataset.tx) return cerrarTimer();
+    if (b.dataset.tc) { const k = b.dataset.tc, d = Number(b.dataset.d); if (k === 'total' || k === 'tope') c[k] = Math.max(k === 'tope' ? 0 : 60, c[k] + d * 60); else c[k] = Math.max(k === 'n' ? 1 : 5, c[k] + d); return pintar(); }
+    if (b.dataset.ts) { beep(660, 60); st.fase = 'run'; st.t0 = Date.now() + 3000; st.pausa = 0; st.last = -1; let k = 3;
+      const cd = () => { if (k > 0) { el.innerHTML = `<div class="tin w"><div class="tfase">Prepárate</div><div class="tbig">${k}</div></div>`; beep(740, 90); k--; setTimeout(cd, 1000); } else { pintar(); TM = setInterval(pintar, 200); } }; st.fase = 'pre'; cd(); setTimeout(() => { st.fase = 'run'; }, 3000);
+      try { wake = await navigator.wakeLock?.request('screen'); } catch (_) {} return; }
+    if (b.dataset.tp) { if (st.fase === 'run') { st.fase = 'pausa'; st.pausedAt = Date.now(); } else if (st.fase === 'pausa') { st.pausa += Date.now() - st.pausedAt; st.fase = 'run'; } return pintar(); }
+    if (b.dataset.tv) { st.vuelta++; beep(880, 80); return pintar(); }
+    if (b.dataset.tf) return terminar(); });
+  document.body.appendChild(el); pintar(); }
+function cerrarTimer() { clearInterval(TM); TM = null; document.getElementById('tmr')?.remove(); }
 V.rutina = () => {
   const rd = rutinaDeHoy(); const r = rd.r;
   if (!r) return `<h1>Rutina</h1><div class="card"><div class="muted">Aún no tienes una rutina asignada. Franco te la asigna en la clase.</div></div>`;
@@ -422,13 +524,13 @@ V.rutina = () => {
   <div><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) : ''}</div><h1>${esc(r.tipo || 'Rutina')}</h1></div>
   ${bloques.map((b, bi) => { const isB = /bloque b/i.test(b.titulo || '');
     const nEj = (b.ejercicios || []).length; const cerrado = !blkAbiertos.has(bi);
-    return `<details class="card blk" data-blk="${bi}" ${cerrado ? '' : 'open'}><summary><div><h2>${esc(b.titulo)}</h2><div class="small muted">${nEj} ejercicio${nEj === 1 ? '' : 's'}</div></div><span class="chev" aria-hidden="true">›</span></summary>${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}
+    return `<details class="card blk" data-blk="${bi}" ${cerrado ? '' : 'open'}><summary><div><h2>${esc(b.titulo)}</h2><div class="small muted">${nEj} ejercicio${nEj === 1 ? '' : 's'}</div></div><span class="chev" aria-hidden="true">›</span></summary>${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}${!isB && (/bloque c/i.test(b.titulo || '') || bi >= 2) ? `<button class="btn tbtn" data-timer="${bi}">⏱ Abrir temporizador · ${esc(timerTxt(detectarTimer(b)))}</button>` : ''}
       ${(b.ejercicios || []).map((e, ei) => { const last = (H[e.nombre] || []).filter(x => x.f < today()).slice(-1)[0]; const c = cur[e.nombre];
         const n = isB ? nSer(e.dosis) : 0; const sets = c?.sets || [];
-        return `<div class="ej"><div class="row"><b>${esc(e.nombre)}</b><span class="small muted" style="white-space:nowrap">${esc(e.dosis)}</span></div>
+        return `<div class="ej"><div class="row"><b>${esc(e.nombre)}</b><span class="small muted" style="white-space:nowrap">${esc(e.dosis)}${isB ? ` · ⏱ ${mmss(descansoDe(e))}` : ''}</span></div>
           ${isB ? (() => { const pv = prevSets(e.nombre);
             return `<div class="sets"><div class="set-h"><span>Serie</span><span>Anterior</span><span>Kg</span><span>Reps</span><span></span></div>${Array.from({ length: n }, (_, i) => { const s = sets[i] || {}; const done = s.kg != null || s.r != null; const p = pv[i] || pv[pv.length - 1];
-            return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span><span class="prev">${p ? esc(fmtSet(p)) : '—'}</span><input inputmode="decimal" placeholder="${p && p.kg != null ? esc(String(p.kg).replace('.', ',')) : 'kg'}" aria-label="kg serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s.kg != null ? esc(String(s.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${p && p.r != null ? esc(p.r) : 'reps'}" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s.r != null ? esc(s.r) : ''}"><button type="button" class="chk" data-chk="1" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }).join('')}</div>`; })() : ''}</div>`; }).join('')}
+            return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span><span class="prev">${p ? esc(fmtSet(p)) : '—'}</span><input inputmode="decimal" placeholder="${p && p.kg != null ? esc(String(p.kg).replace('.', ',')) : 'kg'}" aria-label="kg serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s.kg != null ? esc(String(s.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${p && p.r != null ? esc(p.r) : 'reps'}" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s.r != null ? esc(s.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }).join('')}</div>`; })() : ''}</div>`; }).join('')}
     </details>`; }).join('')}
   <section class="card">
     <label class="field">Resultado del bloque C<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>
@@ -629,6 +731,7 @@ async function solicitar(tipo, data) {
   if (error) { toast('No se pudo enviar. Intenta de nuevo.'); return false; } toast('Enviado a Franco ✓'); return true;
 }
 document.addEventListener('click', async ev => {
+  const tmb = ev.target.closest('[data-timer]'); if (tmb) { const r = rutinaDeHoy().r; if (r) abrirTimer(r.bloques[Number(tmb.dataset.timer)]); return; }
   const pa = ev.target.closest('[data-push]'); if (pa) { activarPush(pa); return; }
   const pt = ev.target.closest('[data-pushtest]'); if (pt) { probarPush(pt); return; }
   if (ev.target.closest('[data-pushoff]')) { desactivarPush(); return; }
@@ -637,7 +740,7 @@ document.addEventListener('click', async ev => {
   const chk = ev.target.closest('[data-chk]'); if (chk) { const row = chk.closest('.set'); const ins = [...row.querySelectorAll('input')];
     if (row.classList.contains('done') && ins.every(i => i.value.trim() !== '')) return;
     ins.forEach(i => { if (i.value.trim() === '' && !/kg|reps/.test(i.placeholder)) { i.value = i.placeholder; i.dispatchEvent(new Event('input', { bubbles: true })); } });
-    if (ins.some(i => i.value.trim() !== '')) row.classList.add('done'); else toast('Anota los kilos y las repeticiones.'); return; }
+    if (ins.some(i => i.value.trim() !== '')) { row.classList.add('done'); iniciarDescanso(Number(chk.dataset.rest) || 90); } else toast('Anota los kilos y las repeticiones.'); return; }
   const dp = ev.target.closest('[data-dep]'); if (dp) { S.pfDeps = S.pfDeps || [...(S.perfil.deportes || [])]; const d = dp.dataset.dep; S.pfDeps = S.pfDeps.includes(d) ? S.pfDeps.filter(x => x !== d) : [...S.pfDeps, d]; dp.setAttribute('aria-pressed', S.pfDeps.includes(d)); return; }
   if (ev.target.id === 'pf-ok') { ev.target.disabled = true; const ig = $('#pf-ig').value.trim().replace(/^@+/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '');
     if (await guardarPerfil({ apodo: $('#pf-apodo').value.trim() || null, meta: $('#pf-meta').value.trim() || null, nac: $('#pf-nac').value || null, ig: ig || null, deportes: S.pfDeps || S.perfil.deportes || [] })) { S.pfDeps = null; toast('Perfil guardado ✓'); } else ev.target.disabled = false; return; }
