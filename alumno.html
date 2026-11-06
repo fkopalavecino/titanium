@@ -462,7 +462,8 @@ function clasesDia(f) { const t = today();
   return [...hs.map(h => ({ h, rec: recOf(f, h) })), ...recs.map(r => ({ h: r.hora, rec: r }))].sort((a, b) => a.h.localeCompare(b.h)); }
 const evDia = f => S.eventos.filter(e => e.fecha === f);
 const EVI = { 'Reunión': '👥', 'Evaluación': '📋', 'Actividad': '🏃', 'Evento': '⭐', 'Nutrición': '🥗', 'Otro': '📌' };
-const evHTML = e => `<section class="card" style="border-color:var(--ev);border-left-width:5px"><div class="row"><div class="disp" style="font-size:22px">${e.hora ? esc(e.hora) : 'Todo el día'}</div><span class="chip" style="cursor:default;background:var(--ev);border-color:var(--ev);color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span></div><b>${esc(e.titulo)}</b>${e.detalle ? `<div class="small muted" style="white-space:pre-line">${esc(e.detalle)}</div>` : ''}</section>`;
+const evDestino = e => /evaluaci|inbody|body ?go|bioimped|medici|foto/i.test((e.tipo || '') + ' ' + (e.titulo || '')) ? 'progreso' : /nutrici|pauta|alimenta/i.test((e.tipo || '') + ' ' + (e.titulo || '')) ? null : null;
+const evHTML = e => { const dst = evDestino(e); return `<section class="card" style="border-color:var(--ev);border-left-width:5px${dst ? ';cursor:pointer' : ''}" ${dst ? `data-evgo="${dst}" role="button" tabindex="0"` : ''}><div class="row"><div class="disp" style="font-size:22px">${e.hora ? esc(e.hora) : 'Todo el día'}</div><span class="chip" style="cursor:inherit;background:var(--ev);border-color:var(--ev);color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span></div><b>${esc(e.titulo)}</b>${e.detalle ? `<div class="small muted" style="white-space:pre-line">${esc(e.detalle)}</div>` : ''}${dst === 'progreso' ? '<div class="small" style="color:var(--ev);font-weight:700">Ver mis evaluaciones y subir mi InBody ›</div>' : ''}</section>`; };
 const waNum = () => String(S.cfg.whatsapp || '').replace(/\D/g, '');
 function noVoyBtn(i, f, h) { const n = waNum(); const nom = String(S.a.nombre || '').split(' ')[0];
   const msg = `Hola Franco, soy ${nom}. No puedo ir a mi clase del ${longD(f).toLowerCase()} a las ${h}.`;
@@ -527,6 +528,7 @@ document.addEventListener('click', async ev => {
   const ibi = ev.target.closest('[data-ibi]'); if (ibi) { S.ibInfo = ibi.dataset.ibi; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'fup-open') { S.fotoUp = !S.fotoUp; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'ib-cancel') { if (S.ibNew?.prev) URL.revokeObjectURL(S.ibNew.prev); S.ibNew = null; render(); return; }
+  const eg = ev.target.closest('[data-evgo]'); if (eg) { S.v = eg.dataset.evgo; render(); setTimeout(() => document.getElementById('ib-card')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 60); return; }
   const gd = ev.target.closest('[data-goday]'); if (gd) { S.dia = gd.dataset.goday; S.wk = lunesDe(S.dia); S.v = 'agenda'; render(); return; }
   const zf = ev.target.closest('[data-zoom]'); if (zf) { const lb = document.createElement('div'); lb.id = 'lightbox'; lb.innerHTML = `<img src="${zf.getAttribute('src')}" alt="Foto ampliada">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); return; }
   const fa = ev.target.closest('[data-fang]'); if (fa) { S.fang = fa.dataset.fang; render(); return; }
