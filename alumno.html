@@ -495,11 +495,11 @@ V.progreso = () => {
       ${S.ibVer === 'hist' && ib.length > 1 ? `<div style="display:grid;gap:6px">${ib.slice().reverse().map(x => `<div class="row small"><span>${esc(fmtD(x.f))}</span><span class="muted">${[['peso', 'kg'], ['pgc', '%'], ['mme', 'kg músc.']].filter(([k]) => x[k] != null).map(([k, u]) => fmtN(x[k], 1) + ' ' + u).join(' · ') || 'sin datos'}</span></div>`).join('')}</div>` : ''}
       ${S.ibVer === 'inf' && S.urls[ibL.img] ? `<img src="${esc(S.urls[ibL.img])}" data-zoom="1" alt="Informe InBody ${esc(fmtD(ibL.f))}" style="width:100%;max-height:280px;object-fit:contain;border-radius:10px;background:var(--sunk);cursor:zoom-in">` : ''}
       ${upBtn('＋ Subir nuevo InBody', false)}</section>`; }
-  return `<h1>Mi progreso</h1>
+  return `<h1>${S.evalFirst ? 'Mis evaluaciones' : 'Mi progreso'}</h1>${S.evalFirst ? inbCard + fotosCard + medCard : ''}
   <div class="grid3"><div class="card kpi"><div class="small muted">Clases mes</div><div class="v">${delMes}</div></div>
     <div class="card kpi"><div class="small muted">Asistencia</div><div class="v">${marcadas ? Math.round(delMes / marcadas * 100) + '%' : '—'}</div></div>
     <div class="card kpi"><div class="small muted">Ejercicios</div><div class="v red">${best.length}</div></div></div>
-  ${fotosCard}${medCard}${inbCard}
+  ${S.evalFirst ? '' : fotosCard + medCard + inbCard}
   ${top ? `<section class="card"><div class="row"><h2>${esc(top[0].replace(/^\d+[ab]? · /, ''))}</h2><span class="small muted">mejor ${esc(fmtSet(top[1]))}</span></div>${chart || '<div class="small muted">Anota más sesiones para ver tu gráfico.</div>'}</section>` : ''}
   <section class="card"><h2>Tus mejores marcas</h2>${best.length ? best.slice(0, 8).map(([n, b]) => `<div class="row small"><span>${esc(n.replace(/^\d+[ab]? · /, ''))}</span><b>${esc(fmtSet(b))}</b></div>`).join('') : '<div class="small muted">Cuando anotes tus series en «Rutina», aquí verás tus récords.</div>'}</section>`;
 };
@@ -614,7 +614,7 @@ document.addEventListener('click', async ev => {
   const pt = ev.target.closest('[data-pushtest]'); if (pt) { probarPush(pt); return; }
   if (ev.target.closest('[data-pushoff]')) { desactivarPush(); return; }
   if (ev.target.closest('[data-pushx]')) { try { localStorage.setItem('tl-pushx', '1'); } catch (_) {} render(); return; }
-  const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.v = go.dataset.go || go.dataset.v; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
+  const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.v = go.dataset.go || go.dataset.v; S.evalFirst = false; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
   const chk = ev.target.closest('[data-chk]'); if (chk) { const row = chk.closest('.set'); const ins = [...row.querySelectorAll('input')];
     if (row.classList.contains('done') && ins.every(i => i.value.trim() !== '')) return;
     ins.forEach(i => { if (i.value.trim() === '' && !/kg|reps/.test(i.placeholder)) { i.value = i.placeholder; i.dispatchEvent(new Event('input', { bubbles: true })); } });
@@ -628,7 +628,7 @@ document.addEventListener('click', async ev => {
   if (ev.target.id === 'fup-open') { S.fotoUp = !S.fotoUp; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'ib-cancel') { if (S.ibNew?.prev) URL.revokeObjectURL(S.ibNew.prev); S.ibNew = null; render(); return; }
   const ei = ev.target.closest('[data-evid]'); if (ei) { abrirEvento(ei.dataset.evid); return; }
-  const eg = ev.target.closest('[data-evgo]'); if (eg) { S.v = eg.dataset.evgo; render(); setTimeout(() => document.getElementById('ib-card')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 60); return; }
+  const eg = ev.target.closest('[data-evgo]'); if (eg) { S.v = eg.dataset.evgo; S.evalFirst = S.v === 'progreso'; render(); return; }
   const gd = ev.target.closest('[data-goday]'); if (gd) { S.dia = gd.dataset.goday; S.wk = lunesDe(S.dia); S.v = 'agenda'; render(); return; }
   const zf = ev.target.closest('[data-zoom]'); if (zf) { const lb = document.createElement('div'); lb.id = 'lightbox'; lb.innerHTML = `<img src="${zf.getAttribute('src')}" alt="Foto ampliada">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); return; }
   const fa = ev.target.closest('[data-fang]'); if (fa) { S.fang = fa.dataset.fang; render(); return; }
@@ -658,8 +658,8 @@ async function irAEvento(id) {
   let e = S.eventos.find(x => String(x.id) === String(id));
   if (!e) { await load(); e = S.eventos.find(x => String(x.id) === String(id)); } if (!e) return;
   document.getElementById('sheet')?.remove();
-  if (e.tipo === 'Evaluación') S.v = 'progreso'; else { S.v = 'agenda'; S.dia = e.fecha; S.wk = lunesDe(e.fecha); }
-  render(); if (S.v === 'progreso') document.getElementById('ib-card')?.scrollIntoView({ block: 'start' });
+  if (e.tipo === 'Evaluación') { S.v = 'progreso'; S.evalFirst = true; } else { S.v = 'agenda'; S.dia = e.fecha; S.wk = lunesDe(e.fecha); }
+  render();
   abrirEvento(e.id);
 }
 async function avisoPendiente() { if (!('caches' in window)) return null;
