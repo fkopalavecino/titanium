@@ -867,7 +867,8 @@ async function irAEvento(id) {
   let e = S.eventos.find(x => String(x.id) === String(id));
   if (!e) { await load(); e = S.eventos.find(x => String(x.id) === String(id)); } if (!e) return;
   document.getElementById('sheet')?.remove();
-  if (e.tipo === 'Evaluación') { S.v = 'progreso'; S.evalFirst = true; } else { S.v = 'agenda'; S.dia = e.fecha; S.wk = lunesDe(e.fecha); }
+  if (e.tipo === 'Evaluación' && /foto/i.test(e.titulo || '')) { S.v = 'progreso'; S.evalFirst = false; S.fotoUp = true; }
+  else if (e.tipo === 'Evaluación') { S.v = 'progreso'; S.evalFirst = true; } else { S.v = 'agenda'; S.dia = e.fecha; S.wk = lunesDe(e.fecha); }
   render();
   abrirEvento(e.id);
 }

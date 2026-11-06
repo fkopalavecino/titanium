@@ -230,8 +230,16 @@
 #tl-agp .hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
 #tl-agp h3{margin:0;font:800 22px Barlow,system-ui,sans-serif;letter-spacing:.01em}
 #tl-agp .x{width:44px;height:44px;border-radius:12px;border:1px solid #2f2a2e;background:#161317;color:#f2eef0;font-size:18px;cursor:pointer}
-#tl-agp .seg{display:grid;grid-template-columns:1fr 1fr 1fr;background:#161317;border:1px solid #2f2a2e;border-radius:12px;padding:3px}
-#tl-agp .seg button{height:40px;border:0;border-radius:9px;background:transparent;color:#a69ea3;font:700 15px Barlow,sans-serif;cursor:pointer}
+#tl-agp .seg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#161317;border:1px solid #2f2a2e;border-radius:12px;padding:3px}
+#tl-agp .seg button{height:40px;border:0;border-radius:9px;background:transparent;color:#a69ea3;font:700 14px Barlow,sans-serif;cursor:pointer;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tl-agp .fo{display:flex;align-items:center;gap:10px;background:#161317;border:1px solid #2f2a2e;border-radius:12px;padding:10px 10px 10px 12px}
+#tl-agp .fo .tx{flex:1;min-width:0}
+#tl-agp .fo b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#tl-agp .fo .mt{color:#a69ea3;font-size:13px}
+#tl-agp .pl{display:inline-block;font-size:12px;font-weight:800;border-radius:999px;padding:2px 8px;margin-top:3px}
+#tl-agp .pl.r{background:#3a1519;color:#ff8a94}#tl-agp .pl.a{background:#33280f;color:#ffc861}#tl-agp .pl.g{background:#12301f;color:#6fdc9c}#tl-agp .pl.b{background:#13263a;color:#8cc4ff}
+#tl-agp .fo .ag{height:40px;border-radius:10px;border:1px solid #d71f30;background:transparent;color:#fff;font:700 14px Barlow,sans-serif;padding:0 12px;cursor:pointer;flex:none}
+#tl-agp .fres{display:grid;gap:10px;background:#161317;border:1px solid #2f2a2e;border-radius:12px;padding:12px}
 #tl-agp .seg button[aria-selected=true]{background:#d71f30;color:#fff}
 #tl-agp .bd{overflow:auto;-webkit-overflow-scrolling:touch;padding:16px 18px;display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:16px;flex:1;overscroll-behavior:contain}
 #tl-agp .lb{display:grid;gap:6px;color:#a69ea3;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
@@ -308,13 +316,13 @@
     document.body.appendChild(p); const prevOv = document.body.style.overflow; document.body.style.overflow = 'hidden';
     const cerrar = () => { p.remove(); document.body.style.overflow = prevOv; document.removeEventListener('keydown', onKey); };
     const onKey = e => { if (e.key === 'Escape') cerrar(); }; document.addEventListener('keydown', onKey);
-    const { data: al } = await sb.from('alumnos').select('codigo,nombre,estado').order('nombre');
+    const { data: al } = await sb.from('alumnos').select('codigo,nombre,estado,fotos').order('nombre');
     const act = (al || []).filter(a => a.estado !== 'inactivo');
     const nom = Object.fromEntries((al || []).map(a => [a.codigo, a.nombre]));
     let tipo = 'Reunión', vista = 'nuevo', eventos = [], pasados = [], editId = null, editAdj = null, quitarAdj = false;
     p.innerHTML = `<div class="sh" role="dialog" aria-modal="true" aria-labelledby="tl-ag-h">
       <header><div class="hd"><h3 id="tl-ag-h">Agenda de alumnos</h3><button class="x" data-x="1" aria-label="Cerrar">✕</button></div>
-        <div class="seg" role="tablist"><button role="tab" data-v="nuevo" aria-selected="true" id="tl-ag-tabn">＋ Nuevo</button><button role="tab" data-v="prox" aria-selected="false">Próximos <span id="tl-ag-n"></span></button><button role="tab" data-v="hist" aria-selected="false">Historial</button></div></header>
+        <div class="seg" role="tablist"><button role="tab" data-v="nuevo" aria-selected="true" id="tl-ag-tabn">＋ Nuevo</button><button role="tab" data-v="prox" aria-selected="false">Próximos <span id="tl-ag-n"></span></button><button role="tab" data-v="hist" aria-selected="false">Historial</button><button role="tab" data-v="fot" aria-selected="false">📸 Fotos</button></div></header>
       <div class="bd" id="tl-ag-nuevo">
         <label class="lb">¿Para quién?<select id="tl-ag-al"><option value="">👥 Todos los alumnos</option>${act.map(a => `<option value="${escA(a.codigo)}">${escA(a.nombre)}</option>`).join('')}</select></label>
         <div class="lb">Tipo<div class="tipos">${TIPOS.map(t => `<button type="button" data-t="${t}" aria-pressed="${t === tipo}"><span>${TICO[t]}</span>${t}</button>`).join('')}</div></div>
@@ -328,6 +336,7 @@
       </div>
       <div class="bd" id="tl-ag-prox" hidden></div>
       <div class="bd" id="tl-ag-hist" hidden></div>
+      <div class="bd" id="tl-ag-fot" hidden></div>
       <footer id="tl-ag-foot"><div class="msg" id="tl-ag-msg" role="status"></div><button class="ok" id="tl-ag-ok">Guardar en la agenda</button><button class="cx" id="tl-ag-cx" type="button" hidden>Cancelar edición</button></footer></div>`;
     const $ = id => document.getElementById(id);
     const msg = (t, c) => { $('tl-ag-msg').style.color = c || '#6fd39a'; $('tl-ag-msg').textContent = t; };
@@ -341,13 +350,47 @@
       $('tl-ag-prox').innerHTML = grupos(eventos, 'Nada agendado todavía.<br>Usa «＋ Nuevo» para agregar.');
       $('tl-ag-hist').innerHTML = grupos(pasados, 'Todavía no hay eventos pasados.');
     };
+    /* ---------- registro de fotos de progreso: a quién le toca y agendar ---------- */
+    const FOTO_TIT = '📸 Fotos de progreso', FOTO_DET = 'Frente, perfil y espalda. Ven con ropa ajustada (top o peto y short) para comparar bien.';
+    const esFoto = e => e.tipo === 'Evaluación' && /foto/i.test(e.titulo || '');
+    let semFoto = 4; try { semFoto = Number(localStorage.getItem('tl-fot-sem')) || 4; } catch (_) {}
+    const ddmm = f => new Date(f + 'T12:00:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+    const difD = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5);
+    const sumD = (f, n) => { const d = new Date(f + 'T12:00:00'); d.setDate(d.getDate() + n); return isoD(d); };
+    const estadoFotos = () => act.map(a => {
+      const fs = (Array.isArray(a.fotos) ? a.fotos : []).filter(x => x && x.f && (x.frente || x.perfil || x.espalda)).map(x => x.f).sort();
+      const ult = fs[fs.length - 1] || null, toca = ult ? sumD(ult, semFoto * 7) : null;
+      const ag = eventos.filter(e => e.alumno === a.codigo && esFoto(e)).map(e => e.fecha).sort()[0] || null;
+      const k = ag ? 3 : !ult ? 0 : toca <= sumD(iso, 3) ? 1 : 2; // 0 sin fotos · 1 le toca · 2 al día · 3 agendada
+      return { a, ult, toca, ag, k, n: fs.length };
+    }).sort((x, y) => x.k - y.k || String(x.toca || '').localeCompare(String(y.toca || '')) || x.a.nombre.localeCompare(y.a.nombre));
+    const pintarFotos = () => { const L = estadoFotos(); const pend = L.filter(x => x.k <= 1);
+      const fila = x => { const pl = x.k === 3 ? `<span class="pl b">📅 Agendada ${escA(ddmm(x.ag))}</span>` : x.k === 0 ? '<span class="pl r">Sin fotos</span>'
+          : x.k === 1 ? `<span class="pl a">Le toca${x.toca < iso ? ' · atrasada ' + difD(x.toca, iso) + ' días' : x.toca === iso ? ' hoy' : ' el ' + escA(ddmm(x.toca))}</span>` : `<span class="pl g">Al día · próxima ${escA(ddmm(x.toca))}</span>`;
+        return `<div class="fo"><div class="tx"><b>${escA(x.a.nombre)}</b><div class="mt">${x.ult ? 'Última: ' + escA(ddmm(x.ult)) + ' · hace ' + difD(x.ult, iso) + ' días · ' + x.n + ' sesión' + (x.n === 1 ? '' : 'es') : 'Nunca se ha sacado fotos'}</div>${pl}</div>${x.k === 3 ? '' : `<button class="ag" data-fag="${escA(x.a.codigo)}">Agendar</button>`}</div>`; };
+      $('tl-ag-fot').innerHTML = `<div class="fres">
+          <div class="lb">Cada cuánto toca foto<div class="quick">${[4, 6, 8, 12].map(n => `<button type="button" data-fsem="${n}" aria-pressed="${n === semFoto}">${n} semanas</button>`).join('')}</div></div>
+          <div class="mt" style="color:#a69ea3;font-size:14px"><b style="color:#ffc861">${L.filter(x => x.k === 1).length}</b> les toca · <b style="color:#ff8a94">${L.filter(x => x.k === 0).length}</b> sin fotos · <b style="color:#8cc4ff">${L.filter(x => x.k === 3).length}</b> agendadas</div>
+          ${pend.length ? `<div class="two"><label class="sub">Agendar a todos para el<input id="tl-fot-f" type="date" value="${masDias(1)}" min="${iso}"></label><button type="button" class="ok" id="tl-fot-all" style="align-self:end">Agendar a ${pend.length}</button></div>` : ''}
+        </div>${L.map(fila).join('') || '<div class="empty">No hay alumnos activos.</div>'}`; };
+    const agendarFoto = code => { const x = estadoFotos().find(y => y.a.codigo === code); if (!x) return;
+      salirEdicion(); $('tl-ag-al').value = code; setTipo('Evaluación');
+      $('tl-ag-fecha').value = x.toca && x.toca > iso ? x.toca : masDias(1); $('tl-ag-hora').value = '';
+      $('tl-ag-tit').value = FOTO_TIT; $('tl-ag-det').value = FOTO_DET; marcaQuick(); msg('Revisa la fecha y guarda. Le llega el aviso al alumno.');
+      ver('nuevo'); $('tl-ag-fecha').focus(); };
+    const agendarFotosTodos = async btn => { const pend = estadoFotos().filter(x => x.k <= 1); const f = $('tl-fot-f').value;
+      if (!pend.length || !f) return; if (!confirm(`¿Agendar fotos de progreso el ${diaLargo(f)} a ${pend.length} alumno${pend.length === 1 ? '' : 's'}? A cada uno le llega el aviso.`)) return;
+      btn.disabled = true; btn.textContent = 'Agendando…';
+      const { error } = await sb.from('eventos').insert(pend.map(x => ({ alumno: x.a.codigo, tipo: 'Evaluación', fecha: f, hora: null, titulo: FOTO_TIT, detalle: FOTO_DET })));
+      if (error) { btn.disabled = false; btn.textContent = 'Agendar a ' + pend.length; alert('No se pudo agendar: ' + error.message); return; }
+      await lista(); pintarFotos(); };
     const lista = async () => {
       const [a, b] = await Promise.all([
         sb.from('eventos').select('*').gte('fecha', iso).order('fecha').order('hora', { nullsFirst: true }).limit(60),
         sb.from('eventos').select('*').lt('fecha', iso).order('fecha', { ascending: false }).order('hora', { nullsFirst: true }).limit(100)]);
-      eventos = a.data || []; pasados = b.data || []; pintar(); };
+      eventos = a.data || []; pasados = b.data || []; pintar(); if (vista === 'fot') pintarFotos(); };
     const ver = v => { vista = v; p.querySelectorAll('[data-v]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.v === v)));
-      $('tl-ag-nuevo').hidden = v !== 'nuevo'; $('tl-ag-prox').hidden = v !== 'prox'; $('tl-ag-hist').hidden = v !== 'hist'; $('tl-ag-foot').hidden = v !== 'nuevo'; };
+      $('tl-ag-nuevo').hidden = v !== 'nuevo'; $('tl-ag-prox').hidden = v !== 'prox'; $('tl-ag-hist').hidden = v !== 'hist'; $('tl-ag-fot').hidden = v !== 'fot'; if (v === 'fot') pintarFotos(); $('tl-ag-foot').hidden = v !== 'nuevo'; };
     const conAdj = () => editAdj && !quitarAdj;
     const limpiarArchivo = () => { $('tl-ag-file').value = ''; $('tl-ag-fn').textContent = conAdj() ? '📎 Archivo actual (elige otro para reemplazarlo)' : 'Elegir PDF o imagen (máx. 15 MB)'; $('tl-ag-rm').hidden = !conAdj(); };
     const setTipo = t => { tipo = TIPOS.includes(t) ? t : 'Otro'; p.querySelectorAll('[data-t]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.t === tipo))); $('tl-ag-tit').placeholder = TEJ[tipo]; };
@@ -372,6 +415,9 @@
         if (tipo === 'Documento' || tipo === 'Nutrición') $('tl-ag-adj').open = true; return; }
       const q = ev.target.closest('[data-q]'); if (q) { if (q.dataset.q === 'h') $('tl-ag-hora').value = ''; else $('tl-ag-fecha').value = masDias(+q.dataset.q); marcaQuick(); return; }
       if (ev.target.closest('#tl-ag-rm')) { ev.preventDefault(); if (!$('tl-ag-file').files[0] && editAdj) quitarAdj = true; return limpiarArchivo(); }
+      const fsm = ev.target.closest('[data-fsem]'); if (fsm) { semFoto = Number(fsm.dataset.fsem); try { localStorage.setItem('tl-fot-sem', String(semFoto)); } catch (_) {} pintarFotos(); return; }
+      const fag = ev.target.closest('[data-fag]'); if (fag) { agendarFoto(fag.dataset.fag); return; }
+      if (ev.target.id === 'tl-fot-all') { agendarFotosTodos(ev.target); return; }
       const ed = ev.target.closest('[data-ed]'); if (ed) { const e = eventos.concat(pasados).find(x => String(x.id) === ed.dataset.ed); if (e) editar(e); return; }
       const d = ev.target.closest('[data-del]'); if (d) { if (!confirm('¿Borrar este evento de la agenda?')) return;
         await sb.from('eventos').delete().eq('id', d.dataset.del); if (d.dataset.adj) await sb.storage.from('fotos').remove([d.dataset.adj]); if (String(editId) === d.dataset.del) salirEdicion(); lista(); return; }
