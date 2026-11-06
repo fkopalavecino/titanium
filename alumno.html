@@ -108,7 +108,7 @@ const clp = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
 const hm = s => { const [h, m] = String(s).split(':').map(Number); return h * 60 + (m || 0); };
 const nowM = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
 const toast = m => { const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2800); };
-const S = { v: 'hoy', wk: null, dia: null, a: null, planes: [], clases: [], rutinas: new Map(), cfg: {}, sel: null, eventos: [], fotos: [], medidas: [], urls: {}, fang: 'frente' };
+const S = { v: 'hoy', wk: null, dia: null, a: null, planes: [], clases: [], rutinas: new Map(), cfg: {}, sel: null, eventos: [], fotos: [], medidas: [], inbody: [], urls: {}, fang: 'frente' };
 
 await window.tlSession();
 const { data: codigo, error: e1 } = await sb.rpc('vincular_alumno');
@@ -139,7 +139,8 @@ async function load() {
   rs.forEach(r => (r.data || []).forEach(x => S.rutinas.set(x.id, x.data)));
   S.fotos = (Array.isArray(S.a.fotos) ? S.a.fotos : []).filter(x => x && (x.frente || x.perfil || x.espalda)).sort((x, y) => x.f.localeCompare(y.f));
   S.medidas = Array.isArray(S.a.medidas) ? S.a.medidas : [];
-  const fids = S.fotos.flatMap(x => [x.frente, x.perfil, x.espalda]).filter(id => id && !S.urls[id]);
+  S.inbody = (Array.isArray(S.a.inbody) ? S.a.inbody : []).filter(x => x && x.img).sort((x, y) => x.f.localeCompare(y.f));
+  const fids = S.fotos.flatMap(x => [x.frente, x.perfil, x.espalda]).concat(S.inbody.map(x => x.img)).filter(id => id && !S.urls[id]);
   if (fids.length) { const { data: su } = await sb.storage.from('fotos').createSignedUrls(fids, 3600 * 12); (su || []).forEach(x => { if (x.signedUrl) S.urls[x.path] = x.signedUrl; }); }
 }
 await load();
@@ -204,6 +205,19 @@ function applyDraft() { if (S.v !== 'rutina') return; const d = getDraft();
 document.addEventListener('input', ev => { const i = ev.target; const d = getDraft();
   if (i.matches('.set input')) { const n = i.dataset.n; ((d.sets[n] = d.sets[n] || {})[i.dataset.i] = d.sets[n][i.dataset.i] || {})[i.dataset.f] = i.value; i.closest('.set')?.classList.toggle('done', [...i.closest('.set').querySelectorAll('input')].some(x => x.value.trim() !== '')); putDraft(d); }
   else if (i.id === 'carga') { d.carga = i.value; putDraft(d); } });
+
+/* ---------- subir InBody ---------- */
+function achicar(file, max) { return new Promise((res, rej) => { const u = URL.createObjectURL(file), img = new Image();
+  img.onload = () => { const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); c.toBlob(b => b ? res(b) : rej(new Error('blob')), 'image/jpeg', 0.85); };
+  img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('img')); }; img.src = u; }); }
+document.addEventListener('change', async ev => { const f = ev.target; if (f.id !== 'inb-file' || !f.files?.[0]) return;
+  const lbl = f.closest('label'); if (lbl) { lbl.style.opacity = '.6'; lbl.firstChild.textContent = 'Subiendo…'; }
+  try { const blob = await achicar(f.files[0], 2000); const id = 'inbody/' + codigo + '/' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()) + '.jpg';
+    const { error: e1 } = await sb.storage.from('fotos').upload(id, blob, { contentType: 'image/jpeg' }); if (e1) throw e1;
+    const { error: e2 } = await sb.rpc('agregar_mi_inbody', { p_id: id, p_f: today() }); if (e2) throw e2;
+    await load(); toast('InBody guardado ✓'); render();
+  } catch (e) { toast('No se pudo subir: ' + (e.message || 'intenta de nuevo')); if (lbl) { lbl.style.opacity = ''; lbl.firstChild.textContent = '＋ Subir pantallazo del InBody'; } } });
 
 /* ---------- vistas ---------- */
 const V = {};
@@ -283,11 +297,17 @@ V.progreso = () => {
     <div class="kpi"><div class="small muted">% grasa</div><div class="v">${m1.grasa != null ? String(m1.grasa).replace('.', ',') : '—'}</div>${dlt('grasa', ' %')}</div>
     <div class="kpi"><div class="small muted">Cintura</div><div class="v">${m1.cintura != null ? String(m1.cintura).replace('.', ',') : '—'}<span class="small muted"> cm</span></div>${dlt('cintura', ' cm')}</div></div>
     <div class="small muted">Última medición ${esc(fmtD(m1.f))}${md.length > 1 ? ' · comparado con ' + esc(fmtD(m0.f)) : ''}</div></section>` : '';
+  const ib = S.inbody.filter(x => S.urls[x.img]); const ibL = ib[ib.length - 1];
+  const inbCard = `<section class="card"><div class="row"><h2>InBody</h2><span class="small muted">${ib.length ? ib.length + ' informe' + (ib.length === 1 ? '' : 's') : ''}</span></div>
+    ${ibL ? `<figure style="margin:0;display:grid;gap:6px"><img src="${esc(S.urls[ibL.img])}" data-zoom="1" alt="Último InBody, ${esc(fmtD(ibL.f))}" style="width:100%;border-radius:10px;background:var(--sunk);cursor:zoom-in"><figcaption class="small muted">Último informe · ${esc(fmtD(ibL.f))}</figcaption></figure>
+      ${ib.length > 1 ? `<details class="ses"><summary>Ver informes anteriores</summary><div class="ph-th" style="margin-top:8px">${ib.slice(0, -1).reverse().map(x => `<figure style="margin:0"><img src="${esc(S.urls[x.img])}" data-zoom="1" alt="InBody ${esc(fmtD(x.f))}" loading="lazy"><figcaption class="small muted">${esc(fmtD(x.f))}</figcaption></figure>`).join('')}</div></details>` : ''}`
+      : '<div class="small muted">Sube el pantallazo o una foto de tu informe InBody para llevar tu historial.</div>'}
+    <label class="btn" style="position:relative;overflow:hidden">＋ Subir pantallazo del InBody<input type="file" accept="image/*" id="inb-file" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label></section>`;
   return `<h1>Mi progreso</h1>
   <div class="grid3"><div class="card kpi"><div class="small muted">Clases mes</div><div class="v">${delMes}</div></div>
     <div class="card kpi"><div class="small muted">Asistencia</div><div class="v">${marcadas ? Math.round(delMes / marcadas * 100) + '%' : '—'}</div></div>
     <div class="card kpi"><div class="small muted">Ejercicios</div><div class="v red">${best.length}</div></div></div>
-  ${fotosCard}${medCard}
+  ${fotosCard}${medCard}${inbCard}
   ${top ? `<section class="card"><div class="row"><h2>${esc(top[0].replace(/^\d+[ab]? · /, ''))}</h2><span class="small muted">mejor ${esc(fmtSet(top[1]))}</span></div>${chart || '<div class="small muted">Anota más sesiones para ver tu gráfico.</div>'}</section>` : ''}
   <section class="card"><h2>Tus mejores marcas</h2>${best.length ? best.slice(0, 8).map(([n, b]) => `<div class="row small"><span>${esc(n.replace(/^\d+[ab]? · /, ''))}</span><b>${esc(fmtSet(b))}</b></div>`).join('') : '<div class="small muted">Cuando anotes tus series en «Rutina», aquí verás tus récords.</div>'}</section>`;
 };
