@@ -7,14 +7,25 @@
     ['peso', 'Peso', 'kg', ['peso corporal', 'peso', 'weight'], [25, 250], 1, null],
     ['pgc', '% Grasa', '%', ['porcentaje de grasa corporal', 'porcentaje de grasa', 'pgc', 'percent body fat', 'pbf', 'grasa corporal %', 'grasa corporal'], [3, 70], 1, 'baja'],
     ['mme', 'Masa muscular', 'kg', ['masa muscular esqueletica', 'musculo esqueletico', 'skeletal muscle mass', 'smm', 'masa muscular'], [8, 90], 1, 'sube'],
-    ['mgc', 'Masa grasa', 'kg', ['masa de grasa corporal', 'masa grasa corporal', 'masa grasa', 'body fat mass'], [1, 150], 1, 'baja'],
-    ['imc', 'IMC', '', ['indice de masa corporal', 'imc', 'bmi'], [12, 60], 1, null],
     ['visceral', 'Grasa visceral', 'nivel', ['nivel de grasa visceral', 'grasa visceral', 'visceral fat level', 'visceral'], [1, 30], 0, 'baja'],
-    ['tmb', 'Metabolismo basal', 'kcal', ['tasa metabolica basal', 'metabolismo basal', 'basal metabolic rate', 'tmb', 'bmr'], [700, 4500], 0, null],
-    ['agua', 'Agua corporal', 'L', ['agua corporal total', 'agua corporal', 'total body water', 'agua'], [12, 90], 1, null],
-    ['edadMet', 'Edad metabólica', 'años', ['edad metabolica', 'metabolic age'], [10, 99], 0, 'baja'],
-    ['score', 'Puntaje InBody', 'pts', ['puntuacion inbody', 'puntaje inbody', 'inbody score', 'puntuacion'], [30, 120], 0, 'sube'],
+    ['imc', 'IMC', '', ['indice de masa corporal', 'imc', 'bmi'], [12, 60], 1, null],
   ];
+  /* Explicación y zonas de referencia (ACE para % grasa, OMS para IMC, InBody para visceral). */
+  const Z = (lo, hi, zonas) => ({ lo, hi, zonas }); // zonas: [hasta, etiqueta, tono]
+  window.TL_INBODY_INFO = {
+    peso: { que: 'Tu peso total. Míralo siempre junto al % de grasa y la masa muscular: puedes bajar grasa y subir músculo sin que la balanza cambie mucho.', zona: () => null },
+    pgc: { que: 'Qué parte de tu peso es grasa. Es el mejor indicador de cómo va tu composición corporal.',
+      zona: (v, sexo) => sexo === 'm' ? Z(8, 45, [[14, 'Muy bajo', 'warn'], [21, 'Atlético', 'ok'], [25, 'Fitness', 'ok'], [32, 'Aceptable', 'mid'], [99, 'Alto', 'warn']])
+        : sexo === 'h' ? Z(3, 40, [[6, 'Muy bajo', 'warn'], [14, 'Atlético', 'ok'], [18, 'Fitness', 'ok'], [25, 'Aceptable', 'mid'], [99, 'Alto', 'warn']]) : null,
+      tip: 'Baja con fuerza constante, buen descanso y una alimentación ordenada. Un ritmo sano es 0,5 a 1 punto por mes.' },
+    mme: { que: 'El músculo que mueves al entrenar. Más músculo es más fuerza, mejor postura y un metabolismo más activo.', zona: () => null,
+      tip: 'Sube con entrenamiento de fuerza progresivo y suficiente proteína. Ganar 0,5 kg al mes ya es un gran avance.' },
+    visceral: { que: 'Grasa que rodea los órganos del abdomen. Es la más ligada a la salud (presión, azúcar, corazón), por eso bajarla es prioridad.',
+      zona: () => Z(1, 20, [[9, 'Saludable', 'ok'], [14, 'Elevado', 'mid'], [99, 'Alto', 'warn']]),
+      tip: 'Responde muy bien al ejercicio regular, dormir bien y reducir alcohol y azúcar.' },
+    imc: { que: 'Relación entre tu peso y tu estatura. Sirve como referencia general, pero no distingue músculo de grasa: con mucho músculo puede salir alto.',
+      zona: () => Z(15, 40, [[18.5, 'Bajo', 'warn'], [25, 'Normal', 'ok'], [30, 'Sobrepeso', 'mid'], [99, 'Obesidad', 'warn']]) },
+  };
   window.TL_INBODY_CAMPOS = CAMPOS;
 
   const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[|]/g, ' ').replace(/[ \t]+/g, ' ');
