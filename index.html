@@ -1489,7 +1489,7 @@ function abonarModal(code, pid) {
 
 function confirmarFoto(el) { if (el.dataset.ok) return true; el.dataset.ok = '1'; el.textContent = '¿Borrar?'; el.style.width = 'auto'; el.style.padding = '0 8px'; el.style.background = 'var(--crit)'; setTimeout(() => { if (el.isConnected) { delete el.dataset.ok; el.textContent = '✕'; el.style.cssText = ''; } }, 3000); return false; }
 const ANG = [['frente','Frente'],['perfil','Perfil'],['espalda','Espalda']];
-const fotoURL = id => id ? '/_blob/' + id : '';
+const fotoURL = id => id ? (window.tlFotoURL ? window.tlFotoURL(id) : '/_blob/' + id) : '';
 function achicarFoto(file, max = 1400) {
   return new Promise((res, rej) => {
     const url = URL.createObjectURL(file), img = new Image();
