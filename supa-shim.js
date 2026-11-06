@@ -74,7 +74,7 @@
     notas: r.notas || '', planes: planes || [] };
     if (r.email) a.email = r.email; if (r.nacimiento) a.nacimiento = r.nacimiento; if (r.ingreso) a.ingreso = r.ingreso;
     if (r.programa !== undefined) a.programa = r.programa; if (r.programas_hechos && r.programas_hechos.length) a.programasHechos = r.programas_hechos;
-    if (r.fotos && r.fotos.length) a.fotos = r.fotos; if (r.medidas && r.medidas.length) a.medidas = r.medidas; if (r.inbody && r.inbody.length) a.inbody = r.inbody; if (r.perfil && (r.perfil.avatar || r.perfil.apodo || r.perfil.meta)) a.perfil = r.perfil; if (r.user_id) a.vinculado = true; return a; };
+    if (r.fotos && r.fotos.length) a.fotos = r.fotos; if (r.medidas && r.medidas.length) a.medidas = r.medidas; if (r.inbody && r.inbody.length) a.inbody = r.inbody; if (r.perfil && Object.keys(r.perfil).length) a.perfil = r.perfil; if (r.user_id) a.vinculado = true; return a; };
   const P2R = (code, p) => ({ id: p.id, alumno: code, mes: p.mes || null, inicio: p.inicio || null, fin: p.fin || null,
     clases: p.clases == null || p.clases === '' ? null : Number(p.clases), monto: Number(p.monto) || 0, pagos: p.pagos || [], updated_at: new Date().toISOString() });
   const R2P = r => ({ id: r.id, mes: r.mes, inicio: r.inicio, fin: r.fin, clases: r.clases, monto: r.monto, pagos: r.pagos || [] });
