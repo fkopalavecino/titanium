@@ -149,6 +149,49 @@ if (!codigo) {
   return;
 }
 
+/* ---------- avisos push ---------- */
+const PUSH_FN = 'https://lnovgbpxdnqgsojkfzwy.supabase.co/functions/v1/notificar';
+const PUSH_H = { 'Content-Type': 'application/json', Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxub3ZnYnB4ZG5xZ3Nvamtmend5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4ODcwNjYsImV4cCI6MjEwOTQ2MzA2Nn0.7S4U0MtHCPRlhIYpaPE-AD5LEFKqZn0Kt82bKlYqNWE' }; // clave pública (anon)
+const esIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const instalada = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const pushOK = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const b64u = x => { const r = atob((x + '='.repeat((4 - x.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(r, c => c.charCodeAt(0)); };
+const pushEstado = () => S.push ? 'on' : (esIOS && !instalada()) ? 'instalar' : !pushOK() ? 'no' : Notification.permission === 'denied' ? 'bloqueado' : 'off';
+const guardarSub = async s => !(await sb.rpc('guardar_mi_push', { p_sub: s.toJSON(), p_ua: navigator.userAgent })).error;
+const swReg = () => navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready);
+if ('serviceWorker' in navigator) swReg().then(r => r.pushManager && r.pushManager.getSubscription()).then(s => {
+  const on = !!s && window.Notification && Notification.permission === 'granted'; if (s && on) guardarSub(s);
+  if (on !== !!S.push) { S.push = on; if ((S.v === 'hoy' || S.v === 'plan') && !(document.activeElement && document.activeElement.matches('input,textarea'))) render(); } }).catch(() => {});
+async function activarPush(btn) {
+  if (!pushOK()) { toast('Este navegador no permite avisos.'); return; }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { toast(perm === 'denied' ? 'Avisos bloqueados. Actívalos en Ajustes.' : 'No se activaron los avisos.'); render(); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Activando…'; }
+  try {
+    const reg = await swReg();
+    const { pub } = await fetch(PUSH_FN, { method: 'POST', headers: PUSH_H, body: '{"init":true}' }).then(r => r.json());
+    const s = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(pub) }));
+    if (!(await guardarSub(s))) throw new Error('save');
+    S.push = true; toast('Avisos activados 🔔'); render();
+  } catch (e) { console.error(e); toast('No se pudieron activar los avisos. Intenta de nuevo.'); if (btn) { btn.disabled = false; btn.textContent = '🔔 Activar avisos'; } }
+}
+async function probarPush(btn) { btn.disabled = true; const s = await (await swReg()).pushManager.getSubscription();
+  const r = s ? await fetch(PUSH_FN, { method: 'POST', headers: PUSH_H, body: JSON.stringify({ prueba: s.endpoint }) }).then(x => x.json()).catch(() => ({})) : {};
+  btn.disabled = false; toast(r.ok ? 'Aviso de prueba enviado ✓' : 'No llegó la prueba. Desactiva y vuelve a activar.'); }
+async function desactivarPush() { const s = await (await swReg()).pushManager.getSubscription();
+  if (s) { await sb.rpc('borrar_mi_push', { p_endpoint: s.endpoint }); await s.unsubscribe().catch(() => {}); }
+  S.push = false; toast('Avisos desactivados'); render(); }
+function avisosCard() { const e = pushEstado(); const b = {
+  on: `<div class="small ok" style="font-weight:700">Activados en este teléfono ✓</div><div class="small muted">Te avisamos cuando Franco te agenda algo y el día anterior.</div><div class="grid2"><button class="btn" data-pushtest="1">Enviar prueba</button><button class="btn" data-pushoff="1">Desactivar</button></div>`,
+  off: `<div class="small muted">Recibe un aviso cuando Franco te agende una evaluación, reunión, pauta o documento, y un recordatorio el día anterior.</div><button class="btn pri" data-push="1">🔔 Activar avisos</button>`,
+  instalar: `<div class="small muted">En iPhone los avisos funcionan con la app en tu pantalla de inicio:</div><ol class="small" style="margin:0;padding-left:20px;line-height:1.7"><li>Abre este link en <b>Safari</b>.</li><li>Toca <b>Compartir</b> (cuadrado con flecha ↑).</li><li>Elige <b>«Agregar a inicio»</b>.</li><li>Entra a Titanium desde el ícono nuevo y activa los avisos aquí.</li></ol>`,
+  bloqueado: `<div class="small warn">Los avisos están bloqueados. Ve a <b>Ajustes → Notificaciones → Titanium</b> y permítelos.</div>`,
+  no: `<div class="small muted">Este navegador no permite avisos. Usa Safari en iPhone o Chrome en Android.</div>` }[e];
+  return `<section class="card" id="push-card"><h2>🔔 Avisos</h2>${b}</section>`; }
+function avisoBanner() { const e = pushEstado(); let x = null; try { x = localStorage.getItem('tl-pushx'); } catch (_) {}
+  if (x || !['off', 'instalar'].includes(e)) return '';
+  return `<section class="card" style="border-color:var(--ev);background:rgba(77,163,255,.08)"><div class="row"><b>🔔 Activa los avisos</b><button data-pushx="1" aria-label="Ocultar" style="background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer;min-width:36px;min-height:36px">✕</button></div><div class="small muted">Entérate al tiro cuando Franco te agende algo.</div>${e === 'off' ? '<button class="btn pri" data-push="1">Activar avisos</button>' : '<button class="btn" data-go="plan">Ver cómo activarlos</button>'}</section>`; }
+
 async function load() {
   const desde = addDays(today(), -120);
   const [a, p, c, cf, ev] = await Promise.all([
@@ -335,6 +378,7 @@ V.hoy = () => {
   </section>
   ${(() => { const nac = S.perfil?.nac || S.a.nacimiento; return nac && nac.slice(5) === t.slice(5) ? `<section class="card" style="background:linear-gradient(135deg,#d71f30,#7a0f1a);border-color:#d71f30;text-align:center"><div style="font-size:40px">🎂</div><div class="disp" style="font-size:28px;color:#fff">¡Feliz cumpleaños, ${esc(nombreC)}!</div><div style="color:#ffe3e6">Todo el equipo Titanium te desea un gran día. Hoy celebra… y entrena con todo 💪</div></section>` : ''; })()}
   ${(() => { const [tit, txt] = fraseDelDia(); return `<section class="card" style="background:linear-gradient(135deg,#2a0d12,#1b181c 60%);border-color:#4a1d24"><div class="row"><span class="eyebrow red">Pensamiento del día</span><span class="small muted">${esc(tit)}</span></div><div style="font:600 19px/1.35 Barlow,sans-serif">«${esc(txt)}»</div><div class="small muted">Inspirado en los principios de Napoleon Hill · <i>Piense y hágase rico</i> y <i>Más astuto que el diablo</i></div></section>`; })()}
+  ${avisoBanner()}
   ${evDia(t).map(evHTML).join('')}
   <div class="grid2">
     <div class="card kpi"><div class="small muted">Clases del plan</div><div class="v">${usadas} <span class="muted" style="font-size:18px">de ${tot || '—'}</span></div>${tot ? `<div class="bar"><i style="width:${Math.min(100, Math.round(usadas / tot * 100))}%"></i></div>` : ''}</div>
@@ -435,10 +479,10 @@ V.progreso = () => {
   <section class="card"><h2>Tus mejores marcas</h2>${best.length ? best.slice(0, 8).map(([n, b]) => `<div class="row small"><span>${esc(n.replace(/^\d+[ab]? · /, ''))}</span><b>${esc(fmtSet(b))}</b></div>`).join('') : '<div class="small muted">Cuando anotes tus series en «Rutina», aquí verás tus récords.</div>'}</section>`;
 };
 V.plan = () => {
-  const p = planActual(); if (!p) return `<h1>Mi perfil</h1>${perfilCard()}<div class="card"><div class="muted">Todavía no tienes un plan registrado. Habla con Franco.</div></div><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
+  const p = planActual(); if (!p) return `<h1>Mi perfil</h1>${perfilCard()}${avisosCard()}<div class="card"><div class="muted">Todavía no tienes un plan registrado. Habla con Franco.</div></div><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
   const usadas = presentes(p.inicio, p.fin); const tot = p.clases || S.a.clases || 0; const ab = abonado(p); const saldo = Math.max(0, (p.monto || 0) - ab);
   const dias = (S.a.bloques || []).map(k => DL[k.split('-')[0]] + ' ' + k.split('-')[1]).join(' · ');
-  return `<h1>Mi perfil</h1>${perfilCard()}<div class="eyebrow">Mi plan</div>
+  return `<h1>Mi perfil</h1>${perfilCard()}${avisosCard()}<div class="eyebrow">Mi plan</div>
   <section class="card"><div class="row" style="align-items:center"><div><div class="disp" style="font-size:26px">Plan ${tot || ''} clases</div><div class="small muted">${esc(fmtD(p.inicio))} → ${esc(fmtD(p.fin))}${dias ? ' · ' + esc(dias) : ''}</div></div>
     <span class="small ${saldo ? 'warn' : 'ok'}" style="font-weight:700">${saldo ? 'Pendiente' : 'Pagado'}</span></div>
     <div class="row small"><span class="muted">Clases usadas</span><b>${usadas} de ${tot || '—'}</b></div>${tot ? `<div class="bar"><i style="width:${Math.min(100, Math.round(usadas / tot * 100))}%"></i></div>` : ''}
@@ -541,6 +585,10 @@ async function solicitar(tipo, data) {
   if (error) { toast('No se pudo enviar. Intenta de nuevo.'); return false; } toast('Enviado a Franco ✓'); return true;
 }
 document.addEventListener('click', async ev => {
+  const pa = ev.target.closest('[data-push]'); if (pa) { activarPush(pa); return; }
+  const pt = ev.target.closest('[data-pushtest]'); if (pt) { probarPush(pt); return; }
+  if (ev.target.closest('[data-pushoff]')) { desactivarPush(); return; }
+  if (ev.target.closest('[data-pushx]')) { try { localStorage.setItem('tl-pushx', '1'); } catch (_) {} render(); return; }
   const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.v = go.dataset.go || go.dataset.v; render(); return; }
   const chk = ev.target.closest('[data-chk]'); if (chk) { const row = chk.closest('.set'); const ins = [...row.querySelectorAll('input')];
     if (row.classList.contains('done') && ins.every(i => i.value.trim() !== '')) return;
@@ -579,6 +627,10 @@ document.addEventListener('click', async ev => {
   }
 });
 render();
+const evq = new URLSearchParams(location.search).get('ev');
+if (evq) { history.replaceState(null, '', location.pathname); abrirEvento(evq); }
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', m => { const u = m.data && m.data.ev; if (!u) return;
+  const id = new URL(u).searchParams.get('ev'); load().then(() => { render(); if (id) abrirEvento(id); }); });
 const rel = async () => { await load(); if (!document.activeElement || !document.activeElement.matches('input')) render(); };
 sb.channel('al-' + codigo).on('postgres_changes', { event: '*', schema: 'public', table: 'clases', filter: 'alumno=eq.' + codigo }, rel).on('postgres_changes', { event: '*', schema: 'public', table: 'eventos' }, rel).subscribe();
 })();
