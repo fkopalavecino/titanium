@@ -1301,6 +1301,7 @@ function fichaAlumno(code) {
     </div>
   `;
   const fichaExistente = () => `
+    ${a.perfil ? `<div style="display:flex;gap:12px;align-items:center">${a.perfil.avatar && fotoURL(a.perfil.avatar) ? `<img src="${fotoURL(a.perfil.avatar)}" alt="" data-act="foto-zoom" style="width:52px;height:52px;border-radius:50%;object-fit:cover;cursor:zoom-in">` : ''}<div>${a.perfil.apodo ? `<b>«${esc(a.perfil.apodo)}»</b>` : ''}${a.perfil.meta ? `<div class="small muted">🎯 Su objetivo: ${esc(a.perfil.meta)}</div>` : ''}</div></div>` : ''}
     ${(() => { const ing = a.ingreso || {}; const al = [];
       if (ing.parq?.length) al.push(`<span class="pill crit">PAR-Q: pedir autorización médica</span>`);
       if (lesionCorta(a).length) al.push(`<span class="pill warn">⚠ ${esc(lesionCorta(a).join(', '))}</span>`);
