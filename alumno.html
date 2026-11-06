@@ -36,11 +36,23 @@ h2{font-size:22px}
 .chip{padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 13px Barlow,sans-serif;white-space:nowrap;cursor:pointer}
 .chip[aria-pressed=true]{background:var(--red);border-color:var(--red);color:#fff}
 .ej{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line)}.ej:first-of-type{border-top:0;padding-top:0}
-.sets{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
-.set{background:var(--sunk);border:1px dashed #4a4247;border-radius:10px;padding:6px 8px;display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;color:var(--muted)}
-.set.done{border-style:solid;border-color:var(--red)}
-.set span{grid-column:1/-1;text-align:center}
-.set input{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--fg);font:600 15px Barlow,sans-serif;text-align:center;padding:2px 0}
+.sets{display:grid;gap:6px;margin-top:4px}
+.set-h,.set{display:grid;grid-template-columns:30px minmax(0,1fr) 74px 64px 44px;gap:8px;align-items:center}
+.set-h{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:0 6px}
+.set-h span:nth-child(n+3){text-align:center}
+.set{background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:6px}
+.set.done{border-color:var(--ok);background:rgba(111,211,154,.08)}
+.set .n{text-align:center;font-weight:700}
+.set .prev{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.set input{width:100%;height:42px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:700 18px Barlow,sans-serif;text-align:center;padding:0}
+.set input::placeholder{color:#5b5358;font-weight:600}
+.set .chk{height:42px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:18px;cursor:pointer}
+.set.done .chk{background:var(--ok);border-color:var(--ok);color:#0e0c0f}
+details.blk>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px}
+details.blk>summary::-webkit-details-marker{display:none}
+details.blk>summary .chev{transition:transform .2s;color:var(--muted);font-size:20px}
+details.blk[open]>summary .chev{transform:rotate(90deg)}
+details.blk:not([open]){padding-bottom:16px}
 input,select,textarea{font-family:Barlow,sans-serif}
 .field{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}
 .field input,.field select,.field textarea{min-height:46px;border-radius:10px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);padding:8px 12px;font-size:16px}
@@ -293,6 +305,9 @@ V.hoy = () => {
   <section class="card"><div class="small">Este mes llevas <b>${delMes} clase${delMes === 1 ? '' : 's'}</b>. ${delMes >= 8 ? '¡Vas excelente!' : 'Cada clase suma.'}</div></section>
   <div class="small muted" style="text-align:center;font-style:italic">«${esc(S.cfg.lema || 'El que abandona pierde')}» · ${esc(S.cfg.gimnasio || 'Titanium Sport')}</div>`;
 };
+const blkCerrados = () => { try { return JSON.parse(localStorage.getItem('tl-blk') || '[]'); } catch (e) { return []; } };
+document.addEventListener('toggle', ev => { const d = ev.target; if (!d.matches || !d.matches('details.blk')) return; const i = Number(d.dataset.blk); let c = blkCerrados().filter(x => x !== i); if (!d.open) c.push(i); try { localStorage.setItem('tl-blk', JSON.stringify(c)); } catch (e) {} }, true);
+function prevSets(nombre) { const t = today(); for (let i = S.clases.length - 1; i >= 0; i--) { const r = S.clases[i]; if (r.fecha >= t) continue; const e = (r.ej || []).find(x => x.n === nombre); if (e) return e.sets && e.sets.length ? e.sets : [{ kg: e.kg, r: e.r }]; } return []; }
 V.rutina = () => {
   const rd = rutinaDeHoy(); const r = rd.r;
   if (!r) return `<h1>Rutina</h1><div class="card"><div class="muted">Aún no tienes una rutina asignada. Franco te la asigna en la clase.</div></div>`;
@@ -301,14 +316,15 @@ V.rutina = () => {
   return `
   <div><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) : ''}</div><h1>${esc(r.tipo || 'Rutina')}</h1></div>
   ${bloques.map((b, bi) => { const isB = /bloque b/i.test(b.titulo || '');
-    return `<section class="card"><div class="row"><h2>${esc(b.titulo)}</h2></div>${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}
+    const nEj = (b.ejercicios || []).length; const cerrado = blkCerrados().includes(bi);
+    return `<details class="card blk" data-blk="${bi}" ${cerrado ? '' : 'open'}><summary><div><h2>${esc(b.titulo)}</h2><div class="small muted">${nEj} ejercicio${nEj === 1 ? '' : 's'}</div></div><span class="chev" aria-hidden="true">›</span></summary>${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}
       ${(b.ejercicios || []).map((e, ei) => { const last = (H[e.nombre] || []).filter(x => x.f < today()).slice(-1)[0]; const c = cur[e.nombre];
         const n = isB ? nSer(e.dosis) : 0; const sets = c?.sets || [];
         return `<div class="ej"><div class="row"><b>${esc(e.nombre)}</b><span class="small muted" style="white-space:nowrap">${esc(e.dosis)}</span></div>
-          ${isB ? `${last ? `<div class="small muted">Última vez: <b style="color:var(--fg)">${esc(fmtSet(last))}</b></div>` : ''}
-          <div class="sets">${Array.from({ length: n }, (_, i) => { const s = sets[i] || {}; const done = s.kg != null || s.r != null;
-            return `<div class="set ${done ? 'done' : ''}"><span>Serie ${i + 1}</span><input inputmode="decimal" placeholder="kg" aria-label="kg serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s.kg != null ? esc(String(s.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="reps" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s.r != null ? esc(s.r) : ''}"></div>`; }).join('')}</div>` : ''}</div>`; }).join('')}
-    </section>`; }).join('')}
+          ${isB ? (() => { const pv = prevSets(e.nombre);
+            return `<div class="sets"><div class="set-h"><span>Serie</span><span>Anterior</span><span>Kg</span><span>Reps</span><span></span></div>${Array.from({ length: n }, (_, i) => { const s = sets[i] || {}; const done = s.kg != null || s.r != null; const p = pv[i] || pv[pv.length - 1];
+            return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span><span class="prev">${p ? esc(fmtSet(p)) : '—'}</span><input inputmode="decimal" placeholder="${p && p.kg != null ? esc(String(p.kg).replace('.', ',')) : 'kg'}" aria-label="kg serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s.kg != null ? esc(String(s.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${p && p.r != null ? esc(p.r) : 'reps'}" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s.r != null ? esc(s.r) : ''}"><button type="button" class="chk" data-chk="1" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }).join('')}</div>`; })() : ''}</div>`; }).join('')}
+    </details>`; }).join('')}
   <section class="card">
     <label class="field">Resultado del bloque C<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>
     <div class="field">¿Qué tan duro fue? (RPE)<div class="chips">${[5,6,7,8,9,10].map(v => `<button class="chip" data-rpe="${v}" aria-pressed="${String(rd.rec?.rpe ?? S.rpe) === String(v)}">${v}</button>`).join('')}</div></div>
@@ -465,6 +481,10 @@ async function solicitar(tipo, data) {
 }
 document.addEventListener('click', async ev => {
   const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.v = go.dataset.go || go.dataset.v; render(); return; }
+  const chk = ev.target.closest('[data-chk]'); if (chk) { const row = chk.closest('.set'); const ins = [...row.querySelectorAll('input')];
+    if (row.classList.contains('done') && ins.every(i => i.value.trim() !== '')) return;
+    ins.forEach(i => { if (i.value.trim() === '' && !/kg|reps/.test(i.placeholder)) { i.value = i.placeholder; i.dispatchEvent(new Event('input', { bubbles: true })); } });
+    if (ins.some(i => i.value.trim() !== '')) row.classList.add('done'); else toast('Anota los kilos y las repeticiones.'); return; }
   if (ev.target.id === 'ib-ok') { guardarInbody(ev.target); return; }
   const ibi = ev.target.closest('[data-ibi]'); if (ibi) { S.ibInfo = ibi.dataset.ibi; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'fup-open') { S.fotoUp = !S.fotoUp; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; }
