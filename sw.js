@@ -12,8 +12,13 @@ self.addEventListener('push', e => {
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   const url = (e.notification.data && e.notification.data.url) || new URL('./alumno.html', self.registration.scope).href;
-  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
-    for (const c of cs) if (c.url.includes('alumno.html') && 'focus' in c) { c.postMessage({ ev: url }); return c.focus(); }
-    return self.clients.openWindow(url);
-  }));
+  const ev = new URL(url).searchParams.get('ev');
+  e.waitUntil((async () => {
+    // deja anotado a qué evento ir: la app lo lee al abrirse o al volver a primer plano
+    if (ev) { const c = await caches.open('tl-push'); await c.put('pending', new Response(JSON.stringify({ ev, t: Date.now() }))); }
+    const cs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const c = cs.find(x => x.url.includes('alumno.html')) || cs[0];
+    if (c) { c.postMessage({ ev: url }); try { await c.focus(); } catch (_) {} return; }
+    await self.clients.openWindow(url);
+  })());
 });
