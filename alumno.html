@@ -641,10 +641,22 @@ document.addEventListener('click', async ev => {
   }
 });
 render();
+/* abrir el evento de un aviso: Evaluación → Progreso (evaluaciones); el resto → Agenda en ese día */
+async function irAEvento(id) {
+  let e = S.eventos.find(x => String(x.id) === String(id));
+  if (!e) { await load(); e = S.eventos.find(x => String(x.id) === String(id)); } if (!e) return;
+  document.getElementById('sheet')?.remove();
+  if (e.tipo === 'Evaluación') S.v = 'progreso'; else { S.v = 'agenda'; S.dia = e.fecha; S.wk = lunesDe(e.fecha); }
+  render(); if (S.v === 'progreso') document.getElementById('ib-card')?.scrollIntoView({ block: 'start' });
+  abrirEvento(e.id);
+}
+async function avisoPendiente() { if (!('caches' in window)) return null;
+  try { const c = await caches.open('tl-push'); const r = await c.match('pending'); if (!r) return null; await c.delete('pending'); const p = await r.json(); return Date.now() - p.t < 15 * 60e3 ? p.ev : null; } catch (_) { return null; } }
+const revisarAviso = async () => { const id = await avisoPendiente(); if (id) irAEvento(id); };
 const evq = new URLSearchParams(location.search).get('ev');
-if (evq) { history.replaceState(null, '', location.pathname); abrirEvento(evq); }
-if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', m => { const u = m.data && m.data.ev; if (!u) return;
-  const id = new URL(u).searchParams.get('ev'); load().then(() => { render(); if (id) abrirEvento(id); }); });
+if (evq) { history.replaceState(null, '', location.pathname); avisoPendiente(); irAEvento(evq); } else revisarAviso();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') revisarAviso(); });
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', m => { if (m.data && m.data.ev) revisarAviso(); });
 const rel = async () => { await load(); if (!document.activeElement || !document.activeElement.matches('input')) render(); };
 sb.channel('al-' + codigo).on('postgres_changes', { event: '*', schema: 'public', table: 'clases', filter: 'alumno=eq.' + codigo }, rel).on('postgres_changes', { event: '*', schema: 'public', table: 'eventos' }, rel).subscribe();
 })();
