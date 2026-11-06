@@ -1312,8 +1312,18 @@ function fichaAlumno(code) {
       ${p ? `<div class="small num">${clp(p.monto)} · abonado ${clp(abonado(p))} · ${fmtDY(p.inicio)} → ${fmtDY(p.fin)} · ${p.clases || '—'} clases</div>` : '<div class="small muted">Sin plan registrado.</div>'}
       <div class="tools">${p ? `<button type="button" class="btn sm" data-act="abonar" data-id="${esc(a.codigo)}" data-p="${esc(p.id)}">Abonar</button><button type="button" class="btn sm" data-act="renovar" data-id="${esc(a.codigo)}">Renovar</button><button type="button" class="btn sm" data-act="editar-plan" data-id="${esc(a.codigo)}" data-p="${esc(p.id)}">Editar plan</button>` : `<button type="button" class="btn sm pri" data-act="nuevo-plan" data-id="${esc(a.codigo)}">Crear plan</button>`}<button type="button" class="btn sm ghost" data-act="msg" data-id="${esc(a.codigo)}">Mensaje</button></div>
     </div>
-    <div class="card pad" style="display:grid;gap:10px;box-shadow:none;background:var(--sunk)">
-      <b>Programa de entrenamiento</b>
+    ${(() => { const pg = progEstado(a); const t0 = today(); const a30 = asistencias(a.codigo, addDays(t0, -30), t0); const pc = a30.pres + a30.aus ? Math.round(100 * a30.pres / (a30.pres + a30.aus)) : null;
+      const tel = String(a.telefono || '').replace(/\D/g, '');
+      const tile = (l, v, s) => `<div class="card pad" style="box-shadow:none;background:var(--sunk);display:grid;gap:2px;min-width:0"><span class="small muted">${l}</span><b style="overflow:hidden;text-overflow:ellipsis">${v}</b>${s ? `<span class="small muted">${s}</span>` : ''}</div>`;
+      return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+        ${tile('Programa', a.programa?.familia ? esc(a.programa.familia) : '<span class="muted">Sin programa</span>', pg ? `Semana ${Math.min(pg.semana, pg.total)} de ${pg.total} · próxima: ${esc(pg.next[1].tipo || '')}` : '')}
+        ${tile('Asistencia · 30 días', pc == null ? '—' : pc + ' %', `${a30.pres} presentes · ${a30.aus} ausencias`)}
+        ${tile('Horario', esc(bloquesTexto(a) || '—'), (a.clases || '—') + ' clases por ciclo')}
+        ${tile('Contacto', tel ? `<a href="https://wa.me/${tel}" target="_blank" rel="noopener">${esc(a.telefono)}</a>` : '<span class="muted">Sin teléfono</span>', a.email ? (a.vinculado ? 'App activa ✓' : 'Correo cargado · aún no entra') : 'Sin correo para la app')}
+      </div>`; })()}
+    <label class="f">Notas · lesiones, objetivos, preferencias<textarea id="fa-notas" rows="3">${esc(a.notas)}</textarea></label>
+    <details class="sec" ${!a.programa?.familia ? 'open' : ''}><summary>Cambiar programa <span class="small muted" style="font-weight:500">· ${esc(a.programa?.familia ? a.programa.familia + ' · ' + (a.programa.nivel || '') : 'sin programa')}</span></summary>
+    <div style="display:grid;gap:10px;margin-top:8px">
       <div class="frow">
         <label class="f">Programa<select id="fa-prog"><option value="">Sin programa</option>${progOptions(a.programa?.familia)}</select></label>
         <label class="f">Nivel<select id="fa-pniv">${['Básico','Intermedio','Avanzado'].map(n => `<option ${(a.programa?.nivel || 'Básico') === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
@@ -1324,11 +1334,15 @@ function fichaAlumno(code) {
       </div>
       ${(() => { const pg = progEstado(a); return pg ? `<div class="small muted num">Semana ${Math.min(pg.semana, pg.total)} de ${pg.total} · ${pg.hechas} sesiones hechas · próxima: <b style="color:var(--fg)">${esc(pg.next[1].tipo || '')}</b>${pg.terminado ? ' · <b style="color:var(--warn)">terminado: elige el siguiente programa o sube de nivel</b>' : ''}</div>` : `<div class="small muted">La sesión que le toca aparecerá sola en "Clase de hoy" y rota según su asistencia.</div>`; })()}
     </div>
-    <label class="f">Notas · lesiones, objetivos, preferencias<textarea id="fa-notas" rows="3">${esc(a.notas)}</textarea></label>
+    </details>
+    <details class="sec"><summary>Últimas clases y cargas <span class="small muted" style="font-weight:500">· ${as.pres} presentes, ${as.aus} ausencias en total</span></summary>
+    <div style="display:grid;gap:12px;margin-top:8px">
     <div><b>Asistencia</b> <span class="muted small num">· ${as.pres} presentes, ${as.aus} ausencias en total</span>
       <div class="list small" style="margin-top:4px">${hist.slice(0,8).map(([f,h,r]) => `<div class="li"><span class="grow num">${fmtDY(f)} · ${esc(h)}${r.carga ? ' · ' + esc(r.carga) : ''}${r.rpe ? ' · RPE ' + esc(r.rpe) : ''}</span><span class="pill ${r.asis === 'presente' ? 'ok' : 'crit'}">${r.asis === 'presente' ? 'Presente' : 'Ausente'}</span></div>`).join('') || '<div class="muted">Sin registros todavía.</div>'}</div></div>
     ${(() => { const cs = cargasDe(a.codigo); if (!cs.length) return ''; const by = {}; cs.forEach(x => (by[x.n] = by[x.n] || []).push(x));
       return `<div><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><span><b>Cargas registradas</b> <span class="muted small">· última vez y mejor marca</span></span><button type="button" class="btn sm" data-act="progreso" data-id="${esc(a.codigo)}">Ver progreso completo</button></div><div class="list small" style="margin-top:4px">${Object.entries(by).slice(0, 6).map(([n, xs]) => { const best = xs.filter(x => x.kg != null).sort((p, q) => q.kg - p.kg || (q.r || 0) - (p.r || 0))[0]; return `<div class="li"><span class="grow"><b>${esc(n)}</b><span class="muted num"> · ${fmtDY(xs[0].f)}: ${esc(fmtSet(xs[0]))}${xs.length > 1 ? ` · antes: ${esc(fmtSet(xs[1]))}` : ''}</span></span>${best ? `<span class="pill info num">Mejor ${esc(fmtSet(best))}</span>` : ''}</div>`; }).join('')}</div></div>`; })()}
+    </div>
+    </details>
     <details class="sec" ${isNew ? 'open' : ''}><summary>Horario fijo <span class="small muted" style="font-weight:500">· ${esc(bloquesTexto(a))}</span></summary>
       ${grid}
     </details>
@@ -1358,7 +1372,9 @@ function fichaAlumno(code) {
       <label class="f">Clases por ciclo<input type="number" id="fa-clases" min="1" value="${esc(a.clases || '')}"></label>
     </div>
     </details>
+    <details class="sec"><summary>Historial de planes <span class="small muted" style="font-weight:500">· ${planesOrden(a).length} plan${planesOrden(a).length === 1 ? '' : 'es'}</span></summary>
     <div class="planes-h"><b>Historial de planes</b><div class="list small" style="margin-top:4px">${planesOrden(a).reverse().map(x => `<div class="li"><span class="grow num">${fmtDY(x.inicio)} → ${fmtDY(x.fin)} · ${clp(x.monto)}</span>${pill(pagoEstado(x))}</div>`).join('') || '<div class="muted">—</div>'}</div></div>
+    </details>
     <div id="del-zone"></div>
   `;
   openModal(isNew ? 'Nuevo alumno' : a.nombre, `
