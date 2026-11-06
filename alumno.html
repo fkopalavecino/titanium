@@ -653,7 +653,7 @@ function proximoHTML() { const t = today(); const pred = prediccion(); const it 
     const badge = `<span class="dt"><small>${esc(dia)}</small><b>${dt.getDate()}</b></span>`;
     if (x.k === 'e') { const e = x.e; return `<button class="nx e" data-evid="${esc(e.id)}">${badge}<span><b>${EVI[e.tipo] || '📌'} ${esc(e.titulo)}</b><span class="small muted">${e.hora ? esc(e.hora.slice(0, 5)) + ' · ' : ''}${esc(e.tipo || 'Actividad')}</span></span><span class="chev" aria-hidden="true">›</span></button>`; }
     return `<button class="nx c" data-goday="${x.f}">${badge}<span><b>🏋️ ${esc(x.tit)}</b><span class="small muted">${esc(x.h)} · ${esc(x.sub)}</span></span><span class="chev" aria-hidden="true">›</span></button>`; };
-  return `<section class="card"><div class="row"><span class="eyebrow">Lo que viene</span><button class="chip" data-go="agenda">Ver agenda</button></div>
+  return `<section class="card"><span class="eyebrow">Lo que viene</span>
     ${lst.length ? `<div style="display:grid;gap:8px">${lst.map(fila).join('')}</div>` : '<div class="small muted">No tienes clases ni actividades en los próximos días.</div>'}</section>`; }
 const EVI = { 'Reunión': '👥', 'Evaluación': '📋', 'Actividad': '🏃', 'Evento': '⭐', 'Nutrición': '🥗', 'Documento': '📄', 'Otro': '📌' };
 const EVA = { 'Evaluación': 'Ver mis evaluaciones ›', 'Nutrición': 'Ver mi pauta ›', 'Reunión': 'Ver detalle y agendar ›', 'Documento': 'Abrir documento ›' };
