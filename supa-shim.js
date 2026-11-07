@@ -356,7 +356,7 @@
     const { data: al } = await sb.from('alumnos').select('codigo,nombre,estado,fotos,inbody,medidas').order('nombre');
     const act = (al || []).filter(a => a.estado !== 'inactivo');
     const nom = Object.fromEntries((al || []).map(a => [a.codigo, a.nombre]));
-    let tipo = 'Reunión', vista = 'nuevo', eventos = [], pasados = [], editId = null, editAdj = null, quitarAdj = false;
+    let tipo = 'Reunión', vista = 'nuevo', eventos = [], pasados = [], evPasadas = [], editId = null, editAdj = null, quitarAdj = false;
     p.innerHTML = `<div class="sh" role="dialog" aria-modal="true" aria-labelledby="tl-ag-h">
       <header><div class="hd"><h3 id="tl-ag-h">Agenda de alumnos</h3><button class="x" data-x="1" aria-label="Cerrar">✕</button></div>
         <div class="seg" role="tablist"><button role="tab" data-v="nuevo" aria-selected="true" id="tl-ag-tabn">＋ Nuevo</button><button role="tab" data-v="prox" aria-selected="false">Próximos <span id="tl-ag-n"></span></button><button role="tab" data-v="hist" aria-selected="false">Historial</button><button role="tab" data-v="fot" aria-selected="false">📋 Evaluaciones</button><button role="tab" data-v="msj" aria-selected="false">📣 Mensaje</button></div></header>
@@ -407,7 +407,7 @@
     const estadoFotos = () => act.map(a => {
       const arr = x => Array.isArray(x) ? x : [];
       const fs = [...new Set([...arr(a.fotos).filter(x => x && x.f && (x.frente || x.perfil || x.espalda)).map(x => x.f), ...arr(a.inbody).filter(x => x && x.f).map(x => x.f),
-        ...arr(a.medidas).filter(x => x && x.f).map(x => x.f), ...pasados.filter(e => e.alumno === a.codigo && esFoto(e)).map(e => e.fecha)])].sort();
+        ...arr(a.medidas).filter(x => x && x.f).map(x => x.f), ...evPasadas.filter(e => e.alumno === a.codigo).map(e => e.fecha)])].sort();
       const ult = fs[fs.length - 1] || null, toca = ult ? sumD(ult, semFoto * 7) : null;
       const ag = eventos.filter(e => e.alumno === a.codigo && esFoto(e)).map(e => e.fecha).sort()[0] || null;
       const k = ag ? 3 : !ult ? 0 : toca <= sumD(iso, 3) ? 1 : 2; // 0 nunca evaluado · 1 le toca · 2 al día · 3 agendada
@@ -463,10 +463,11 @@
       m(msjProg ? 'Programado ✓ Se enviará ' + fHora(cuando) + '.' : 'Enviado ✓ Les llega en unos segundos.'); setMq(false);
       setTimeout(listaMsj, msjProg ? 0 : 2500); listaMsj(); };
     const lista = async () => {
-      const [a, b] = await Promise.all([
+      const [a, b, c] = await Promise.all([
         sb.from('eventos').select('*').gte('fecha', iso).order('fecha').order('hora', { nullsFirst: true }).limit(60),
-        sb.from('eventos').select('*').lt('fecha', iso).order('fecha', { ascending: false }).order('hora', { nullsFirst: true }).limit(100)]);
-      eventos = a.data || []; pasados = b.data || []; pintar(); if (vista === 'fot') pintarFotos(); };
+        sb.from('eventos').select('*').lt('fecha', iso).order('fecha', { ascending: false }).order('hora', { nullsFirst: true }).limit(100),
+        sb.from('eventos').select('alumno,fecha,tipo').eq('tipo', 'Evaluación').lt('fecha', iso).limit(2000)]);
+      eventos = a.data || []; pasados = b.data || []; evPasadas = c.data || []; pintar(); if (vista === 'fot') pintarFotos(); };
     const ver = v => { vista = v; p.querySelectorAll('[data-v]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.v === v)));
       $('tl-ag-nuevo').hidden = v !== 'nuevo'; $('tl-ag-prox').hidden = v !== 'prox'; $('tl-ag-hist').hidden = v !== 'hist'; $('tl-ag-fot').hidden = v !== 'fot'; if (v === 'fot') pintarFotos(); $('tl-ag-msj').hidden = v !== 'msj'; if (v === 'msj') listaMsj(); $('tl-ag-foot').hidden = v !== 'nuevo'; };
     const conAdj = () => editAdj && !quitarAdj;
@@ -568,7 +569,7 @@
       b.disabled = true; b.textContent = '⏳ Preparando respaldo…';
       try {
         const out = { app: 'Titanium Sport', fecha: new Date().toISOString(), tablas: {} };
-        for (const t of ['alumnos', 'planes', 'clases', 'rutinas', 'eventos', 'solicitudes', 'config', 'coaches']) {
+        for (const t of ['alumnos', 'planes', 'clases', 'rutinas', 'eventos', 'solicitudes', 'config', 'coaches', 'confirmaciones', 'mensajes']) {
           const rows = []; for (let i = 0; ; i += 1000) { const { data, error } = await sb.from(t).select('*').range(i, i + 999); if (error) throw new Error(t + ': ' + error.message); rows.push(...data); if (data.length < 1000) break; }
           out.tablas[t] = rows;
         }
