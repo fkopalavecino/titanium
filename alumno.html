@@ -204,7 +204,7 @@ while (!codigo) {
     <img src="icon-192.png" alt="" width="68" height="68" style="border-radius:16px">
     <h1>Tu código de invitación</h1>
     <p class="muted" style="margin:0">Escribe el código de 6 letras que te mandó ${esc(profe)} por WhatsApp.</p>
-    ${inv ? `<div class="note small" style="max-width:340px;border:1px solid var(--warn)">El código <b>${esc(inv)}</b> no funcionó o ya se usó. Revísalo o pide ayuda.</div>` : ''}
+    ${inv ? `<div class="note small" style="max-width:340px;border:1px solid var(--warn)">El código <b>${esc(inv)}</b> no funcionó: puede estar mal escrito, ya se usó o venció (dura 24 horas). Pide uno nuevo.</div>` : ''}
     <input id="inv-in" autocapitalize="characters" autocomplete="off" maxlength="12" placeholder="Ej: K7M2QX" style="width:100%;max-width:340px;min-height:56px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);text-align:center;letter-spacing:.25em;font:700 22px Barlow,sans-serif;text-transform:uppercase">
     <button class="btn pri" id="inv-ok" style="width:100%;max-width:340px">Entrar</button>
     ${ayuda ? `<a class="btn" href="${ayuda}" target="_blank" rel="noopener" style="width:100%;max-width:340px;background:#1f7a4d;border-color:#1f7a4d;color:#fff">💬 Pedir ayuda a ${esc(profe)}</a>` : ''}

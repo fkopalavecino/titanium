@@ -1362,7 +1362,7 @@ function fichaAlumno(code) {
         ${tile('Horario', esc(bloquesTexto(a) || '—'), (a.clases || '—') + ' clases por ciclo')}
         ${tile('Contacto', tel ? `<a href="https://wa.me/${tel}" target="_blank" rel="noopener">${esc(a.telefono)}</a>` : '<span class="muted">Sin teléfono</span>', a.email ? (a.vinculado ? 'App activa ✓' : 'Correo cargado · aún no entra') : (a.vinculado ? 'App activa ✓' : 'Aún no entra a la app'))}
       </div>`; })()}
-    ${a.vinculado ? `<div class="card pad" style="box-shadow:none;background:var(--sunk);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="grow small">📱 <b>Usa la app${a.email ? ' con ' + esc(a.email) : ''}.</b> Si borró la app, basta con que entre de nuevo con ese correo. Si cambió de correo o no puede entrar, mándale un código nuevo.</span><button type="button" class="btn sm" data-act="reinvitar" data-id="${esc(a.codigo)}">🔄 Reinvitar</button></div>` : ''}
+    ${a.vinculado ? `<div class="card pad" style="box-shadow:none;background:var(--sunk);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="grow small">📱 <b>Usa la app${a.email ? ' con ' + esc(a.email) : ''}.</b> Si borró la app o cambió de teléfono, mándale un código nuevo con Reinvitar (vale 24 horas).</span><button type="button" class="btn sm" data-act="reinvitar" data-id="${esc(a.codigo)}">🔄 Reinvitar</button></div>` : ''}
     ${!a.vinculado ? `<div class="card pad" style="box-shadow:none;background:var(--sunk);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="grow small">📲 <b>${esc(firstName(a.nombre))} aún no usa la app.</b> Mándale su link personal por WhatsApp: entra con el correo que quiera y queda vinculado a esta ficha.</span><button type="button" class="btn sm pri" data-act="invitar" data-id="${esc(a.codigo)}">Invitar a la app</button></div>` : ''}
     <label class="f">Notas · lesiones, objetivos, preferencias<textarea id="fa-notas" rows="3">${esc(a.notas)}</textarea></label>
     <details class="sec" ${!a.programa?.familia ? 'open' : ''}><summary>Cambiar programa <span class="small muted" style="font-weight:500">· ${esc(a.programa?.familia ? a.programa.familia + ' · ' + (a.programa.nivel || '') : 'sin programa')}</span></summary>
@@ -1851,7 +1851,7 @@ document.addEventListener('click', e => {
   if (act === 'inv-guia') { e.preventDefault(); compartirGuia().then(ok => { if (ok) el.textContent = '✓ Guía enviada'; }); return; }
   if (act === 'link-grupo') { e.preventDefault(); linkGrupo(); return; }
   if (act === 'reinvitar') { e.preventDefault(); e.stopPropagation(); const al = S.alumnos.get(id);
-    if (al && confirm(`¿Mandarle un código nuevo a ${firstName(al.nombre)}? Se cierra su sesión actual y entra de nuevo con el código (sus datos y su rutina no se pierden).`)) invitarAlumno(id, el, true); return; }
+    if (al && confirm(`¿Mandarle un código nuevo a ${firstName(al.nombre)}? Le llega un código nuevo que vale 24 horas; su sesión anterior se cierra (sus datos y su rutina no se pierden).`)) invitarAlumno(id, el, true); return; }
   if (act === 'invitar') { e.preventDefault(); e.stopPropagation(); invitarAlumno(id, el); return; }
   if (act === 'cp-on') { cpActivar(el); return; }
   if (act === 'cp-test') { cpProbar(el); return; }
@@ -2027,7 +2027,7 @@ async function invitarAlumno(code, btn, reset) {
   if (btn) { btn.disabled = false; btn.textContent = txt0; }
   if (error || !inv) { toast('No se pudo crear la invitación: ' + (error?.message || ''), true); return; }
   const url = location.origin + location.pathname.replace(/[^/]*$/, '') + 'alumno.html?i=' + inv;
-  const c = cfg(); const msg = `Hola ${firstName(a.nombre)}! 💪 Ya tienes tu app de ${c.gimnasio || 'Titanium Sport'}: tu rutina, tu agenda y tu progreso en el celular.\n\n👉 ${url}\n\nÁbrelo y sigue los pasos que aparecen. Tu código de invitación es: *${inv}*\n\n¡Nos vemos en el gym!`;
+  const c = cfg(); const msg = `Hola ${firstName(a.nombre)}! 💪 Ya tienes tu app de ${c.gimnasio || 'Titanium Sport'}: tu rutina, tu agenda y tu progreso en el celular.\n\n👉 ${url}\n\nÁbrelo y sigue los pasos que aparecen. Tu código de invitación es: *${inv}* (vale 24 horas y se usa una sola vez)\n\n¡Nos vemos en el gym!`;
   const tel = String(a.telefono || '').replace(/\D/g, '');
   INV = { msg, tel }; openModal(`📲 Invitar a ${firstName(a.nombre)}`, previewInvitacion(msg));
 }

@@ -30,7 +30,7 @@
     return `<div class="box">${TL_MARK}${TL_WORD}<div class="sp"></div>
       ${step === 'elige' ? `<p>¿Es tu primera vez en la app? Si te llegó un código del profe por WhatsApp, elige «Primera vez».</p>
         <div style="width:100%;display:flex;flex-direction:column;gap:12px"><button type="button" id="tl-nuevo">🆕 Primera vez · tengo código</button><button type="button" class="sec" id="tl-ya">👋 Ya tengo cuenta</button></div>`
-      : step === 'inv' ? `<p>Escribe el código de 6 letras que te mandó el profe por WhatsApp.</p>
+      : step === 'inv' ? `<p>Escribe el código de 6 letras que te mandó el profe por WhatsApp. Vale 24 horas y se usa una sola vez.</p>
         <form id="tl-fi" style="display:flex;flex-direction:column;gap:12px"><label>Código de invitación<input id="tl-inv" autocapitalize="characters" autocomplete="off" maxlength="12" required placeholder="Ej: K7M2QX" style="text-align:center;letter-spacing:.25em;font-weight:700;text-transform:uppercase"></label><button>Entrar</button><button type="button" class="sec" id="tl-back0">Volver</button></form>`
       : step === 'email' ? `<p>${(() => { try { return localStorage.getItem('tl-inv') && /alumno\.html/.test(location.pathname) ? 'Invitación lista ✓ Ahora escribe tu correo (el que quieras): te enviamos un código para entrar.' : 'Entra con tu correo. Te enviamos un código para entrar.'; } catch (e) { return 'Entra con tu correo. Te enviamos un código para entrar.'; } })()}</p>
         <form id="tl-f1" style="display:flex;flex-direction:column;gap:12px"><label>Tu correo<input id="tl-email" type="email" autocomplete="email" required value="${email || ''}"></label><button>Enviarme el código</button></form>`
