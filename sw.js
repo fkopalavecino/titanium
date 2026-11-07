@@ -1,6 +1,13 @@
-/* Titanium Sport · service worker: solo avisos (sin caché) */
+/* Titanium Sport · service worker: avisos + siempre la última versión de la app (sin caché) */
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+// páginas y scripts propios: se piden siempre frescos para que cada cambio se vea al abrir la app
+self.addEventListener('fetch', e => {
+  const r = e.request; if (r.method !== 'GET') return;
+  const u = new URL(r.url); if (u.origin !== self.location.origin) return;
+  if (r.mode === 'navigate' || /\.(html|js|json)$/.test(u.pathname) || u.pathname.endsWith('/'))
+    e.respondWith(fetch(r, { cache: 'no-store' }).catch(() => fetch(r)));
+});
 self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data && e.data.text() }; }
