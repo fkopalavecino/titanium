@@ -186,12 +186,11 @@ try { const qi = new URLSearchParams(location.search).get('i'); if (qi) { localS
 const invGuardada = () => { try { return localStorage.getItem('tl-inv'); } catch (_) { return null; } };
 /* guía de instalación: si abrió el link en el navegador (no desde el ícono), primero le mostramos cómo dejarla en su pantalla */
 const enApp = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-let saltoGuia = false; try { saltoGuia = sessionStorage.getItem('tl-guia') === '1'; } catch (_) {}
-if (!enApp && !saltoGuia && !(await window.__sb.auth.getSession()).data?.session) {
+if (!enApp && !(await window.__sb.auth.getSession()).data?.session) {
   document.getElementById('app').innerHTML = `<div style="display:grid;gap:12px">
     <img src="guia-app-titanium.jpg" alt="Cómo dejar Titanium en tu pantalla: 1) Abre el link en Safari. 2) Compartir › Agregar a inicio. 3) Abre Titanium desde el ícono y entra con tu correo. 4) Busca tu nombre." style="width:100%;height:auto;border-radius:16px;border:1px solid var(--line);display:block">
-    <button class="btn" id="guia-skip" style="background:transparent;border:0;color:var(--muted);text-decoration:underline">Seguir en el navegador por ahora</button></div>`;
-  await new Promise(res => { document.getElementById('guia-skip').onclick = () => { try { sessionStorage.setItem('tl-guia', '1'); } catch (_) {} res(); }; });
+  </div>`;
+  return; // solo se usa desde el ícono de la pantalla de inicio
 }
 await window.tlSession();
 let { data: codigo, error: e1 } = await sb.rpc('vincular_alumno', { p_inv: invGuardada() });
