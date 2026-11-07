@@ -47,9 +47,11 @@
     const step1 = () => {
       g.innerHTML = gateHTML('email', email);
       document.getElementById('tl-f1').onsubmit = async ev => {
-        ev.preventDefault(); email = document.getElementById('tl-email').value.trim().toLowerCase();
+        ev.preventDefault(); const bt = ev.target.querySelector('button'); if (bt && bt.disabled) return; if (bt) { bt.disabled = true; bt.textContent = 'Enviando…'; }
+        email = document.getElementById('tl-email').value.trim().toLowerCase();
         try { localStorage.setItem('tl-email', email); } catch (e) {}
         const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: location.origin + location.pathname } });
+        if (bt) { bt.disabled = false; bt.textContent = 'Enviarme el código'; }
         if (error) { err(error.status === 429 ? 'Se pidieron muchos códigos. Espera unos minutos.' : 'No se pudo enviar el código: ' + error.message); return; }
         step2();
       };
@@ -57,11 +59,18 @@
     const step2 = () => {
       g.innerHTML = gateHTML('code', email);
       document.getElementById('tl-back').onclick = step1;
-      document.getElementById('tl-f2').onsubmit = async ev => {
-        ev.preventDefault();
-        const token = document.getElementById('tl-code').value.trim();
+      const f2 = document.getElementById('tl-f2');
+      const aviso = document.createElement('div'); aviso.style.cssText = 'color:#a69ea3;font-size:13px;line-height:1.4';
+      aviso.textContent = 'Usa el código del ÚLTIMO correo que te llegó: cada vez que pides uno nuevo, el anterior deja de servir. Puede tardar 1 minuto en llegar.';
+      f2.insertBefore(aviso, f2.firstChild);
+      f2.onsubmit = async ev => {
+        ev.preventDefault(); const bt = f2.querySelector('button:not(.sec)'); if (bt && bt.disabled) return;
+        const token = document.getElementById('tl-code').value.replace(/\D/g, '');
+        if (token.length < 6) { err('Escribe el código completo que te llegó al correo.'); return; }
+        if (bt) { bt.disabled = true; bt.textContent = 'Revisando…'; }
         const { error } = await sb.auth.verifyOtp({ email, token, type: 'email' });
-        if (error) { err('Código incorrecto o vencido.'); return; }
+        if (bt) { bt.disabled = false; bt.textContent = 'Entrar'; }
+        if (error) { err('Código incorrecto o vencido. Revisa que sea el del último correo; si no, vuelve atrás y pide uno nuevo (espera 1 minuto entre pedidos).'); return; }
         g.remove(); onDone();
       };
     };
