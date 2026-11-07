@@ -297,7 +297,7 @@ async function load() {
     sb.from('clases').select('*').eq('alumno', codigo).gte('fecha', desde).order('fecha'),
     sb.from('config').select('data').eq('id', 1).maybeSingle(),
     sb.from('eventos').select('*').gte('fecha', desde).order('fecha'),
-    sb.from('confirmaciones').select('fecha,hora,estado').eq('alumno', codigo).gte('fecha', today()),
+    sb.from('confirmaciones').select('fecha,hora,estado,cambios').eq('alumno', codigo).gte('fecha', today()),
     sb.from('mensajes').select('id,titulo,cuerpo,enviado_at').not('enviado_at', 'is', null).gte('enviado_at', new Date(Date.now() - 7 * 864e5).toISOString()).order('enviado_at', { ascending: false }).limit(5),
   ]);
   S.mensajes = msj?.data || [];
@@ -305,7 +305,7 @@ async function load() {
   try { const { data: rc } = await sb.rpc('mis_recuperaciones'); S.recup = rc || null; } catch (_) { S.recup = null; }
   try { const [ep, sp] = await Promise.all([sb.rpc('mi_estado_pago'), sb.from('solicitudes').select('id,data,created_at').eq('alumno', codigo).eq('tipo', 'pago').eq('estado', 'pendiente').order('created_at', { ascending: false }).limit(1)]);
     S.pago = ep.data || null; S.pagoPend = (sp.data || [])[0] || null; } catch (_) { S.pago = null; S.pagoPend = null; }
-  S.conf = new Map((cfm.data || []).map(r => [r.fecha + '_' + r.hora, r.estado]));
+  S.conf = new Map((cfm.data || []).map(r => [r.fecha + '_' + r.hora, r.estado])); S.confCambios = new Map((cfm.data || []).map(r => [r.fecha + '_' + r.hora, r.cambios || 0]));
   S.eventos = (ev.data || []).sort((x, y) => (x.fecha + (x.hora || '')).localeCompare(y.fecha + (y.hora || '')));
   S.a = a.data; S.planes = (p.data || []).sort((x, y) => String(x.inicio || '').localeCompare(String(y.inicio || '')));
   S.clases = c.data || []; S.cfg = cf.data?.data || {};
@@ -894,12 +894,19 @@ const waNoVoy = (f, h) => { const n = waNum(); if (!n) return ''; const nom = St
   return `https://wa.me/${n}?text=${encodeURIComponent(`Hola Franco, soy ${nom}. No puedo ir a mi clase del ${longD(f).toLowerCase()} a las ${h}.`)}`; };
 function asisBtns(f, h) { const k = f + '_' + h, e = S.conf?.get(k), wa = waNoVoy(f, h);
   const waBtn = (txt, extra) => wa ? `<a class="btn" ${extra || ''} href="${wa}" target="_blank" rel="noopener" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">${txt}</a>` : `<button class="btn" ${extra || ''}>${txt}</button>`;
-  if (e === 'voy') return `<div class="note small" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b class="ok">✅ Confirmaste que vienes</b><button class="chip" data-nov="${k}">No puedo ir</button></div>`;
-  if (e === 'no_voy') return `<div class="note small" style="display:grid;gap:8px"><b class="warn">❌ Avisaste que no vienes</b><div class="grid2">${waBtn('Escribirle a Franco')}<button class="btn" data-voy="${k}">Al final sí voy</button></div></div>`;
+  // reglas: responden una vez, pueden cambiar 1 vez y solo hasta 2 horas antes
+  const limite = new Date(f + 'T' + h + ':00'); limite.setHours(limite.getHours() - 2);
+  const hl = String(limite.getHours()).padStart(2, '0') + ':' + String(limite.getMinutes()).padStart(2, '0');
+  const fija = e && ((S.confCambios?.get(k) || 0) >= 1 || new Date() >= limite);
+  const nota = fija ? `<div class="small muted">Tu respuesta quedó fija. Si algo cambió, escríbele a ${esc(S.cfg?.coach?.split(' ')[0] || 'tu profe')}.</div>`
+    : e ? `<div class="small muted">Puedes cambiarla 1 vez, hasta las ${hl}${f !== today() ? ' del ' + esc(fmtD(f)) : ''}.</div>` : '';
+  if (e === 'voy') return `<div class="note small" style="display:grid;gap:6px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b class="ok">✅ Confirmaste que vienes</b>${fija ? waBtn('Escribir') : `<button class="chip" data-nov="${k}">No puedo ir</button>`}</div>${nota}</div>`;
+  if (e === 'no_voy') return `<div class="note small" style="display:grid;gap:8px"><b class="warn">❌ Avisaste que no vienes</b>${fija ? waBtn('Escribirle a ' + esc(S.cfg?.coach?.split(' ')[0] || 'tu profe')) : `<div class="grid2">${waBtn('Escribirle a ' + esc(S.cfg?.coach?.split(' ')[0] || 'tu profe'))}<button class="btn" data-voy="${k}">Al final sí voy</button></div>`}${nota}</div>`;
   return `<div class="grid2"><button class="btn pri" data-voy="${k}">✅ Voy</button>${waBtn('❌ No puedo ir', `data-nov="${k}"`)}</div>`; }
 async function confirmar(k, estado) { const [f, h] = k.split('_');
   const { error } = await sb.rpc('confirmar_clase', { p_fecha: f, p_hora: h, p_estado: estado });
-  if (error) { toast('No se pudo enviar: ' + error.message); return false; }
+  if (error) { toast(String(error.message || 'No se pudo enviar').replace(/^.*?: /, '')); await load(); render(); return false; }
+  S.confCambios = S.confCambios || new Map(); const previo = S.conf?.get(k); if (previo && previo !== estado) S.confCambios.set(k, (S.confCambios.get(k) || 0) + 1);
   S.conf = S.conf || new Map(); S.conf.set(k, estado);
   const antes = S.recup?.disponibles || 0; try { const { data: rc } = await sb.rpc('mis_recuperaciones'); if (rc) S.recup = rc; } catch (_) {}
   const gano = (S.recup?.disponibles || 0) > antes;
