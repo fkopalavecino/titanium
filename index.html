@@ -545,9 +545,12 @@ function asistencias(code, desde, hasta) {
   }
   return {pres, aus};
 }
+// horas fuera del horario normal que ese día tienen alumnos (bloques extra de recuperación, clases a otra hora)
+const horasFuera = fecha => { const c = cfg(), b = S.dias.get(fecha)?.bloques || {};
+  return Object.keys(b).filter(h => /^\d\d:\d\d$/.test(h) && !c.horas.includes(h) && Object.values(b[h]).some(v => v.extra && !v.quitado)); };
 function horasDelDia(fecha) {
   const c = cfg(), dk = dayKey(fecha);
-  return c.horas.filter(h => !c.noDisponible.includes(dk+'-'+h)).filter(h => roster(fecha, h).length || Object.keys(S.dias.get(fecha)?.bloques?.[h]||{}).length);
+  return [...c.horas.filter(h => !c.noDisponible.includes(dk+'-'+h)).filter(h => roster(fecha, h).length || Object.keys(S.dias.get(fecha)?.bloques?.[h]||{}).length), ...horasFuera(fecha)].sort();
 }
 /* ---------- seguimiento, progreso y logros ---------- */
 function progFin(a) { const pr = a?.programa; if (!pr?.familia || !pr.inicio) return null; return addDays(pr.inicio, (Number(pr.semanas) || 6) * 7); }
@@ -814,7 +817,7 @@ VIEWS.inicio = () => {
 VIEWS.clase = () => {
   const c = cfg(), t = today();
   const f = S.ui.claseFecha || t;
-  const hs = c.horas.filter(h => !c.noDisponible.includes(dayKey(f)+'-'+h));
+  const hs = [...c.horas.filter(h => !c.noDisponible.includes(dayKey(f)+'-'+h)), ...horasFuera(f)].sort();
   let hora = S.ui.claseHora;
   if (!hora || !hs.includes(hora)) {
     const withPeople = hs.filter(h => roster(f,h).length);
@@ -1280,6 +1283,12 @@ VIEWS.registro = () => {
           ${c.horas.map(h => `<tr><td class="num">${esc(h)}</td>${['lun','mar','mie','jue','vie','sab'].filter(d => c.dias.includes(d)).map(d => { const k = d+'-'+h; return c.noDisponible.includes(k) ? '<td><span class="muted">–</span></td>' : (() => { const rc = c.recup || {}; const v = Array.isArray(rc) ? (rc.includes(k) ? (c.recupCupo || 2) : 0) : (+rc[k] || 0);
             return `<td><select name="aj-recup" data-k="${esc(k)}" aria-label="Cupos de recuperación ${DNAME[d]} ${esc(h)}" style="min-width:52px;padding:4px;${v ? 'border-color:var(--red);color:var(--fg);font-weight:700' : 'color:var(--muted)'}">${[0,1,2,3,4].filter(n => n <= c.cupos).map(n => `<option value="${n}" ${n === v ? 'selected' : ''}>${n || '—'}</option>`).join('')}</select></td>`; })(); }).join('')}</tr>`).join('')}
         </tbody></table></div>
+        <div style="display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px">
+          <b class="small">⭐ Bloques extra ocasionales</b>
+          <div class="small muted">Para abrir recuperaciones un día y hora puntual, aunque no sea tu horario normal (por ejemplo, un sábado a las 10:00). Se muestran a los alumnos solo en la semana de esa fecha.</div>
+          ${(c.recupExtra || []).filter(x => x.f >= today()).sort((a, b) => (a.f + a.h).localeCompare(b.f + b.h)).map(x => `<div class="row" style="align-items:center;gap:8px"><span class="grow"><b>${esc(longDate(x.f))}</b> · ${esc(x.h)} · ${x.n} cupo${x.n === 1 ? '' : 's'}</span><button type="button" class="btn sm ghost" data-act="rx-del" data-k="${esc(x.f + '_' + x.h)}" aria-label="Quitar bloque extra">✕</button></div>`).join('') || '<div class="small muted">No hay bloques extra.</div>'}
+          <div class="frow" style="align-items:end"><label class="f">Fecha<input type="date" id="rx-f" min="${today()}"></label><label class="f">Hora<input type="time" id="rx-h" value="10:00"></label><label class="f">Cupos<input type="number" id="rx-n" min="1" max="${c.cupos}" value="3"></label><button type="button" class="btn" data-act="rx-add">＋ Agregar</button></div>
+        </div>
       </fieldset>
       <div><button class="btn pri" type="submit">Guardar ajustes</button></div>
     </form>
@@ -1896,6 +1905,12 @@ document.addEventListener('click', e => {
     case 'reag-undo': { const {f, h, code} = toggleOne(el.dataset.k); const v = rec(f, h, code);
       if (v.reagA) { const o = rec(v.reagA.f, v.reagA.h, code); if (o.extra && !o.asis) patchDia(v.reagA.f, v.reagA.h, code, {extra: null, reagDe: null, rutina: null, aprobada: null}); }
       patchDia(f, h, code, {quitado: null, reagA: null}); toast(`${nombre(code)} vuelve a este bloque.`); break; }
+    case 'rx-add': { const f = val('rx-f'), h = val('rx-h'), n = Math.max(1, Math.min(cfg().cupos, Number(val('rx-n')) || 1));
+      if (!f || !/^\d\d:\d\d$/.test(h)) { toast('Elige la fecha y la hora del bloque extra.', true); break; }
+      if (f < today()) { toast('Esa fecha ya pasó.', true); break; }
+      const c = clone(cfg()); c.recupExtra = (c.recupExtra || []).filter(x => x.f >= today() && !(x.f === f && x.h === h)).concat({f, h, n}); saveCfg(c);
+      toast(`Bloque extra: ${longDate(f)} a las ${h} con ${n} cupo${n === 1 ? '' : 's'} para recuperar.`); break; }
+    case 'rx-del': { const [f, h] = el.dataset.k.split('_'); const c = clone(cfg()); c.recupExtra = (c.recupExtra || []).filter(x => !(x.f === f && x.h === h)); saveCfg(c); toast('Bloque extra quitado.'); break; }
     case 'quitar-extra': { const {f,h,code} = toggleOne(el.dataset.k); patchDia(f, h, code, {extra: null, quitado: null, asis: null, rutina: null, aprobada: null}); break; }
     case 'todos-presentes': { const f = S.ui.claseFecha || today(), h = S.ui.claseHora; roster(f,h).filter(cd => !rec(f,h,cd).asis).forEach((cd,i) => { const pg = !rec(f,h,cd).rutina ? progEstado(S.alumnos.get(cd), f) : null; patchDia(f, h, cd, Object.assign({asis:'presente'}, pg ? {rutina: pg.next[0]} : {})); }); break; }
     case 'asis': { const {f,h,code} = toggleOne(el.dataset.k); const cur = rec(f,h,code).asis; const nv = cur === el.dataset.v ? null : el.dataset.v; patchDia(f, h, code, Object.assign({asis: nv}, nv === 'presente' && el.dataset.r ? {rutina: el.dataset.r} : {})); break; }
