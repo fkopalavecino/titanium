@@ -1275,10 +1275,10 @@ VIEWS.registro = () => {
       <fieldset style="border:0;padding:0;margin:0;display:grid;gap:6px"><legend class="small muted" style="font-weight:600;margin-bottom:4px">Días con clases</legend>
         <div class="chips">${['lun','mar','mie','jue','vie','sab'].map(d => `<label class="chip"><input type="checkbox" name="aj-dia" value="${d}" ${c.dias.includes(d) ? 'checked' : ''} style="accent-color:var(--red)"> ${DNAME[d]}</label>`).join('')}</div></fieldset>
       <fieldset style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:0;display:grid;gap:10px"><legend class="small" style="font-weight:700;padding:0 6px">🔁 Recuperaciones automáticas</legend>
-        <div class="small muted">Marca los bloques donde los alumnos pueden recuperar solos desde su app. Reglas: ganan 1 clase por recuperar si avisan "no voy" con 2 horas o más de anticipación; solo pueden agendar en la semana en curso; lo que no recuperan en el mes se pierde. Si no marcas ningún bloque, la función queda apagada.</div>
-        <label class="f" style="max-width:260px">Cupos de recuperación por bloque<input type="number" id="aj-rcupo" min="1" max="20" value="${c.recupCupo || 2}"></label>
+        <div class="small muted">Elige cuántos cupos de recuperación das en cada bloque (— = no se recupera ahí). Esos cupos salen de los ${c.cupos} del bloque: si el bloque ya está lleno con alumnos regulares, no se ofrece. Reglas: ganan 1 clase por recuperar si avisan "no voy" con 2 horas o más de anticipación; solo agendan en la semana en curso; lo que no recuperan en el mes se pierde.</div>
         <div class="blk-grid"><table><thead><tr><th></th>${['lun','mar','mie','jue','vie','sab'].filter(d => c.dias.includes(d)).map(d => `<th>${DSHORT[d]}</th>`).join('')}</tr></thead><tbody>
-          ${c.horas.map(h => `<tr><td class="num">${esc(h)}</td>${['lun','mar','mie','jue','vie','sab'].filter(d => c.dias.includes(d)).map(d => { const k = d+'-'+h; return c.noDisponible.includes(k) ? '<td><span class="muted">–</span></td>' : `<td><input type="checkbox" name="aj-recup" value="${esc(k)}" ${(c.recup || []).includes(k) ? 'checked' : ''} style="accent-color:var(--red)" aria-label="Recuperar ${DNAME[d]} ${esc(h)}"></td>`; }).join('')}</tr>`).join('')}
+          ${c.horas.map(h => `<tr><td class="num">${esc(h)}</td>${['lun','mar','mie','jue','vie','sab'].filter(d => c.dias.includes(d)).map(d => { const k = d+'-'+h; return c.noDisponible.includes(k) ? '<td><span class="muted">–</span></td>' : (() => { const rc = c.recup || {}; const v = Array.isArray(rc) ? (rc.includes(k) ? (c.recupCupo || 2) : 0) : (+rc[k] || 0);
+            return `<td><select name="aj-recup" data-k="${esc(k)}" aria-label="Cupos de recuperación ${DNAME[d]} ${esc(h)}" style="min-width:52px;padding:4px;${v ? 'border-color:var(--red);color:var(--fg);font-weight:700' : 'color:var(--muted)'}">${[0,1,2,3,4].filter(n => n <= c.cupos).map(n => `<option value="${n}" ${n === v ? 'selected' : ''}>${n || '—'}</option>`).join('')}</select></td>`; })(); }).join('')}</tr>`).join('')}
         </tbody></table></div>
       </fieldset>
       <div><button class="btn pri" type="submit">Guardar ajustes</button></div>
@@ -1978,7 +1978,8 @@ document.addEventListener('submit', e => {
     const dias = [...document.querySelectorAll('input[name=aj-dia]:checked')].map(x => x.value);
     if (!horas.length || !dias.length) { toast('Indica al menos una hora y un día.', true); return; }
     Object.assign(c, {coach: val('aj-coach') || 'Coach', lema: val('aj-lema'), cupos: Number(val('aj-cupos')) || 8, cicloDias: Number(val('aj-ciclo')) || 28, horas, dias,
-      recup: [...document.querySelectorAll('input[name=aj-recup]:checked')].map(x => x.value), recupCupo: Math.max(1, Number(val('aj-rcupo')) || 2)});
+      recup: Object.fromEntries([...document.querySelectorAll('select[name=aj-recup]')].map(x => [x.dataset.k, +x.value]).filter(([, n]) => n > 0))});
+    delete c.recupCupo;
     saveCfg(c); toast('Ajustes guardados.');
   }
 });
