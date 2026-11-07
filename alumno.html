@@ -1001,7 +1001,7 @@ document.addEventListener('click', async ev => {
   const rp = ev.target.closest('[data-rpe]'); if (rp) { S.rpe = Number(rp.dataset.rpe); { const d = getDraft(); d.rpe = S.rpe; putDraft(d); } document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', b === rp)); return; }
   const vy = ev.target.closest('[data-voy]'); if (vy) { vy.disabled = true; if (!(await confirmar(vy.dataset.voy, 'voy'))) vy.disabled = false; return; }
   const nvy = ev.target.closest('[data-nov]'); if (nvy) { confirmar(nvy.dataset.nov, 'no_voy'); return; }
-  const nv = ev.target.closest('[data-novoy]'); if (nv) { const x = proximas(4)[Number(nv.dataset.novoy)]; if (x && await solicitar('no_voy', { fecha: x.f, hora: x.h })) { nv.disabled = true; nv.style.opacity = '.6'; } return; }
+  const nv = ev.target.closest('[data-novoy]'); if (nv) { const x = proximas(4)[Number(nv.dataset.novoy)]; if (x && await confirmar(x.f + '_' + x.h, 'no_voy')) { nv.disabled = true; nv.style.opacity = '.6'; } return; }
   if (ev.target.id === 'recuperar') { const v = $('#pref').value.trim(); if (!v) { toast('Escribe qué día te acomoda.'); return; } if (await solicitar('recuperar', { prefiere: v })) $('#pref').value = ''; return; }
   if (ev.target.id === 'avisarPago') { const v = $('#pmonto').value.trim(); if (await solicitar('pago', { monto: v ? clp(v.replace(/\D/g, '')) : 'sin monto' })) $('#pmonto').value = ''; return; }
   if (ev.target.id === 'guardar') {
