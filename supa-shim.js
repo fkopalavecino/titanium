@@ -28,7 +28,11 @@
   const TL_WORD = '<svg class="wm" viewBox="580 138 1874 423" role="img" aria-label="Titanium Sport Center"><path fill="#ea203a" fill-rule="evenodd" d="M2390,481 2390,559 2406,559 2407,531 2411,531 2432,559 2452,559 2433,532 2443,524 2448,514 2448,501 2445,494 2437,486 2428,482ZM2406,497 2408,495 2418,495 2427,498 2432,506 2430,513 2422,519 2407,519ZM2241,481 2240,558 2292,559 2291,545 2257,544 2258,527 2283,527 2283,513 2257,512 2257,496 2292,495 2292,482ZM2084,481 2083,495 2103,495 2105,497 2105,559 2121,559 2121,497 2123,495 2143,495 2142,481ZM1767,481 1767,559 1818,559 1818,545 1783,544 1783,529 1785,527 1809,527 1809,513 1783,512 1783,497 1785,495 1818,495 1818,481ZM1319,481 1319,495 1340,496 1340,559 1357,559 1357,496 1378,495 1378,481ZM1162,481 1161,558 1178,558 1177,535 1179,531 1183,531 1203,559 1223,559 1205,533 1219,516 1220,503 1216,493 1205,484 1199,482ZM1178,496 1189,495 1197,497 1203,504 1201,514 1193,519 1179,519 1177,514ZM861,482 821,482 821,559 837,559 838,536 862,534 871,529 879,520 881,514 879,497 873,489ZM837,497 839,495 858,497 865,506 863,515 854,521 839,521 837,519ZM1916,480 1916,559 1933,558 1934,516 1985,560 1985,481 1969,481 1969,523 1967,524ZM1621,483 1609,490 1602,497 1596,508 1594,523 1599,539 1614,554 1626,559 1643,560 1662,554 1668,548 1658,539 1644,545 1632,545 1621,540 1613,531 1611,515 1614,508 1627,497 1642,495 1657,502 1668,491 1657,484 1635,480ZM1016,480 1000,484 988,492 982,499 976,514 976,527 984,544 994,553 1008,559 1025,560 1042,555 1056,543 1063,529 1063,512 1055,496 1046,488 1034,482ZM1008,497 1015,495 1031,497 1045,510 1047,516 1046,528 1035,541 1025,545 1014,545 1006,542 996,533 992,522 993,513 997,506ZM693,480 685,482 675,489 670,499 670,509 678,520 703,530 707,537 698,545 690,544 685,537 669,540 674,551 680,556 687,559 700,560 713,555 719,549 723,541 723,532 714,520 692,512 688,509 686,503 694,495 702,497 706,503 719,501 721,497 712,485 703,481Z"/><path fill="#cbcbcb" fill-rule="evenodd" d="M1261,139 1115,407 1172,407 1192,369 1331,369 1352,407 1408,407ZM1262,239 1307,325 1217,326 1216,323ZM2173,138 2173,407 2225,407 2226,271 2312,368 2400,271 2401,407 2453,407 2453,138 2313,293ZM1873,138 1873,308 1881,343 1896,368 1914,385 1931,395 1953,403 1976,407 2009,407 2027,404 2049,397 2073,383 2090,366 2100,350 2110,317 2111,139 2059,139 2059,308 2056,322 2046,340 2031,354 2012,362 1982,364 1965,360 1949,351 1935,336 1928,322 1925,308 1925,138ZM1751,138 1751,407 1803,407 1803,138ZM1440,138 1440,407 1492,407 1493,248 1681,407 1681,138 1629,184 1628,300ZM939,138 940,181 1020,182 1020,407 1072,407 1072,182 1151,181 1151,138ZM846,138 846,407 898,407 898,138ZM625,138 580,181 669,182 669,407 721,407 721,182 800,181 800,138Z"/></svg>';
   function gateHTML(step, email) {
     return `<div class="box">${TL_MARK}${TL_WORD}<div class="sp"></div>
-      ${step === 'email' ? `<p>Entra con tu correo. Te enviamos un código para entrar.</p>
+      ${step === 'elige' ? `<p>¿Es tu primera vez en la app? Si te llegó un código del profe por WhatsApp, elige «Primera vez».</p>
+        <div style="width:100%;display:flex;flex-direction:column;gap:12px"><button type="button" id="tl-nuevo">🆕 Primera vez · tengo código</button><button type="button" class="sec" id="tl-ya">👋 Ya tengo cuenta</button></div>`
+      : step === 'inv' ? `<p>Escribe el código de 6 letras que te mandó el profe por WhatsApp.</p>
+        <form id="tl-fi" style="display:flex;flex-direction:column;gap:12px"><label>Código de invitación<input id="tl-inv" autocapitalize="characters" autocomplete="off" maxlength="12" required placeholder="Ej: K7M2QX" style="text-align:center;letter-spacing:.25em;font-weight:700;text-transform:uppercase"></label><button>Seguir</button><button type="button" class="sec" id="tl-back0">Volver</button></form>`
+      : step === 'email' ? `<p>${(() => { try { return localStorage.getItem('tl-inv') && /alumno\.html/.test(location.pathname) ? 'Invitación lista ✓ Ahora escribe tu correo (el que quieras): te enviamos un código para entrar.' : 'Entra con tu correo. Te enviamos un código para entrar.'; } catch (e) { return 'Entra con tu correo. Te enviamos un código para entrar.'; } })()}</p>
         <form id="tl-f1" style="display:flex;flex-direction:column;gap:12px"><label>Tu correo<input id="tl-email" type="email" autocomplete="email" required value="${email || ''}"></label><button>Enviarme el código</button></form>`
       : `<p>Revisa tu correo <b style="color:#f2eef0">${email}</b> y escribe aquí el código que te llegó (si no lo ves, mira en Spam).</p>
         <form id="tl-f2" style="display:flex;flex-direction:column;gap:12px"><label>Código<input id="tl-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required></label><button>Entrar</button><button type="button" class="sec" id="tl-back">Usar otro correo</button></form>`}
@@ -61,7 +65,21 @@
         g.remove(); onDone();
       };
     };
-    step1();
+    const esAlumno = /alumno\.html/.test(location.pathname);
+    const tieneInv = () => { try { return !!localStorage.getItem('tl-inv'); } catch (e) { return false; } };
+    const step0 = () => {
+      g.innerHTML = gateHTML('elige', email);
+      document.getElementById('tl-nuevo').onclick = stepInv;
+      document.getElementById('tl-ya').onclick = () => { try { localStorage.removeItem('tl-inv'); } catch (e) {} step1(); };
+    };
+    const stepInv = () => {
+      g.innerHTML = gateHTML('inv', email);
+      document.getElementById('tl-back0').onclick = step0;
+      document.getElementById('tl-fi').onsubmit = ev => { ev.preventDefault();
+        const v = document.getElementById('tl-inv').value.trim().toUpperCase(); if (!v) return;
+        try { localStorage.setItem('tl-inv', v); } catch (e) {} step1(); };
+    };
+    if (esAlumno && !tieneInv()) step0(); else step1();
     const { data: sub } = sb.auth.onAuthStateChange((ev, ses) => { if (ses && document.getElementById('tl-gate')) { sub.subscription.unsubscribe(); g.remove(); onDone(); } });
   }
   async function ensureSession() {
