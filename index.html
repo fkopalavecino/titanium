@@ -1990,7 +1990,12 @@ function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.classNa
 let GUIA = null; // se precarga para poder compartirla al instante (iPhone exige compartir dentro del toque)
 fetch('guia-app-titanium.jpg?v=1794067868').then(r => r.ok ? r.blob() : null).then(b => { if (b) GUIA = new File([b], 'guia-app-titanium.jpg', { type: 'image/jpeg' }); }).catch(() => {});
 let INV = null; // mensaje pendiente de enviar {msg, tel}
+const esMovil = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 async function compartirTexto(msg, tel) {
+  if (!esMovil()) { // computador: WhatsApp Web (o la app de escritorio) con el mensaje listo; además queda copiado
+    try { await navigator.clipboard.writeText(msg); } catch (_) {}
+    window.open(tel ? `https://web.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(msg)}` : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
+    toast('Se abrió WhatsApp Web: elige el chat o el grupo y envía. El mensaje también quedó copiado.'); return true; }
   if (tel) { window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank'); return true; }
   if (navigator.share) { try { await navigator.share({ text: msg }); return true; } catch (e) { if (e && e.name === 'AbortError') return false; } }
   try { await navigator.clipboard.writeText(msg); toast('Mensaje copiado. Pégalo en WhatsApp.'); return true; } catch (_) { window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank'); return true; }
