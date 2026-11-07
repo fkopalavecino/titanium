@@ -390,6 +390,16 @@ function achicar(file, max) { return new Promise((res, rej) => { const u = URL.c
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); c.toBlob(b => b ? res(b) : rej(new Error('blob')), 'image/jpeg', 0.85); };
   img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('img')); }; img.src = u; }); }
 const IBC = () => window.TL_INBODY_CAMPOS || [];
+const compDe = (inb, med, f) => { // composición del día de la foto: InBody > medidas; si no hay ese día, la más cercana (±7 días)
+  const n = v => v == null || v === '' || isNaN(+v) ? null : +v;
+  const c = [...(inb || []).map(x => ({ f: x.f, peso: n(x.peso), g: n(x.pgc), mm: n(x.mme), src: 'InBody' })), ...(med || []).map(x => ({ f: x.f, peso: n(x.peso), g: n(x.grasa), mm: null, src: 'Medidas' }))]
+    .filter(x => x.f && (x.peso != null || x.g != null));
+  const d = x => Math.abs((Date.parse(x.f) - Date.parse(f)) / 864e5);
+  c.sort((a, b) => d(a) - d(b) || (a.src === 'InBody' ? -1 : 1)); const r = c[0]; return r && d(r) <= 7 ? { ...r, exacto: d(r) === 0 } : null; };
+const compTxt = (r, dif) => { if (!r) return ''; const s = v => String(Math.round(v * 10) / 10).replace('.', ',');
+  const p = []; if (r.peso != null) p.push('⚖️ ' + s(r.peso) + ' kg'); if (r.g != null) p.push(s(r.g) + '% grasa'); if (r.mm != null) p.push(s(r.mm) + ' kg músculo');
+  return p.join(' · ') + (r.exacto ? '' : ' <span style="opacity:.7">(' + (dif ? dif(r.f) : r.f) + ')</span>'); };
+
 document.addEventListener('change', async ev => { const f = ev.target; if (f.id !== 'inb-file' || !f.files?.[0]) return;
   const file = f.files[0]; S.ibNew = { file, estado: 'leyendo', vals: {}, f: today(), prev: URL.createObjectURL(file), sexo: (S.inbody.slice().reverse().find(x => x.sexo) || {}).sexo || '' }; S.v = 'progreso'; render();
   document.getElementById('ib-card')?.scrollIntoView({ block: 'start' });
@@ -720,7 +730,8 @@ V.progreso = () => {
   const ses = S.fotos.slice().sort((a, b) => a.f < b.f ? -1 : a.f > b.f ? 1 : 0);
   const fA = ses.find(x => x.f === S.fA) || ses[0], fB = ses.find(x => x.f === S.fB) || ses[ses.length - 1];
   const celda = (x, k, l) => x && x[k] && S.urls[x[k]] ? `<figure><img src="${esc(S.urls[x[k]])}" data-zoom="1" alt="${l}, ${esc(fmtD(x.f))}" loading="lazy"><figcaption>${l}</figcaption></figure>` : `<figure><div class="nf">Sin foto</div><figcaption>${l}</figcaption></figure>`;
-  const fila = (x, tit) => `<div class="ph-row"><div class="ph-h"><b>${tit}</b><span class="small muted">${esc(fmtD(x.f))}</span></div><div class="ph3">${ANG.map(([k, l]) => celda(x, k, l)).join('')}</div></div>`;
+  const compF = f => compTxt(compDe(S.inbody, S.medidas, f), g => 'medido el ' + esc(fmtD(g)));
+  const fila = (x, tit) => `<div class="ph-row"><div class="ph-h"><b>${tit || esc(fmtD(x.f))}</b>${tit ? `<span class="small muted">${esc(fmtD(x.f))}</span>` : ''}</div>${compF(x.f) ? `<div class="small" style="color:var(--muted);margin:-2px 0 6px">${compF(x.f)}</div>` : ''}<div class="ph3">${ANG.map(([k, l]) => celda(x, k, l)).join('')}</div></div>`;
   const opts = sel => ses.map(x => `<option value="${esc(x.f)}" ${x.f === sel.f ? 'selected' : ''}>${esc(fmtD(x.f))}</option>`).join('');
   const fuF = S.fotoUpF || today(); const fuRow = S.fotos.find(x => x.f === fuF) || {};
   const uploader = S.fotoUp ? `<div style="display:grid;gap:8px"><label class="field">Fecha de las fotos<input type="date" id="fu-f" value="${esc(fuF)}"></label>
@@ -730,7 +741,9 @@ V.progreso = () => {
   const fotosCard = S.fotos.length ? `<section class="card" id="fup-card"><div class="row"><h2>Fotos de progreso</h2><span class="small muted">${S.fotos.length === 1 ? '1 sesión' : S.fotos.length + ' sesiones'}</span></div>
     ${ses.length === 1 ? fila(fB, 'Tu punto de partida')
       : `<div class="ph-sel"><label>Antes<select data-fsel="A">${opts(fA)}</select></label><label>Ahora<select data-fsel="B">${opts(fB)}</select></label></div>
-      ${fila(fA, 'Antes')}${fila(fB, 'Ahora')}${fA.f !== fB.f ? `<div class="small muted" style="text-align:center">${Math.abs(diffDays(fA.f, fB.f))} días de diferencia</div>` : ''}`}
+      ${fila(fA, 'Antes')}${fila(fB, 'Ahora')}${fA.f !== fB.f ? `<div class="small muted" style="text-align:center">${Math.abs(diffDays(fA.f, fB.f))} días de diferencia${(() => { const ca = compDe(S.inbody, S.medidas, fA.f), cb = compDe(S.inbody, S.medidas, fB.f); if (!ca || !cb) return '';
+        const dd = (k, u, bajaBien) => ca[k] != null && cb[k] != null && ca[k] !== cb[k] ? (() => { const v = Math.round((cb[k] - ca[k]) * 10) / 10; return `<b class="${(v < 0) === bajaBien ? 'ok' : 'warn'}">${v > 0 ? '+' : ''}${String(v).replace('.', ',')}${u}</b>`; })() : '';
+        const p = [dd('peso', ' kg', true), dd('g', '% grasa', true), dd('mm', ' kg músculo', false)].filter(Boolean); return p.length ? '<br>' + p.join(' · ') : ''; })()}</div>` : ''}`}
     ${ses.length > 2 ? `<details class="ses"><summary>Ver todas las sesiones (${ses.length})</summary><div style="display:grid;gap:14px;margin-top:10px">${ses.slice().reverse().map(x => fila(x, '')).join('')}</div></details>` : ''}
     ${uploader}${fuBtn}<div class="small muted">Solo tú y Franco pueden ver tus fotos.</div></section>`
     : `<section class="card" id="fup-card"><h2>Fotos de progreso</h2><div class="small muted">Sube fotos de frente, perfil y espalda para comparar tu antes y después. Solo tú y Franco pueden verlas.</div>${uploader}${fuBtn}</section>`;

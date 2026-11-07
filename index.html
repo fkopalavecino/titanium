@@ -1603,6 +1603,15 @@ function inbodyHTML(a) {
     </div>
   </details>`;
 }
+const compDe = (inb, med, f) => { // composición del día de la foto: InBody > medidas; si no hay ese día, la más cercana (±7 días)
+  const n = v => v == null || v === '' || isNaN(+v) ? null : +v;
+  const c = [...(inb || []).map(x => ({ f: x.f, peso: n(x.peso), g: n(x.pgc), mm: n(x.mme), src: 'InBody' })), ...(med || []).map(x => ({ f: x.f, peso: n(x.peso), g: n(x.grasa), mm: null, src: 'Medidas' }))]
+    .filter(x => x.f && (x.peso != null || x.g != null));
+  const d = x => Math.abs((Date.parse(x.f) - Date.parse(f)) / 864e5);
+  c.sort((a, b) => d(a) - d(b) || (a.src === 'InBody' ? -1 : 1)); const r = c[0]; return r && d(r) <= 7 ? { ...r, exacto: d(r) === 0 } : null; };
+const compTxt = (r, dif) => { if (!r) return ''; const s = v => String(Math.round(v * 10) / 10).replace('.', ',');
+  const p = []; if (r.peso != null) p.push('⚖️ ' + s(r.peso) + ' kg'); if (r.g != null) p.push(s(r.g) + '% grasa'); if (r.mm != null) p.push(s(r.mm) + ' kg músculo');
+  return p.join(' · ') + (r.exacto ? '' : ' <span style="opacity:.7">(' + (dif ? dif(r.f) : r.f) + ')</span>'); };
 function fotosHTML(a) {
   const code = a.codigo, fs = (a.fotos || []).filter(x => ANG.some(([k]) => x[k]));
   const fecha = S.ui.fotoFecha || today();
@@ -1627,13 +1636,13 @@ function fotosHTML(a) {
         <div class="tools" style="justify-content:space-between"><b class="small">Comparar antes y después</b>
           <div class="chips">${ANG.map(([k, l]) => `<button type="button" class="chip" data-act="foto-ang" data-id="${esc(code)}" data-v="${k}" aria-pressed="${ang === k}">${l}</button>`).join('')}</div></div>
         <div class="f-cmp">
-          <figure>${A ? `<img src="${fotoURL(A[ang])}" data-act="foto-zoom" alt="Antes">` : ''}<figcaption><select id="foto-a" data-id="${esc(code)}" aria-label="Fecha antes">${opts(fa)}</select></figcaption></figure>
-          <figure>${B ? `<img src="${fotoURL(B[ang])}" data-act="foto-zoom" alt="Después">` : ''}<figcaption><select id="foto-b" data-id="${esc(code)}" aria-label="Fecha después">${opts(fb)}</select></figcaption></figure>
+          <figure>${A ? `<img src="${fotoURL(A[ang])}" data-act="foto-zoom" alt="Antes">` : ''}<figcaption><select id="foto-a" data-id="${esc(code)}" aria-label="Fecha antes">${opts(fa)}</select>${A ? `<div class="small muted">${compTxt(compDe(a.inbody, a.medidas, A.f), g => 'medido el ' + fmtD(g))}</div>` : ''}</figcaption></figure>
+          <figure>${B ? `<img src="${fotoURL(B[ang])}" data-act="foto-zoom" alt="Después">` : ''}<figcaption><select id="foto-b" data-id="${esc(code)}" aria-label="Fecha después">${opts(fb)}</select>${B ? `<div class="small muted">${compTxt(compDe(a.inbody, a.medidas, B.f), g => 'medido el ' + fmtD(g))}</div>` : ''}</figcaption></figure>
         </div>
         ${A && B && A.f !== B.f ? `<div class="small muted" style="text-align:center">${diffDays(A.f, B.f)} días entre ambas fotos${(() => { const med = a.medidas || []; const near = d => med.filter(m => m.peso).sort((x, y) => Math.abs(diffDays(x.f, d)) - Math.abs(diffDays(y.f, d)))[0]; const ma = near(A.f), mb = near(B.f); return ma && mb && ma !== mb ? ` · peso ${String(ma.peso).replace('.', ',')} → ${String(mb.peso).replace('.', ',')} kg` : ''; })()}</div>` : ''}
       </div>
       <div class="f-hist"><b class="small">Historial</b>
-        ${fs.slice().reverse().map(x => `<div class="row"><button type="button" class="btn sm ghost" data-act="foto-ir" data-id="${esc(code)}" data-f="${x.f}" title="Editar esta sesión">${fmtD(x.f)}</button>${ANG.map(([k, l]) => x[k] ? `<img src="${fotoURL(x[k])}" alt="${l} ${fmtD(x.f)}" data-act="foto-zoom" loading="lazy">` : '<div class="vac"></div>').join('')}</div>`).join('')}
+        ${fs.slice().reverse().map(x => `<div class="row"><button type="button" class="btn sm ghost" data-act="foto-ir" data-id="${esc(code)}" data-f="${x.f}" title="Editar esta sesión">${fmtD(x.f)}${(() => { const r = compDe(a.inbody, a.medidas, x.f); return r ? `<span style="display:block;font-weight:500;font-size:11px;opacity:.8">${r.peso != null ? String(r.peso).replace('.', ',') + ' kg' : ''}${r.peso != null && r.g != null ? ' · ' : ''}${r.g != null ? String(r.g).replace('.', ',') + '%' : ''}</span>` : ''; })()}</button>${ANG.map(([k, l]) => x[k] ? `<img src="${fotoURL(x[k])}" alt="${l} ${fmtD(x.f)}" data-act="foto-zoom" loading="lazy">` : '<div class="vac"></div>').join('')}</div>`).join('')}
       </div>` : ''}
     </div>
   </details>`;
