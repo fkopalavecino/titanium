@@ -711,7 +711,10 @@ function render() {
   if (v === 'clase') paintTimer();
 }
 function route() {
-  const h = (location.hash || '#inicio').slice(1);
+  let h = (location.hash || '#inicio').slice(1);
+  // link de un aviso: #clase/2026-11-09/11:30 abre esa clase en su día y bloque
+  const mc = h.match(/^clase\/(\d{4}-\d\d-\d\d)\/(\d\d:\d\d)$/);
+  if (mc) { S.ui.claseFecha = mc[1] === today() ? null : mc[1]; S.ui.claseHora = mc[2]; h = 'clase'; history.replaceState(null, '', '#clase'); }
   S.view = VIEWS[h] ? h : 'inicio';
   render(); window.scrollTo({top:0});
 }
@@ -2040,6 +2043,9 @@ document.addEventListener('change', e => {
   else if (t.dataset.act === 'campo') { const [f,h,code] = t.dataset.k.split('|'); patchDia(f, h, code, {[t.dataset.field]: t.value.trim() || null}); }
 });
 window.addEventListener('hashchange', route);
+// si el panel ya estaba abierto, el aviso tocado llega por mensaje del service worker
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', ev => { const go = ev.data && ev.data.go; if (!go) return;
+  const hash = go.includes('#') ? go.slice(go.indexOf('#')) : ''; if (!hash) return; if (location.hash === hash) route(); else location.hash = hash; });
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.classList?.contains('inb-in') && t.files?.[0]) { subirInbody(t.dataset.id, $('#inb-fecha')?.value || today(), t.files[0], t); }

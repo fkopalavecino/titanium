@@ -34,7 +34,7 @@ self.addEventListener('notificationclick', e => {
     const ruta = u => new URL(u).pathname.replace(/index\.html$/, '');
     const esAlumno = ruta(url).endsWith('alumno.html');
     const c = cs.find(x => ruta(x.url) === ruta(url)) || (esAlumno ? cs.find(x => x.url.includes('alumno.html')) || cs[0] : null);
-    if (c) { if (esAlumno) c.postMessage({ ev: url }); else if (new URL(url).hash) { try { await c.navigate(url); } catch (_) {} } try { await c.focus(); } catch (_) {} return; }
+    if (c) { if (esAlumno) c.postMessage({ ev: url }); else if (new URL(url).hash) c.postMessage({ go: url }); try { await c.focus(); } catch (_) {} return; }
     await self.clients.openWindow(url);
   })());
 });
