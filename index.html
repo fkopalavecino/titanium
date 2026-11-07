@@ -1999,7 +1999,7 @@ let toastT = 0;
 function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (err ? ' err' : ''); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
 /* ---------- guía en imagen que va junto a las invitaciones ---------- */
 let GUIA = null; // se precarga para poder compartirla al instante (iPhone exige compartir dentro del toque)
-fetch('guia-app-titanium.jpg?v=1794069156').then(r => r.ok ? r.blob() : null).then(b => { if (b) GUIA = new File([b], 'guia-app-titanium.jpg', { type: 'image/jpeg' }); }).catch(() => {});
+fetch('guia-app-titanium.jpg?v=1794075474').then(r => r.ok ? r.blob() : null).then(b => { if (b) GUIA = new File([b], 'guia-app-titanium.jpg', { type: 'image/jpeg' }); }).catch(() => {});
 let INV = null; // mensaje pendiente de enviar {msg, tel}
 const esMovil = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 async function compartirTexto(msg, tel) {
