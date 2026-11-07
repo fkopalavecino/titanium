@@ -831,7 +831,10 @@ V.progreso = () => {
 V.plan = () => {
   const p = planActual(); if (!p) return `<h1>Mi perfil</h1>${perfilCard()}${fichaCard()}${avisosCard()}<div class="card"><div class="muted">Todavía no tienes un plan registrado. Habla con Franco.</div></div><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
   const usadas = presentes(p.inicio, p.fin); const tot = p.clases || S.a.clases || 0; const ab = abonado(p); const saldo = Math.max(0, (p.monto || 0) - ab);
-  const dias = (S.a.bloques || []).map(k => DL[k.split('-')[0]] + ' ' + k.split('-')[1]).join(' · ');
+  // días fijos; si entrena fuera del horario normal, se toman de sus clases agendadas de las próximas 2 semanas
+  const fijos = (S.a.bloques || []).length ? S.a.bloques : [...new Set((S.clases || []).filter(r => r.extra && !r.quitado && !(r.reag_de && r.reag_de.recup) && r.fecha >= today() && r.fecha <= addDays(today(), 13) && /^\d\d:\d\d$/.test(r.hora)).map(r => dayKey(r.fecha) + '-' + r.hora))]
+    .sort((a, b) => ['lun','mar','mie','jue','vie','sab','dom'].indexOf(a.split('-')[0]) - ['lun','mar','mie','jue','vie','sab','dom'].indexOf(b.split('-')[0]));
+  const dias = fijos.map(k => DL[k.split('-')[0]] + ' ' + k.split('-')[1]).join(' · ');
   return `<h1>Mi perfil</h1>${perfilCard()}${fichaCard()}${avisosCard()}${pagosCard(p, usadas, tot, ab, saldo, dias)}`;
 };
 function weekStrip(wk, sel, attr) { const t = today();
