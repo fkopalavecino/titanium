@@ -1847,6 +1847,8 @@ document.addEventListener('click', e => {
   const act = el.dataset.act, id = el.dataset.id;
   if (el.tagName === 'SELECT' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return;
   if (act === 'cerrar') { closeModal(); return; }
+  if (act === 'inv-msg') { e.preventDefault(); if (INV) compartirTexto(INV.msg, INV.tel).then(ok => { if (ok) { el.textContent = '✓ Mensaje enviado'; el.classList.remove('pri'); document.querySelector('[data-act="inv-guia"]')?.classList.add('pri'); } }); return; }
+  if (act === 'inv-guia') { e.preventDefault(); compartirGuia().then(ok => { if (ok) el.textContent = '✓ Guía enviada'; }); return; }
   if (act === 'link-grupo') { e.preventDefault(); linkGrupo(); return; }
   if (act === 'invitar') { e.preventDefault(); e.stopPropagation(); invitarAlumno(id, el); return; }
   if (act === 'cp-on') { cpActivar(el); return; }
@@ -1987,23 +1989,29 @@ function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.classNa
 /* ---------- guía en imagen que va junto a las invitaciones ---------- */
 let GUIA = null; // se precarga para poder compartirla al instante (iPhone exige compartir dentro del toque)
 fetch('guia-app-titanium.jpg').then(r => r.ok ? r.blob() : null).then(b => { if (b) GUIA = new File([b], 'guia-app-titanium.jpg', { type: 'image/jpeg' }); }).catch(() => {});
-async function compartirInvitacion(msg, tel) {
-  const conImg = GUIA && navigator.canShare && navigator.canShare({ files: [GUIA] });
-  if (conImg) { try { await navigator.share({ files: [GUIA], text: msg }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
-  if (tel) { window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank'); return; }
-  if (navigator.share) { try { await navigator.share({ text: msg }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
-  try { await navigator.clipboard.writeText(msg); toast('Mensaje copiado. Pégalo en WhatsApp.'); } catch (_) { window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank'); }
+let INV = null; // mensaje pendiente de enviar {msg, tel}
+async function compartirTexto(msg, tel) {
+  if (tel) { window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank'); return true; }
+  if (navigator.share) { try { await navigator.share({ text: msg }); return true; } catch (e) { if (e && e.name === 'AbortError') return false; } }
+  try { await navigator.clipboard.writeText(msg); toast('Mensaje copiado. Pégalo en WhatsApp.'); return true; } catch (_) { window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank'); return true; }
+}
+async function compartirGuia() {
+  if (GUIA && navigator.canShare && navigator.canShare({ files: [GUIA] })) { try { await navigator.share({ files: [GUIA] }); return true; } catch (e) { if (e && e.name === 'AbortError') return false; } }
+  window.open('guia-app-titanium.jpg', '_blank'); toast('Mantén presionada la imagen para guardarla y mándala por WhatsApp.'); return true;
 }
 function previewInvitacion(msg) {
-  return `<div style="display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:start"><img src="guia-app-titanium.jpg" alt="Guía de instalación" style="width:96px;border-radius:10px;border:1px solid var(--line)">
-    <div class="small" style="white-space:pre-wrap;background:var(--sunk);border-radius:10px;padding:10px;max-height:38vh;overflow:auto">${esc(msg)}</div></div>
-    <p class="small muted" style="margin:0">Se envía la imagen con la guía y este mensaje. Elige WhatsApp y el chat${GUIA ? '' : ' (la imagen se está cargando; si no aparece, mándala aparte)'}.</p>`;
+  return `<div class="small" style="white-space:pre-wrap;background:var(--sunk);border-radius:10px;padding:10px;max-height:30vh;overflow:auto">${esc(msg)}</div>
+    <div style="display:grid;gap:8px">
+      <button type="button" class="btn pri" data-act="inv-msg">📤 1 · Enviar mensaje</button>
+      <div style="display:flex;gap:10px;align-items:center"><img src="guia-app-titanium.jpg" alt="" style="width:46px;border-radius:6px;border:1px solid var(--line)"><button type="button" class="btn" data-act="inv-guia" style="flex:1">🖼️ 2 · Enviar la guía al mismo chat</button></div>
+    </div>
+    <p class="small muted" style="margin:0">Así en WhatsApp llega primero el mensaje y debajo la imagen con los pasos.</p>`;
 }
 /* ---------- link único para el grupo de WhatsApp: cada alumno busca su nombre y el profe aprueba ---------- */
 function linkGrupo() {
   const c = cfg(); const url = location.origin + location.pathname.replace(/[^/]*$/, '') + 'alumno.html';
   const msg = `¡Hola equipo ${c.gimnasio || 'Titanium Sport'}! 💪 Ya está lista nuestra app: tu rutina, tu agenda, confirmar tus clases y ver tu progreso.\n\n👉 ${url}\n\nSigue los 4 pasos de la imagen. En el paso 4 busca tu nombre y yo confirmo que eres tú.\n\n¡Nos vemos en el gym!`;
-  openModal('📣 Link para el grupo', previewInvitacion(msg), { submit: '📤 Compartir', onSubmit: () => { compartirInvitacion(msg, null); } });
+  INV = { msg, tel: null }; openModal('📣 Link para el grupo', previewInvitacion(msg));
 }
 /* ---------- invitar alumnos a la app (link personal con código) ---------- */
 async function invitarAlumno(code, btn) {
@@ -2015,7 +2023,7 @@ async function invitarAlumno(code, btn) {
   const url = location.origin + location.pathname.replace(/[^/]*$/, '') + 'alumno.html?i=' + inv;
   const c = cfg(); const msg = `Hola ${firstName(a.nombre)}! 💪 Ya tienes tu app de ${c.gimnasio || 'Titanium Sport'}: tu rutina, tu agenda y tu progreso en el celular.\n\n👉 ${url}\n\nSigue los pasos de la imagen. Si te pide código de invitación, es: *${inv}*\n\n¡Nos vemos en el gym!`;
   const tel = String(a.telefono || '').replace(/\D/g, '');
-  openModal(`📲 Invitar a ${firstName(a.nombre)}`, previewInvitacion(msg), { submit: '📤 Enviar por WhatsApp', onSubmit: () => { compartirInvitacion(msg, tel); } });
+  INV = { msg, tel }; openModal(`📲 Invitar a ${firstName(a.nombre)}`, previewInvitacion(msg));
 }
 /* ---------- avisos push para el profe: cuando un alumno confirma o cancela su clase ---------- */
 const CP_FN = 'https://lnovgbpxdnqgsojkfzwy.supabase.co/functions/v1/notificar';
