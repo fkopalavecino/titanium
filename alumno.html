@@ -442,6 +442,7 @@ function fichaCard() { const f = S.perfil?.ficha || {}; const e = f.emerg || {};
   <div style="display:grid;gap:14px;margin-top:12px">
     <div class="note small">Esto lo ve solo Franco. Sirve para adaptar tu entrenamiento y saber qué hacer en una emergencia. Actualízala cada vez que algo cambie.</div>
     <h3 style="margin:4px 0 0">Mis datos</h3>
+    <label class="field">Mi correo<input id="fx-mail" type="email" inputmode="email" autocomplete="email" placeholder="nombre@correo.cl" value="${esc(S.a.email || '')}"></label>
     <div class="grid2"><label class="field">Mi teléfono<input id="fx-tel" type="tel" inputmode="tel" placeholder="+56 9 …" value="${esc(f.tel || S.a.telefono || '')}"></label>
       <label class="field">Estatura (cm)<input id="fx-est" type="number" inputmode="numeric" min="100" max="230" value="${esc(f.estatura || '')}"></label></div>
     <div class="grid2"><label class="field">Ocupación<input id="fx-ocu" maxlength="60" placeholder="Ej: oficina, pie todo el día" value="${esc(f.ocupacion || '')}"></label>
@@ -474,6 +475,10 @@ async function guardarFicha(btn) {
   if (Object.keys(resp).length < F_PARQ.length) { toast('Responde las 7 preguntas del PAR-Q.'); return; }
   if (!$('#fx-ok').checked) { toast('Marca la declaración para guardar.'); return; }
   if (!v('fx-et')) { toast('Agrega un teléfono de emergencia.'); $('#fx-et').focus(); return; }
+  const mail = v('fx-mail').toLowerCase();
+  if (mail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) { toast('Revisa tu correo: parece que está mal escrito.'); $('#fx-mail').focus(); return; }
+  if (mail !== String(S.a.email || '').toLowerCase()) { const { error: em } = await sb.rpc('guardar_mi_correo', { p_email: mail });
+    if (em) { toast('No se pudo guardar el correo: ' + em.message); return; } S.a.email = mail || null; }
   const ficha = { tel: v('fx-tel') || null, estatura: Number(v('fx-est')) || null, ocupacion: v('fx-ocu') || null, prevision: v('fx-prev') || null,
     emerg: { nombre: v('fx-en') || null, rel: v('fx-er') || null, tel: v('fx-et') || null },
     objetivo: v('fx-obj') || null, experiencia: v('fx-exp') || null,
