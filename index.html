@@ -1286,6 +1286,9 @@ VIEWS.registro = () => {
       <label class="f">Horas de los bloques (separadas por coma)<input type="text" id="aj-horas" value="${esc(c.horas.join(', '))}"></label>
       <fieldset style="border:0;padding:0;margin:0;display:grid;gap:6px"><legend class="small muted" style="font-weight:600;margin-bottom:4px">Días con clases</legend>
         <div class="chips">${['lun','mar','mie','jue','vie','sab'].map(d => `<label class="chip"><input type="checkbox" name="aj-dia" value="${d}" ${c.dias.includes(d) ? 'checked' : ''} style="accent-color:var(--red)"> ${DNAME[d]}</label>`).join('')}</div></fieldset>
+      <fieldset style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:0;display:grid;gap:10px"><legend class="small" style="font-weight:700;padding:0 6px">🔔 Avisos de profe en este teléfono</legend>
+        <div class="tools" style="align-items:center">${(() => { const e = cpEstado(); return e === 'on' ? '<span class="small" style="color:var(--ok);font-weight:700">🔔 Activados</span><button type="button" class="btn sm" data-act="cp-test">Probar</button><button type="button" class="btn sm ghost" data-act="cp-off">Desactivar</button>' : e === 'off' ? '<button type="button" class="btn sm pri" data-act="cp-on">🔔 Activar avisos</button>' : '<span class="small muted">Actívalos desde la tarjeta «Asistencia hoy y mañana» del Inicio.</span>'; })()}</div>
+      </fieldset>
       <fieldset style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:0;display:grid;gap:10px"><legend class="small" style="font-weight:700;padding:0 6px">💳 Pagos</legend>
         <div class="small muted">Estos datos los ven tus alumnos en Perfil › Pagos, con botón para copiarlos. La app les avisa 5 días antes del vencimiento, el día que vence y 3 días después; y a ti te llega un resumen cada lunes a las 08:00.</div>
         <div class="frow"><label class="f">Banco<input type="text" id="aj-pbanco" value="${esc(c.pago?.banco || '')}" placeholder="Banco Estado"></label><label class="f">Tipo de cuenta<input type="text" id="aj-ptipo" value="${esc(c.pago?.tipo || '')}" placeholder="Cuenta RUT / Vista / Corriente"></label></div>
@@ -2161,7 +2164,7 @@ function confirmacionesHTML() {
       <span class="pill ok">✅ ${si.length}</span>${no.length ? `<span class="pill crit">❌ ${no.length}</span>` : ''}
       ${e === 'on' ? '<span title="Avisos activados">🔔</span>' : '<span class="small muted" style="font-weight:500">· activa los avisos</span>'}</summary>
     <div style="display:grid;gap:8px">
-      <div class="tools" style="align-items:center">${ctrl}</div>
+      ${e === 'on' ? '' : `<div class="tools" style="align-items:center">${ctrl}</div>`}
       ${no.length ? `<div class="small muted" style="font-weight:700;margin-top:4px">No vienen</div>` + no.map(x => `<div class="li" style="padding:7px 0"><span class="grow"><b>${esc(nombre(x.code))}</b> <span class="small muted">· ${esc(cuando(x))}</span></span><button class="btn sm" data-act="msg" data-id="${esc(x.code)}" data-tipo="${esc('recuperar:' + x.f + ':' + x.h)}">💬 Recuperar</button></div>`).join('') : ''}
       ${si.length ? `<div class="small muted" style="font-weight:700;margin-top:4px">Vienen</div><div class="small" style="line-height:1.7">${si.map(x => `<span style="white-space:nowrap">✅ ${esc(firstName(nombre(x.code)))} <span class="muted">${esc(cuando(x))}</span></span>`).join(' · ')}</div>` : ''}
       ${!items.length ? '<p class="small muted" style="margin:0">Cuando un alumno confirme o cancele desde su app, aparece aquí al instante.</p>' : ''}
