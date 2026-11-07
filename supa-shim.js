@@ -191,7 +191,7 @@
   if (window.TL_MODE === 'alumno') return;
 
   /* ---------- solicitudes de alumnos (panel flotante del entrenador) ---------- */
-  const TIPO = { no_voy: 'No puede ir', recuperar: 'Quiere recuperar', pago: 'Avisa un pago', mensaje: 'Mensaje' };
+  const TIPO = { no_voy: 'No puede ir', recuperar: 'Quiere recuperar', pago: 'Avisa un pago', mensaje: 'Mensaje', vincular: '📲 Quiere entrar a la app' };
   async function solicitudes() {
     const { data } = await sb.from('solicitudes').select('*').eq('estado', 'pendiente').order('created_at');
     const list = data || [];
@@ -209,10 +209,13 @@
     p.innerHTML = '<b style="font-size:16px">Solicitudes</b>' + list.map(r => { const d = r.data || {};
       return '<div style="border-top:1px solid #2f2a2e;padding-top:8px;display:grid;gap:6px"><div><b>' + esc(d.nombre || r.alumno) + '</b> · ' + esc(TIPO[r.tipo] || r.tipo) + '</div>'
         + '<div style="color:#a69ea3">' + esc([d.fecha, d.hora, d.prefiere, d.monto, d.texto].filter(Boolean).join(' · ')) + '</div>'
-        + '<div style="display:flex;gap:8px"><button data-id="' + r.id + '" data-e="aprobada" style="flex:1;height:36px;border:0;border-radius:8px;background:#17804a;color:#fff;font-weight:700">Listo</button><button data-id="' + r.id + '" data-e="rechazada" style="flex:1;height:36px;border:1px solid #2f2a2e;border-radius:8px;background:transparent;color:#f2eef0">Rechazar</button></div></div>'; }).join('')
+        + (r.tipo === 'vincular' ? '<div style="color:#a69ea3;font-size:12px">Verifica que sea esta persona antes de aprobar: tendrá acceso a la ficha de ' + esc(d.nombre || r.alumno) + '.</div><div style="display:flex;gap:8px"><button data-id="' + r.id + '" data-vin="1" style="flex:1;height:36px;border:0;border-radius:8px;background:#17804a;color:#fff;font-weight:700">✓ Sí, es él/ella</button><button data-id="' + r.id + '" data-e="rechazada" style="flex:1;height:36px;border:1px solid #2f2a2e;border-radius:8px;background:transparent;color:#f2eef0;font-weight:700">No es</button></div></div>' :
+        + '<div style="display:flex;gap:8px"><button data-id="' + r.id + '" data-e="aprobada" style="flex:1;height:36px;border:0;border-radius:8px;background:#17804a;color:#fff;font-weight:700">Listo</button><button data-id="' + r.id + '" data-e="rechazada" style="flex:1;height:36px;border:1px solid #2f2a2e;border-radius:8px;background:transparent;color:#f2eef0">Rechazar</button></div></div>'); }).join('')
       + '<p style="margin:0;color:#a69ea3;font-size:12px">Para mover la clase usa ↻ Reagendar en Clase de hoy y luego marca «Listo».</p>';
     p.onclick = async ev => { const t = ev.target.closest('button[data-id]'); if (!t) return;
-      await sb.from('solicitudes').update({ estado: t.dataset.e }).eq('id', t.dataset.id); p.remove(); solicitudes(); };
+      if (t.dataset.vin) { t.disabled = true; const { error } = await sb.rpc('aprobar_vinculo', { p_sol: t.dataset.id }); if (error) { alert('No se pudo aprobar: ' + error.message); t.disabled = false; return; } }
+      else await sb.from('solicitudes').update({ estado: t.dataset.e }).eq('id', t.dataset.id);
+      p.remove(); solicitudes(); };
     document.body.appendChild(p);
   }
 

@@ -1085,6 +1085,7 @@ VIEWS.alumnos = () => {
       <select id="a-f" aria-label="Filtrar">
         ${[['activos','Activos'],['sinprog','Sin programa'],['progpronto','Programa termina en 7 días'],['progfin','Programa terminado'],['lesion','Con lesiones o PAR-Q'],['riesgo','En riesgo de abandonar'],['sinapp',`Sin app · por invitar (${activos().filter(a => !a.vinculado).length})`],['inactivos','Inactivos'],['todos','Todos']].map(([v,l]) => `<option value="${v}" ${F === v ? 'selected' : ''}>${l}</option>`).join('')}
       </select>
+      <button class="btn" data-act="link-grupo" title="Un solo link para mandar al grupo de WhatsApp">📣 Link para el grupo</button>
       <button class="btn pri" data-act="nuevo-alumno">+ Nuevo alumno</button>
     </div>
   </div>
@@ -1846,6 +1847,7 @@ document.addEventListener('click', e => {
   const act = el.dataset.act, id = el.dataset.id;
   if (el.tagName === 'SELECT' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return;
   if (act === 'cerrar') { closeModal(); return; }
+  if (act === 'link-grupo') { e.preventDefault(); linkGrupo(); return; }
   if (act === 'invitar') { e.preventDefault(); e.stopPropagation(); invitarAlumno(id, el); return; }
   if (act === 'cp-on') { cpActivar(el); return; }
   if (act === 'cp-test') { cpProbar(el); return; }
@@ -1982,6 +1984,13 @@ setInterval(() => { if (!document.hidden && S.view === 'inicio' && $('#modal').h
 
 let toastT = 0;
 function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (err ? ' err' : ''); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
+/* ---------- link único para el grupo de WhatsApp: cada alumno busca su nombre y el profe aprueba ---------- */
+async function linkGrupo() {
+  const c = cfg(); const url = location.origin + location.pathname.replace(/[^/]*$/, '') + 'alumno.html';
+  const msg = `¡Hola equipo ${c.gimnasio || 'Titanium Sport'}! 💪 Ya está lista nuestra app: tu rutina, tu agenda, confirmar tus clases y ver tu progreso.\n\n1️⃣ Abre este link: ${url}\n2️⃣ Guárdala en tu pantalla de inicio:\n   • iPhone: en Safari toca Compartir (cuadrado con flecha ↑) › «Agregar a inicio»\n   • Android: en Chrome toca ⋮ › «Agregar a pantalla principal»\n3️⃣ Abre Titanium desde el ícono, escribe tu correo y el código que te llega al correo.\n4️⃣ Busca tu nombre y tócalo. Yo confirmo que eres tú y quedas adentro.\n\n¡Nos vemos en el gym!`;
+  if (navigator.share) { try { await navigator.share({ text: msg }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+  try { await navigator.clipboard.writeText(msg); toast('Mensaje copiado. Pégalo en el grupo de WhatsApp.'); } catch (_) { window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank'); }
+}
 /* ---------- invitar alumnos a la app (link personal con código) ---------- */
 async function invitarAlumno(code, btn) {
   const a = S.alumnos.get(code); if (!a || !window.__sb) return;

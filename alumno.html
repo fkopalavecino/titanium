@@ -187,18 +187,39 @@ await window.tlSession();
 let { data: codigo, error: e1 } = await sb.rpc('vincular_alumno', { p_inv: invGuardada() });
 while (!codigo) {
   const { data: u } = await sb.auth.getUser(); const inv = invGuardada();
-  $('#app').innerHTML = `<div class="center"><h1>Casi listo</h1>
-    <p class="muted">${inv ? `El código <b style="color:var(--fg)">${esc(inv)}</b> no es válido o ya se usó.` : `No encontramos una ficha con el correo <b style="color:var(--fg)">${esc(u?.user?.email)}</b>.`}</p>
-    <p class="muted">Escribe el código de invitación que te mandó Franco por WhatsApp:</p>
-    <label class="field" style="width:100%;max-width:320px">Código de invitación<input id="inv-in" autocapitalize="characters" autocomplete="off" maxlength="12" placeholder="Ej: K7M2QX" style="text-align:center;letter-spacing:.2em;font-weight:700;text-transform:uppercase"></label>
-    <button class="btn pri" id="inv-ok" style="width:100%;max-width:320px">Entrar con mi código</button>
-    <p class="small muted">¿No tienes código? Pídeselo a Franco.</p>
-    <button class="btn" onclick="tlLogout()">Usar otro correo</button></div>`;
-  const nuevo = await new Promise(res => { const go = () => { const v = $('#inv-in').value.trim().toUpperCase(); if (v) res(v); };
-    $('#inv-ok').onclick = go; $('#inv-in').onkeydown = e => { if (e.key === 'Enter') go(); }; });
-  try { localStorage.setItem('tl-inv', nuevo); } catch (_) {}
-  $('#inv-ok').disabled = true; $('#inv-ok').textContent = 'Revisando…';
-  ({ data: codigo, error: e1 } = await sb.rpc('vincular_alumno', { p_inv: nuevo }));
+  const { data: pend } = await sb.rpc('mi_vinculo_pendiente');
+  if (pend) { // ya pidió entrar: espera la aprobación de Franco
+    $('#app').innerHTML = `<div class="center"><div style="font-size:44px">⏳</div><h1>Esperando a Franco</h1>
+      <p class="muted">Le avisamos que <b style="color:var(--fg)">${esc(pend)}</b> quiere entrar a la app. Apenas te apruebe, entras directo.</p>
+      <button class="btn pri" id="vin-rev" style="width:100%;max-width:320px">Revisar de nuevo</button>
+      <button class="btn" id="vin-otro" style="width:100%;max-width:320px">No soy yo, elegir otro nombre</button>
+      <button class="btn" style="background:transparent;border:0;color:var(--muted)" onclick="tlLogout()">Usar otro correo</button></div>`;
+    const r = await new Promise(res => { $('#vin-rev').onclick = () => res('rev'); $('#vin-otro').onclick = () => res('otro'); });
+    if (r === 'rev') { ({ data: codigo } = await sb.rpc('vincular_alumno', { p_inv: invGuardada() })); if (!codigo) toast('Aún no te aprueba. Te avisamos apenas lo haga.'); continue; }
+  }
+  const { data: lista } = await sb.rpc('lista_para_vincular');
+  const L = lista || [];
+  $('#app').innerHTML = `<div class="center" style="justify-content:flex-start;padding-top:24px"><h1>¿Quién eres?</h1>
+    <p class="muted">Busca tu nombre y tócalo. Franco confirmará que eres tú y quedas listo.</p>
+    <input id="vin-q" type="search" placeholder="Escribe tu nombre" autocomplete="off" style="width:100%;max-width:360px;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);padding:0 14px;font:500 17px Barlow,sans-serif">
+    <div id="vin-l" style="width:100%;max-width:360px;display:grid;gap:8px;max-height:46vh;overflow:auto"></div>
+    <details style="width:100%;max-width:360px"><summary class="small muted" style="cursor:pointer">Tengo un código de invitación</summary>
+      <div style="display:grid;gap:8px;margin-top:8px"><input id="inv-in" autocapitalize="characters" autocomplete="off" maxlength="12" placeholder="Ej: K7M2QX" value="${esc(inv && !pend ? '' : '')}" style="min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);text-align:center;letter-spacing:.2em;font:700 17px Barlow,sans-serif;text-transform:uppercase"><button class="btn pri" id="inv-ok">Entrar con mi código</button></div></details>
+    <button class="btn" style="background:transparent;border:0;color:var(--muted)" onclick="tlLogout()">Usar otro correo (${esc(u?.user?.email || '')})</button></div>`;
+  const pintar = () => { const q = $('#vin-q').value.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const f = q ? L.filter(x => x.nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q)) : [];
+    $('#vin-l').innerHTML = !q ? '<div class="small muted" style="text-align:center">Escribe al menos tu primer nombre.</div>'
+      : f.length ? f.slice(0, 20).map(x => `<button class="btn" data-vin="${esc(x.codigo)}" data-n="${esc(x.nombre)}" style="justify-content:flex-start">👤 ${esc(x.nombre)}</button>`).join('')
+      : '<div class="small muted" style="text-align:center">No aparece. Pídele a Franco que te agregue.</div>'; };
+  $('#vin-q').oninput = pintar; pintar();
+  const elegido = await new Promise(res => {
+    $('#vin-l').onclick = e => { const b = e.target.closest('[data-vin]'); if (b && confirm(`¿Eres ${b.dataset.n}?`)) res({ cod: b.dataset.vin }); };
+    $('#inv-ok').onclick = () => { const v = $('#inv-in').value.trim().toUpperCase(); if (v) res({ inv: v }); };
+  });
+  if (elegido.inv) { try { localStorage.setItem('tl-inv', elegido.inv); } catch (_) {} ({ data: codigo } = await sb.rpc('vincular_alumno', { p_inv: elegido.inv }));
+    if (!codigo) { toast('Ese código no es válido o ya se usó.'); try { localStorage.removeItem('tl-inv'); } catch (_) {} } continue; }
+  const { error: ev } = await sb.rpc('solicitar_vinculo', { p_codigo: elegido.cod });
+  if (ev) toast('No se pudo enviar: ' + ev.message);
 }
 try { localStorage.removeItem('tl-inv'); } catch (_) {}
 
