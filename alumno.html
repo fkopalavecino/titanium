@@ -180,13 +180,27 @@ const nowM = () => { const d = new Date(); return d.getHours() * 60 + d.getMinut
 const toast = m => { const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2800); };
 const S = { v: 'hoy', wk: null, dia: null, a: null, planes: [], clases: [], rutinas: new Map(), cfg: {}, sel: null, eventos: [], fotos: [], medidas: [], inbody: [], urls: {}, fang: 'frente' };
 
+/* invitación de Franco: el link trae ?i=CÓDIGO; se guarda para usarlo después de entrar con el correo */
+try { const qi = new URLSearchParams(location.search).get('i'); if (qi) { localStorage.setItem('tl-inv', qi.trim().toUpperCase()); history.replaceState(null, '', location.pathname); } } catch (_) {}
+const invGuardada = () => { try { return localStorage.getItem('tl-inv'); } catch (_) { return null; } };
 await window.tlSession();
-const { data: codigo, error: e1 } = await sb.rpc('vincular_alumno');
-if (!codigo) {
-  const { data: u } = await sb.auth.getUser();
-  $('#app').innerHTML = `<div class="center"><h1>Casi listo</h1><p class="muted">No encontramos una ficha con el correo <b style="color:var(--fg)">${esc(u?.user?.email)}</b>.</p><p class="muted">Pídele a Franco que lo registre en tu ficha de Titanium y vuelve a entrar.</p><button class="btn" onclick="tlLogout()">Usar otro correo</button></div>`;
-  return;
+let { data: codigo, error: e1 } = await sb.rpc('vincular_alumno', { p_inv: invGuardada() });
+while (!codigo) {
+  const { data: u } = await sb.auth.getUser(); const inv = invGuardada();
+  $('#app').innerHTML = `<div class="center"><h1>Casi listo</h1>
+    <p class="muted">${inv ? `El código <b style="color:var(--fg)">${esc(inv)}</b> no es válido o ya se usó.` : `No encontramos una ficha con el correo <b style="color:var(--fg)">${esc(u?.user?.email)}</b>.`}</p>
+    <p class="muted">Escribe el código de invitación que te mandó Franco por WhatsApp:</p>
+    <label class="field" style="width:100%;max-width:320px">Código de invitación<input id="inv-in" autocapitalize="characters" autocomplete="off" maxlength="12" placeholder="Ej: K7M2QX" style="text-align:center;letter-spacing:.2em;font-weight:700;text-transform:uppercase"></label>
+    <button class="btn pri" id="inv-ok" style="width:100%;max-width:320px">Entrar con mi código</button>
+    <p class="small muted">¿No tienes código? Pídeselo a Franco.</p>
+    <button class="btn" onclick="tlLogout()">Usar otro correo</button></div>`;
+  const nuevo = await new Promise(res => { const go = () => { const v = $('#inv-in').value.trim().toUpperCase(); if (v) res(v); };
+    $('#inv-ok').onclick = go; $('#inv-in').onkeydown = e => { if (e.key === 'Enter') go(); }; });
+  try { localStorage.setItem('tl-inv', nuevo); } catch (_) {}
+  $('#inv-ok').disabled = true; $('#inv-ok').textContent = 'Revisando…';
+  ({ data: codigo, error: e1 } = await sb.rpc('vincular_alumno', { p_inv: nuevo }));
 }
+try { localStorage.removeItem('tl-inv'); } catch (_) {}
 
 /* ---------- avisos push ---------- */
 const PUSH_FN = 'https://lnovgbpxdnqgsojkfzwy.supabase.co/functions/v1/notificar';
