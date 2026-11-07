@@ -25,7 +25,7 @@ h2{font-size:22px}
 .muted{color:var(--muted)}.small{font-size:14px}.red{color:var(--red-t)}.ok{color:var(--ok)}.warn{color:var(--warn)}
 .row{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:4px}.seg button{min-height:40px;border:0;border-radius:9px;background:transparent;color:var(--muted);font:700 15px Barlow,sans-serif;cursor:pointer}.seg button[aria-selected=true]{background:var(--surface);color:var(--fg);box-shadow:0 1px 0 var(--line)}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .kpi .v{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:700;line-height:1.1}
 .bar{height:7px;border-radius:4px;background:var(--line)}.bar>i{display:block;height:7px;border-radius:4px;background:var(--red)}
 .btn{display:flex;align-items:center;justify-content:center;min-height:48px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 15px Barlow,sans-serif;text-decoration:none;cursor:pointer;width:100%}
@@ -615,7 +615,7 @@ V.progreso = () => {
   const marcadas = S.clases.filter(r => r.fecha.startsWith(mes) && (r.asis === 'presente' || r.asis === 'ausente')).length;
   const H = historial(); const best = Object.entries(H).map(([n, l]) => [n, l.reduce((b, x) => (x.kg || 0) > (b.kg || 0) ? x : b, l[0]), l]).filter(([, b]) => b && b.kg);
   best.sort((a, b) => b[2].length - a[2].length);
-  const top = best[0];
+  const top = best.find(x => x[0] === S.pej) || best[0];
   let chart = '';
   if (top) { const byF = {}; top[2].forEach(x => { if (x.kg != null) byF[x.f] = Math.max(byF[x.f] || 0, x.kg); });
     const pts = Object.entries(byF).sort(); if (pts.length >= 2) { const mn = Math.min(...pts.map(p => p[1])), mx = Math.max(...pts.map(p => p[1])); const W = 320, Hh = 110;
@@ -658,7 +658,8 @@ V.progreso = () => {
       <button class="btn pri" id="ib-ok">Guardar InBody</button><button class="btn" id="ib-cancel">Cancelar</button></section>`; }
   else if (!ibL) inbCard = `<section class="card" id="ib-card"><h2>InBody</h2><div class="small muted">Sube la foto o el pantallazo de tu informe InBody o BodyGo. Leemos los datos automáticamente y vas viendo tu evolución.</div>${upBtn('＋ Subir mi InBody', true)}</section>`;
   else { const prevOf = k => { for (let i = ib.length - 2; i >= 0; i--) if (ib[i][k] != null) return ib[i]; return null; };
-    const tiles = C.filter(([k]) => ibL[k] != null).map(([k, l, u, , , dec, mejor]) => { const pv = prevOf(k); const d = pv ? ibL[k] - pv[k] : null;
+    const PRIN = ['peso', 'pgc', 'mme']; const conDato = C.filter(([k]) => ibL[k] != null); const extra = conDato.filter(([k]) => !PRIN.includes(k)).length;
+    const tiles = conDato.filter(([k]) => S.ibAll || PRIN.includes(k) || S.ibInfo === k).map(([k, l, u, , , dec, mejor]) => { const pv = prevOf(k); const d = pv ? ibL[k] - pv[k] : null;
       const cls = d == null || Math.abs(d) < 0.05 || !mejor ? 'muted' : ((mejor === 'baja') === (d < 0) ? 'ok' : 'warn');
       return `<div class="card kpi ${S.ibInfo === k ? 'sel' : ''}" data-ibi="${k}" role="button" tabindex="0" style="padding:10px;gap:2px;cursor:pointer;min-width:0"><div class="small muted" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l)}</div><div class="v" style="font-size:24px">${fmtN(ibL[k], dec)}<span class="small muted"> ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</span></div>${d != null ? `<div class="small ${cls}">${d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= '}${fmtN(Math.abs(d), dec)} ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</div>` : ''}</div>`; }).join('');
     const gk = (S.ibInfo && ib.filter(x => x[S.ibInfo] != null).length >= 2) ? S.ibInfo : (['pgc', 'mme', 'peso', 'visceral', 'imc'].find(k => ib.filter(x => x[k] != null).length >= 2) || null);
@@ -668,19 +669,25 @@ V.progreso = () => {
       return `<div class="small muted">Evolución · <b style="color:var(--fg)">${esc(gc[1])}</b></div><svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="${esc(gc[1])}: ${pts.map(p => fmtN(p[1], gc[5])).join(', ')}"><polyline points="${xy.map(p => p.join(',')).join(' ')}" fill="none" stroke="#d71f30" stroke-width="3" stroke-linejoin="round"/>${xy.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="#d71f30"/><text x="${p[0]}" y="${p[1] - 9}" text-anchor="middle" fill="#f2eef0" font-size="12" font-weight="700">${fmtN(pts[i][1], gc[5])}</text>`).join('')}<text x="${pad}" y="${Hh - 4}" fill="#a69ea3" font-size="11">${esc(fmtD(pts[0][0]))}</text><text x="${W - pad}" y="${Hh - 4}" text-anchor="end" fill="#a69ea3" font-size="11">${esc(fmtD(pts[pts.length - 1][0]))}</text></svg>`; })()
       : '<div class="small muted" style="text-align:center">📈 Con tu próximo InBody aparecerá aquí el gráfico de tu evolución.</div>';
     inbCard = `<section class="card" id="ib-card"><div class="row"><h2>InBody</h2><span class="small muted">${esc(fmtD(ibL.f))}${ib.length > 1 ? ' · vs ' + esc(fmtD(ib[ib.length - 2].f)) : ''}</span></div>
-      ${tiles ? `<div class="grid3">${tiles}</div>${ibInfoHTML(ibL)}` : '<div class="small muted">Este informe no tiene datos anotados.</div>'}
+      ${tiles ? `<div class="grid3">${tiles}</div>${extra ? `<button class="chip" data-iball="1" style="justify-self:start">${S.ibAll ? 'Ver menos' : 'Ver todos los datos (+' + extra + ')'}</button>` : ''}${ibInfoHTML(ibL)}` : '<div class="small muted">Este informe no tiene datos anotados.</div>'}
       ${trend}
       ${ib.length > 1 || S.urls[ibL.img] ? `<div class="chips">${ib.length > 1 ? `<button class="chip" data-ibv="hist" aria-pressed="${S.ibVer === 'hist'}">Historial (${ib.length})</button>` : ''}${S.urls[ibL.img] ? `<button class="chip" data-ibv="inf" aria-pressed="${S.ibVer === 'inf'}">Ver informe</button>` : ''}</div>` : ''}
       ${S.ibVer === 'hist' && ib.length > 1 ? `<div style="display:grid;gap:6px">${ib.slice().reverse().map(x => `<div class="row small"><span>${esc(fmtD(x.f))}</span><span class="muted">${[['peso', 'kg'], ['pgc', '%'], ['mme', 'kg músc.']].filter(([k]) => x[k] != null).map(([k, u]) => fmtN(x[k], 1) + ' ' + u).join(' · ') || 'sin datos'}</span></div>`).join('')}</div>` : ''}
       ${S.ibVer === 'inf' && S.urls[ibL.img] ? `<img src="${esc(S.urls[ibL.img])}" data-zoom="1" alt="Informe InBody ${esc(fmtD(ibL.f))}" style="width:100%;max-height:280px;object-fit:contain;border-radius:10px;background:var(--sunk);cursor:zoom-in">` : ''}
       ${upBtn('＋ Subir nuevo InBody', false)}</section>`; }
-  return `<h1>${S.evalFirst ? 'Mis evaluaciones' : 'Mi progreso'}</h1>${S.evalFirst ? inbCard + fotosCard + medCard : ''}
-  <div class="grid3"><div class="card kpi"><div class="small muted">Clases mes</div><div class="v">${delMes}</div></div>
-    <div class="card kpi"><div class="small muted">Asistencia</div><div class="v">${marcadas ? Math.round(delMes / marcadas * 100) + '%' : '—'}</div></div>
-    <div class="card kpi"><div class="small muted">Ejercicios</div><div class="v red">${best.length}</div></div></div>
-  ${S.evalFirst ? '' : fotosCard + medCard + inbCard}
-  ${top ? `<section class="card"><div class="row"><h2>${esc(top[0].replace(/^\d+[ab]? · /, ''))}</h2><span class="small muted">mejor ${esc(fmtSet(top[1]))}</span></div>${chart || '<div class="small muted">Anota más sesiones para ver tu gráfico.</div>'}</section>` : ''}
-  <section class="card"><h2>Tus mejores marcas</h2>${best.length ? best.slice(0, 8).map(([n, b]) => `<div class="row small"><span>${esc(n.replace(/^\d+[ab]? · /, ''))}</span><b>${esc(fmtSet(b))}</b></div>`).join('') : '<div class="small muted">Cuando anotes tus series en «Rutina», aquí verás tus récords.</div>'}</section>`;
+  const tab = S.ptab || (S.fotoUp ? 'fotos' : S.evalFirst ? 'cuerpo' : 'entreno');
+  const TABS = [['entreno', '💪 Entreno'], ['cuerpo', '📊 Cuerpo'], ['fotos', '📸 Fotos']];
+  const nom = n => n.replace(/^\d+[ab]? · /, '');
+  const verTodas = S.mAll ? best : best.slice(0, 5);
+  const entreno = `
+  ${top ? `<section class="card"><div class="row"><h2 style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nom(top[0]))}</h2><span class="small muted" style="white-space:nowrap">mejor ${esc(fmtSet(top[1]))}</span></div>
+    ${chart || '<div class="small muted">Anota más sesiones de este ejercicio para ver tu gráfico.</div>'}
+    ${best.length > 1 ? `<div class="chips">${best.slice(0, 8).map(([n]) => `<button class="chip" data-pej="${esc(n)}" aria-pressed="${n === top[0]}">${esc(nom(n).split(' (')[0])}</button>`).join('')}</div>` : ''}</section>` : ''}
+  <section class="card"><h2>Tus mejores marcas</h2>${best.length ? verTodas.map(([n, bb]) => `<div class="row small"><span style="min-width:0">${esc(nom(n))}</span><b style="white-space:nowrap">${esc(fmtSet(bb))}</b></div>`).join('') + (best.length > 5 ? `<button class="chip" data-mall="1" style="justify-self:start">${S.mAll ? 'Ver menos' : 'Ver todas (' + best.length + ')'}</button>` : '') : '<div class="small muted">Cuando anotes tus series en «Rutina», aquí verás tus récords.</div>'}</section>`;
+  return `<h1>${tab === 'cuerpo' && S.evalFirst ? 'Mis evaluaciones' : 'Mi progreso'}</h1>
+  <section class="card" style="flex-direction:row;padding:12px 6px">${[['Clases del mes', delMes, ''], ['Asistencia', marcadas ? Math.round(delMes / marcadas * 100) + '%' : '—', ''], ['Récords', best.length, 'red']].map(([l, v, c], i) => `<div style="flex:1;text-align:center;${i ? 'border-left:1px solid var(--line)' : ''}"><div class="disp ${c}" style="font-size:26px;line-height:1">${v}</div><div class="small muted" style="font-size:12px">${l}</div></div>`).join('')}</section>
+  <div class="seg" role="tablist">${TABS.map(([k, l]) => `<button role="tab" data-ptab="${k}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>
+  ${tab === 'entreno' ? entreno : tab === 'cuerpo' ? inbCard + medCard : fotosCard}`;
 };
 V.plan = () => {
   const p = planActual(); if (!p) return `<h1>Mi perfil</h1>${perfilCard()}${fichaCard()}${avisosCard()}<div class="card"><div class="muted">Todavía no tienes un plan registrado. Habla con Franco.</div></div><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
@@ -833,12 +840,16 @@ document.addEventListener('click', async ev => {
   if (ev.target.id === 'pf-ok') { ev.target.disabled = true; const ig = $('#pf-ig').value.trim().replace(/^@+/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '');
     if (await guardarPerfil({ apodo: $('#pf-apodo').value.trim() || null, meta: $('#pf-meta').value.trim() || null, nac: $('#pf-nac').value || null, ig: ig || null, deportes: S.pfDeps || S.perfil.deportes || [] })) { S.pfDeps = null; toast('Perfil guardado ✓'); } else ev.target.disabled = false; return; }
   if (ev.target.id === 'ib-ok') { guardarInbody(ev.target); return; }
+  const ptb = ev.target.closest('[data-ptab]'); if (ptb) { S.ptab = ptb.dataset.ptab; S.fotoUp = S.ptab === 'fotos' && S.fotoUp; render(); return; }
+  const pj = ev.target.closest('[data-pej]'); if (pj) { S.pej = pj.dataset.pej; render(); return; }
+  if (ev.target.closest('[data-iball]')) { S.ibAll = !S.ibAll; render(); return; }
+  if (ev.target.closest('[data-mall]')) { S.mAll = !S.mAll; render(); return; }
   const ibv = ev.target.closest('[data-ibv]'); if (ibv) { S.ibVer = S.ibVer === ibv.dataset.ibv ? null : ibv.dataset.ibv; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
   const ibi = ev.target.closest('[data-ibi]'); if (ibi) { S.ibInfo = S.ibInfo === ibi.dataset.ibi ? null : ibi.dataset.ibi; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'fup-open') { S.fotoUp = !S.fotoUp; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'ib-cancel') { if (S.ibNew?.prev) URL.revokeObjectURL(S.ibNew.prev); S.ibNew = null; render(); return; }
   const ei = ev.target.closest('[data-evid]'); if (ei) { abrirEvento(ei.dataset.evid); return; }
-  const eg = ev.target.closest('[data-evgo]'); if (eg) { S.v = eg.dataset.evgo; S.evalFirst = S.v === 'progreso'; render(); return; }
+  const eg = ev.target.closest('[data-evgo]'); if (eg) { S.v = eg.dataset.evgo; S.evalFirst = S.v === 'progreso'; if (S.evalFirst) S.ptab = 'cuerpo'; render(); return; }
   const gd = ev.target.closest('[data-goday]'); if (gd) { S.dia = gd.dataset.goday; S.wk = lunesDe(S.dia); S.v = 'agenda'; render(); return; }
   const zf = ev.target.closest('[data-zoom]'); if (zf) { const lb = document.createElement('div'); lb.id = 'lightbox'; lb.innerHTML = `<img src="${zf.getAttribute('src')}" alt="Foto ampliada">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); return; }
   const fa = ev.target.closest('[data-fang]'); if (fa) { S.fang = fa.dataset.fang; render(); return; }
@@ -870,8 +881,8 @@ async function irAEvento(id) {
   let e = S.eventos.find(x => String(x.id) === String(id));
   if (!e) { await load(); e = S.eventos.find(x => String(x.id) === String(id)); } if (!e) return;
   document.getElementById('sheet')?.remove();
-  if (e.tipo === 'Evaluación' && /foto/i.test(e.titulo || '')) { S.v = 'progreso'; S.evalFirst = false; S.fotoUp = true; }
-  else if (e.tipo === 'Evaluación') { S.v = 'progreso'; S.evalFirst = true; } else { S.v = 'agenda'; S.dia = e.fecha; S.wk = lunesDe(e.fecha); }
+  if (e.tipo === 'Evaluación' && /foto/i.test(e.titulo || '')) { S.v = 'progreso'; S.evalFirst = false; S.fotoUp = true; S.ptab = 'fotos'; }
+  else if (e.tipo === 'Evaluación') { S.v = 'progreso'; S.evalFirst = true; S.ptab = 'cuerpo'; } else { S.v = 'agenda'; S.dia = e.fecha; S.wk = lunesDe(e.fecha); }
   render();
   abrirEvento(e.id);
 }
