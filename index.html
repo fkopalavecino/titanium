@@ -1990,7 +1990,7 @@ async function invitarAlumno(code, btn) {
   if (btn) { btn.disabled = false; btn.textContent = txt0; }
   if (error || !inv) { toast('No se pudo crear la invitación: ' + (error?.message || ''), true); return; }
   const url = location.origin + location.pathname.replace(/[^/]*$/, '') + 'alumno.html?i=' + inv;
-  const c = cfg(); const msg = `Hola ${firstName(a.nombre)}! 💪 Ya tienes tu app de ${c.gimnasio || 'Titanium Sport'}: tu rutina, tu agenda y tu progreso en el celular.\n\n1️⃣ Entra aquí: ${url}\n2️⃣ Escribe tu correo (el que quieras) y el código que te llega.\n3️⃣ Si te pide código de invitación, es: ${inv}\n\nTip: en iPhone ábrelo en Safari › Compartir › «Agregar a inicio» para tenerla como app.`;
+  const c = cfg(); const msg = `Hola ${firstName(a.nombre)}! 💪 Ya tienes tu app de ${c.gimnasio || 'Titanium Sport'}: tu rutina, tu agenda y tu progreso en el celular.\n\n1️⃣ Abre este link: ${url}\n2️⃣ Guárdala en tu pantalla de inicio:\n   • iPhone: en Safari toca Compartir (cuadrado con flecha ↑) › «Agregar a inicio»\n   • Android: en Chrome toca ⋮ › «Agregar a pantalla principal»\n3️⃣ Abre Titanium desde el ícono nuevo, escribe tu correo (el que quieras) y el código que te llega al correo.\n4️⃣ Si te pide código de invitación, es: *${inv}*\n\n¡Nos vemos en el gym!`;
   const tel = String(a.telefono || '').replace(/\D/g, '');
   if (tel) { window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank'); return; }
   if (navigator.share) { try { await navigator.share({ text: msg }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
