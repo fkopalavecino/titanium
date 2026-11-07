@@ -184,6 +184,22 @@ const S = { v: 'hoy', wk: null, dia: null, a: null, planes: [], clases: [], ruti
 /* invitación de Franco: el link trae ?i=CÓDIGO; se guarda para usarlo después de entrar con el correo */
 try { const qi = new URLSearchParams(location.search).get('i'); if (qi) { localStorage.setItem('tl-inv', qi.trim().toUpperCase()); history.replaceState(null, '', location.pathname); } } catch (_) {}
 const invGuardada = () => { try { return localStorage.getItem('tl-inv'); } catch (_) { return null; } };
+/* guía de instalación: si abrió el link en el navegador (no desde el ícono), primero le mostramos cómo dejarla en su pantalla */
+const enApp = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+let saltoGuia = false; try { saltoGuia = sessionStorage.getItem('tl-guia') === '1'; } catch (_) {}
+if (!enApp && !saltoGuia && !(await window.__sb.auth.getSession()).data?.session) {
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const and = /Android/i.test(navigator.userAgent);
+  const pasos = ios ? [['🧭', 'Ábrela en Safari', 'Si la abriste desde WhatsApp, toca la brújula (abajo a la derecha).'], ['⬆️', 'Toca Compartir', 'El cuadrado con flecha hacia arriba, en la barra de abajo.'], ['➕', '«Agregar a inicio»', 'Baja en el menú, elige esa opción y toca Agregar.'], ['📲', 'Abre Titanium desde el ícono', 'Entra con tu correo y busca tu nombre.']]
+    : and ? [['🌐', 'Ábrela en Chrome', 'Si la abriste desde WhatsApp, toca ⋮ › «Abrir en Chrome».'], ['⋮', 'Toca el menú ⋮', 'Arriba a la derecha.'], ['➕', '«Agregar a pantalla principal»', 'O «Instalar app» y confirma.'], ['📲', 'Abre Titanium desde el ícono', 'Entra con tu correo y busca tu nombre.']]
+    : [['📱', 'Ábrela en tu celular', 'Así la dejas como app en tu pantalla de inicio.'], ['📲', 'Agrégala a inicio', 'iPhone: Safari › Compartir › Agregar a inicio. Android: Chrome › ⋮ › Agregar a pantalla principal.']];
+  document.getElementById('app').innerHTML = `<div style="display:grid;gap:14px;padding-top:6px">
+    <div style="display:flex;justify-content:center;padding:2px 0 6px"><img src="icon-192.png" alt="Titanium" width="76" height="76" style="border-radius:18px"></div>
+    <div><div class="eyebrow red">Paso previo · 1 minuto</div><h1 style="font-size:34px;line-height:1">Deja Titanium en tu pantalla</h1><p class="muted" style="margin:6px 0 0">Así la abres como cualquier app y no tienes que buscar el link.</p></div>
+    ${pasos.map(([ic, t, d], i) => `<div class="card" style="flex-direction:row;align-items:center;gap:14px;border-left:4px solid var(--red)"><div style="flex:none;width:40px;height:40px;border-radius:20px;background:var(--red);color:#fff;display:grid;place-items:center;font:700 20px 'Barlow Condensed',sans-serif">${i + 1}</div><div style="flex:1;min-width:0"><b>${t}</b><div class="small muted">${d}</div></div><div style="font-size:24px">${ic}</div></div>`).join('')}
+    <button class="btn" id="guia-skip" style="background:transparent;border:0;color:var(--muted);text-decoration:underline">Seguir en el navegador por ahora</button></div>`;
+  await new Promise(res => { document.getElementById('guia-skip').onclick = () => { try { sessionStorage.setItem('tl-guia', '1'); } catch (_) {} res(); }; });
+}
 await window.tlSession();
 let { data: codigo, error: e1 } = await sb.rpc('vincular_alumno', { p_inv: invGuardada() });
 while (!codigo) {
