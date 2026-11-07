@@ -188,9 +188,38 @@ const invGuardada = () => { try { return localStorage.getItem('tl-inv'); } catch
 const enApp = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const movil = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 if (movil && !enApp && !(await window.__sb.auth.getSession()).data?.session) { // en el computador se puede usar desde el navegador
-  document.getElementById('app').innerHTML = `<div style="position:fixed;inset:0;z-index:50;background:#0e0c0f;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)">
+  const ua = navigator.userAgent; const esAndroid = /Android/i.test(ua);
+  const iosOtro = !esAndroid && /CriOS|FxiOS|EdgiOS/i.test(ua); // Chrome / Firefox / Edge en iPhone
+  const enWA = /WhatsApp|FBAN|FBAV|Instagram/i.test(ua) || (esAndroid && /; wv\)/.test(ua));
+  const caja = (n, t, d) => `<div style="display:flex;gap:14px;align-items:flex-start;background:linear-gradient(135deg,#1f1a1e,#161317);border:1px solid #2f2a2e;border-left:5px solid #d71f30;border-radius:16px;padding:14px"><div style="flex:none;width:40px;height:40px;border-radius:20px;background:linear-gradient(160deg,#ea203a,#9c1222);color:#fff;display:grid;place-items:center;font:800 22px 'Barlow Condensed',sans-serif">${n}</div><div><div style="font:700 18px Barlow,sans-serif">${t}</div><div style="font-size:15px;color:#bdb5ba;line-height:1.4;margin-top:2px">${d}</div></div></div>`;
+  const marco = body => `<div style="position:fixed;inset:0;z-index:50;background:radial-gradient(120% 40% at 50% 0%,rgba(215,31,48,.35),transparent 64%),#0e0c0f;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top) + 22px) 18px calc(env(safe-area-inset-bottom) + 24px)"><div style="max-width:520px;margin:0 auto;display:grid;gap:12px">
+    <div style="display:flex;align-items:center;gap:12px"><img src="icon-192.png" alt="" width="54" height="54" style="border-radius:13px"><div style="font:800 36px/0.95 'Barlow Condensed',sans-serif;text-transform:uppercase">Instala <span style="color:#ea203a">Titanium</span></div></div>${body}
+    <div style="font-size:14px;color:#a69ea3;text-align:center;margin-top:6px">¿Te enredaste? Escríbele al profe Franco</div></div></div>`;
+  let html;
+  if (esAndroid) {
+    html = marco(`<p style="margin:0;color:#cfc8cc">Sigue estos pasos en tu Android 💪</p>
+      ${enWA ? caja(1, 'Ábrela en Chrome', 'Toca los 3 puntitos <b>⋮</b> arriba a la derecha y elige <b>«Abrir en Chrome»</b> (o «Abrir en el navegador»).') : ''}
+      <div id="and-inst" style="display:none">${caja(enWA ? 2 : 1, 'Toca «Instalar Titanium»', 'Y confirma con «Instalar».')}<button id="and-btn" style="margin-top:10px;width:100%;height:56px;border:0;border-radius:14px;background:#d71f30;color:#fff;font:800 20px Barlow,sans-serif">📲 Instalar Titanium</button></div>
+      <div id="and-man">${caja(enWA ? 2 : 1, 'Toca los 3 puntitos ⋮', 'Arriba a la derecha de Chrome.')}${caja(enWA ? 3 : 2, '«Agregar a pantalla principal»', 'O «Instalar app». Luego toca <b>Instalar</b> / <b>Agregar</b>.')}</div>
+      ${caja('✓', 'Abre Titanium desde tu pantalla', 'Busca el ícono nuevo entre tus apps, ábrelo y escribe tu código de 6 letras.')}`);
+  } else if (iosOtro) {
+    html = marco(`<p style="margin:0;color:#cfc8cc">Estás en Chrome (u otro navegador) en iPhone:</p>
+      ${caja(1, 'Toca Compartir', 'El cuadrado con flecha ↑, arriba a la derecha junto a la dirección (o en el menú <b>⋯</b>).')}
+      ${caja(2, '«Agregar a pantalla de inicio»', 'Baja en el menú si no lo ves, tócalo y luego toca <b>Agregar</b>.')}
+      ${caja(3, 'Abre Titanium desde tu pantalla', 'Busca el ícono nuevo, ábrelo y escribe tu código de 6 letras.')}
+      <div style="font-size:14px;color:#a69ea3">¿No aparece la opción? Abre el link en <b>Safari</b> y sigue la guía de iPhone.</div>`);
+  } else {
+    html = `<div style="position:fixed;inset:0;z-index:50;background:#0e0c0f;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)">
     <img src="guia-app-titanium.jpg?v=1794075963" alt="Cómo instalar Titanium: 1) Toca los 3 puntitos abajo a la derecha. 2) Toca Compartir. 3) Toca Ver más. 4) Toca Agregar a Inicio. 5) Toca Agregar. 6) Abre Titanium desde tu pantalla. 7) Escribe tu código y toca Entrar." style="display:block;width:100%;height:auto">
   </div>`;
+  }
+  document.getElementById('app').innerHTML = html;
+  if (esAndroid) { // Chrome en Android ofrece instalar con un toque
+    window.addEventListener('beforeinstallprompt', ev => { ev.preventDefault(); const box = document.getElementById('and-inst'); if (!box) return;
+      box.style.display = 'block'; document.getElementById('and-man').style.display = 'none';
+      document.getElementById('and-btn').onclick = async () => { ev.prompt(); try { await ev.userChoice; } catch (_) {} }; });
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
   return; // solo se usa desde el ícono de la pantalla de inicio
 }
 await window.tlSession();
