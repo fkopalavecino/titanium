@@ -258,8 +258,17 @@
 #tl-agp .hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
 #tl-agp h3{margin:0;font:800 22px Barlow,system-ui,sans-serif;letter-spacing:.01em}
 #tl-agp .x{width:44px;height:44px;border-radius:12px;border:1px solid #2f2a2e;background:#161317;color:#f2eef0;font-size:18px;cursor:pointer}
-#tl-agp .seg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#161317;border:1px solid #2f2a2e;border-radius:12px;padding:3px}
-#tl-agp .seg button{height:40px;border:0;border-radius:9px;background:transparent;color:#a69ea3;font:700 14px Barlow,sans-serif;cursor:pointer;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tl-agp .seg{display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;background:#161317;border:1px solid #2f2a2e;border-radius:12px;padding:3px}
+#tl-agp .seg button{height:40px;border:0;border-radius:9px;background:transparent;color:#a69ea3;font:700 14px Barlow,sans-serif;cursor:pointer;padding:0 10px;white-space:nowrap;flex:1 0 auto}
+#tl-agp .seg::-webkit-scrollbar{display:none}
+#tl-agp [hidden]{display:none!important}
+#tl-agp #tl-ag-msj{gap:12px}
+#tl-agp .msj-it{background:#161317;border:1px solid #2f2a2e;border-left:4px solid #d71f30;border-radius:12px;padding:10px 6px 10px 12px;display:flex;gap:10px;align-items:flex-start}
+#tl-agp .msj-it.env{border-left-color:#4a4247}
+#tl-agp .msj-it .tx{flex:1;min-width:0}
+#tl-agp .msj-it p{margin:4px 0 0;font-size:14px;white-space:pre-wrap;word-break:break-word;color:#d9d3d6}
+#tl-agp .msj-it .mt{color:#a69ea3;font-size:13px}
+#tl-agp .msj-it .del{width:40px;height:40px;border:0;background:none;color:#ff8a94;font-size:17px;cursor:pointer;flex:none}
 #tl-agp .fo{display:flex;align-items:center;gap:10px;background:#161317;border:1px solid #2f2a2e;border-radius:12px;padding:10px 10px 10px 12px}
 #tl-agp .fo .tx{flex:1;min-width:0}
 #tl-agp .fo b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -350,7 +359,7 @@
     let tipo = 'Reunión', vista = 'nuevo', eventos = [], pasados = [], editId = null, editAdj = null, quitarAdj = false;
     p.innerHTML = `<div class="sh" role="dialog" aria-modal="true" aria-labelledby="tl-ag-h">
       <header><div class="hd"><h3 id="tl-ag-h">Agenda de alumnos</h3><button class="x" data-x="1" aria-label="Cerrar">✕</button></div>
-        <div class="seg" role="tablist"><button role="tab" data-v="nuevo" aria-selected="true" id="tl-ag-tabn">＋ Nuevo</button><button role="tab" data-v="prox" aria-selected="false">Próximos <span id="tl-ag-n"></span></button><button role="tab" data-v="hist" aria-selected="false">Historial</button><button role="tab" data-v="fot" aria-selected="false">📋 Evaluaciones</button></div></header>
+        <div class="seg" role="tablist"><button role="tab" data-v="nuevo" aria-selected="true" id="tl-ag-tabn">＋ Nuevo</button><button role="tab" data-v="prox" aria-selected="false">Próximos <span id="tl-ag-n"></span></button><button role="tab" data-v="hist" aria-selected="false">Historial</button><button role="tab" data-v="fot" aria-selected="false">📋 Evaluaciones</button><button role="tab" data-v="msj" aria-selected="false">📣 Mensaje</button></div></header>
       <div class="bd" id="tl-ag-nuevo">
         <label class="lb">¿Para quién?<select id="tl-ag-al"><option value="">👥 Todos los alumnos</option>${act.map(a => `<option value="${escA(a.codigo)}">${escA(a.nombre)}</option>`).join('')}</select></label>
         <div class="lb">Tipo<div class="tipos">${TIPOS.map(t => `<button type="button" data-t="${t}" aria-pressed="${t === tipo}"><span>${TICO[t]}</span>${t}</button>`).join('')}</div></div>
@@ -365,6 +374,16 @@
       <div class="bd" id="tl-ag-prox" hidden></div>
       <div class="bd" id="tl-ag-hist" hidden></div>
       <div class="bd" id="tl-ag-fot" hidden></div>
+      <div class="bd" id="tl-ag-msj" hidden>
+        <div class="small" style="color:#a69ea3;font-size:14px">Un aviso para <b style="color:#f2eef0">todos tus alumnos</b>: les llega como notificación al teléfono y queda en su Inicio por 7 días.</div>
+        <label class="lb"><span>Título <small>(opcional)</small></span><input id="tl-ms-tit" placeholder="Ej: Cambio de horario" maxlength="60" autocomplete="off"></label>
+        <label class="lb">Mensaje<textarea id="tl-ms-txt" rows="4" maxlength="500" placeholder="Ej: Este lunes 18 el gimnasio abre a las 9:00 por el feriado 💪"></textarea></label>
+        <div class="lb">¿Cuándo se envía?<div class="quick"><button type="button" data-mq="ya" aria-pressed="true">Ahora</button><button type="button" data-mq="prog" aria-pressed="false">Programar</button></div>
+          <div class="two" id="tl-ms-cu" hidden><label class="sub">Fecha<input id="tl-ms-f" type="date"></label><label class="sub">Hora<input id="tl-ms-h" type="time" value="09:00"></label></div></div>
+        <div class="msg" id="tl-ms-msg" role="status"></div>
+        <button class="ok" id="tl-ms-ok" type="button">📣 Enviar a todos</button>
+        <div id="tl-ms-lst"></div>
+      </div>
       <footer id="tl-ag-foot"><div class="msg" id="tl-ag-msg" role="status"></div><button class="ok" id="tl-ag-ok">Guardar en la agenda</button><button class="cx" id="tl-ag-cx" type="button" hidden>Cancelar edición</button></footer></div>`;
     const $ = id => document.getElementById(id);
     const msg = (t, c) => { $('tl-ag-msg').style.color = c || '#6fd39a'; $('tl-ag-msg').textContent = t; };
@@ -414,13 +433,42 @@
       const { error } = await sb.from('eventos').insert(pend.map(x => ({ alumno: x.a.codigo, tipo: 'Evaluación', fecha: f, hora: null, titulo: FOTO_TIT, detalle: FOTO_DET })));
       if (error) { btn.disabled = false; btn.textContent = 'Agendar a ' + pend.length; alert('No se pudo agendar: ' + error.message); return; }
       await lista(); pintarFotos(); };
+    /* ---------- mensajes grupales: ahora o programados ---------- */
+    let msjProg = false;
+    const fHora = t => { const d = new Date(t); return d.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' }) + ' · ' + d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }); };
+    const setMq = prog => { msjProg = prog; p.querySelectorAll('[data-mq]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.mq === 'prog') === prog)));
+      $('tl-ms-cu').hidden = !prog; if (prog && !$('tl-ms-f').value) $('tl-ms-f').value = masDias(1); $('tl-ms-ok').textContent = prog ? '🗓️ Programar envío' : '📣 Enviar a todos'; };
+    const listaMsj = async () => {
+      const { data } = await sb.from('mensajes').select('*').order('enviar_at', { ascending: false }).limit(30);
+      const ms = data || [], prog = ms.filter(m => !m.enviado_at).reverse(), env = ms.filter(m => m.enviado_at).slice(0, 10);
+      const it = (m, e) => `<div class="msj-it${e ? ' env' : ''}"><div class="tx"><b>${escA(m.titulo || 'Mensaje de tu profe')}</b><div class="mt">${e ? '✓ Enviado ' + escA(fHora(m.enviado_at)) : '🕒 Se envía ' + escA(fHora(m.enviar_at))}</div><p>${escA(m.cuerpo)}</p></div><button class="del" data-mdel="${m.id}" aria-label="${e ? 'Borrar mensaje' : 'Cancelar envío'}">✕</button></div>`;
+      $('tl-ms-lst').innerHTML = (prog.length ? '<div class="day">Programados</div>' + prog.map(m => it(m, false)).join('') : '')
+        + (env.length ? '<div class="day" style="margin-top:10px">Enviados</div>' + env.map(m => it(m, true)).join('') : '')
+        || '<div class="empty" style="padding:14px 0">Aún no has enviado mensajes.</div>';
+      $('tl-ms-lst').style.cssText = 'display:flex;flex-direction:column;gap:8px'; };
+    const enviarMsj = async () => {
+      const m = (t, c) => { $('tl-ms-msg').style.color = c || '#6fd39a'; $('tl-ms-msg').textContent = t; };
+      const txt = $('tl-ms-txt').value.trim(), tit = $('tl-ms-tit').value.trim();
+      if (!txt) { m('Escribe el mensaje.', '#ff8a94'); $('tl-ms-txt').focus(); return; }
+      let cuando = new Date();
+      if (msjProg) { const f = $('tl-ms-f').value, h = $('tl-ms-h').value || '09:00';
+        if (!f) { m('Elige la fecha.', '#ff8a94'); return; }
+        cuando = new Date(f + 'T' + h); if (cuando <= new Date()) { m('Esa hora ya pasó. Elige una más adelante.', '#ff8a94'); return; } }
+      if (!msjProg && !confirm('¿Enviar este mensaje ahora a todos tus alumnos?')) return;
+      const b = $('tl-ms-ok'); b.disabled = true;
+      const { error } = await sb.from('mensajes').insert({ titulo: tit || null, cuerpo: txt, enviar_at: cuando.toISOString() });
+      b.disabled = false;
+      if (error) { m('No se pudo guardar: ' + error.message, '#ff8a94'); return; }
+      $('tl-ms-txt').value = ''; $('tl-ms-tit').value = '';
+      m(msjProg ? 'Programado ✓ Se enviará ' + fHora(cuando) + '.' : 'Enviado ✓ Les llega en unos segundos.'); setMq(false);
+      setTimeout(listaMsj, msjProg ? 0 : 2500); listaMsj(); };
     const lista = async () => {
       const [a, b] = await Promise.all([
         sb.from('eventos').select('*').gte('fecha', iso).order('fecha').order('hora', { nullsFirst: true }).limit(60),
         sb.from('eventos').select('*').lt('fecha', iso).order('fecha', { ascending: false }).order('hora', { nullsFirst: true }).limit(100)]);
       eventos = a.data || []; pasados = b.data || []; pintar(); if (vista === 'fot') pintarFotos(); };
     const ver = v => { vista = v; p.querySelectorAll('[data-v]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.v === v)));
-      $('tl-ag-nuevo').hidden = v !== 'nuevo'; $('tl-ag-prox').hidden = v !== 'prox'; $('tl-ag-hist').hidden = v !== 'hist'; $('tl-ag-fot').hidden = v !== 'fot'; if (v === 'fot') pintarFotos(); $('tl-ag-foot').hidden = v !== 'nuevo'; };
+      $('tl-ag-nuevo').hidden = v !== 'nuevo'; $('tl-ag-prox').hidden = v !== 'prox'; $('tl-ag-hist').hidden = v !== 'hist'; $('tl-ag-fot').hidden = v !== 'fot'; if (v === 'fot') pintarFotos(); $('tl-ag-msj').hidden = v !== 'msj'; if (v === 'msj') listaMsj(); $('tl-ag-foot').hidden = v !== 'nuevo'; };
     const conAdj = () => editAdj && !quitarAdj;
     const limpiarArchivo = () => { $('tl-ag-file').value = ''; $('tl-ag-fn').textContent = conAdj() ? '📎 Archivo actual (elige otro para reemplazarlo)' : 'Elegir PDF o imagen (máx. 15 MB)'; $('tl-ag-rm').hidden = !conAdj(); };
     const setTipo = t => { tipo = TIPOS.includes(t) ? t : 'Otro'; p.querySelectorAll('[data-t]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.t === tipo))); $('tl-ag-tit').placeholder = TEJ[tipo]; };
@@ -445,6 +493,10 @@
         if (tipo === 'Documento' || tipo === 'Nutrición') $('tl-ag-adj').open = true; return; }
       const q = ev.target.closest('[data-q]'); if (q) { if (q.dataset.q === 'h') $('tl-ag-hora').value = ''; else $('tl-ag-fecha').value = masDias(+q.dataset.q); marcaQuick(); return; }
       if (ev.target.closest('#tl-ag-rm')) { ev.preventDefault(); if (!$('tl-ag-file').files[0] && editAdj) quitarAdj = true; return limpiarArchivo(); }
+      const mq = ev.target.closest('[data-mq]'); if (mq) { setMq(mq.dataset.mq === 'prog'); return; }
+      if (ev.target.id === 'tl-ms-ok') { enviarMsj(); return; }
+      const md = ev.target.closest('[data-mdel]'); if (md) { if (!confirm('¿Borrar este mensaje? Los alumnos dejarán de verlo en su Inicio.')) return;
+        await sb.from('mensajes').delete().eq('id', md.dataset.mdel); listaMsj(); return; }
       const fsm = ev.target.closest('[data-fsem]'); if (fsm) { semFoto = Number(fsm.dataset.fsem); try { localStorage.setItem('tl-fot-sem', String(semFoto)); } catch (_) {} pintarFotos(); return; }
       const fag = ev.target.closest('[data-fag]'); if (fag) { agendarFoto(fag.dataset.fag); return; }
       if (ev.target.id === 'tl-fot-all') { agendarFotosTodos(ev.target); return; }
