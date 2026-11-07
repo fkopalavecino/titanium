@@ -199,7 +199,7 @@ const { data: cfgRow } = await sb.from('config').select('data').eq('id', 1).mayb
 const waProfe = String(cfgRow?.data?.whatsapp || '').replace(/\D/g, ''); const profe = cfgRow?.data?.coach || 'tu profe';
 while (!codigo) {
   const { data: u } = await sb.auth.getUser(); const inv = invGuardada(); const mail = u?.user?.email || '';
-  const ayuda = waProfe ? `https://wa.me/${waProfe}?text=${encodeURIComponent(`Hola ${profe}! No puedo entrar a la app de Titanium 🙈\nMi correo: ${mail}${inv ? '\nCódigo que probé: ' + inv : ''}`)}` : '';
+  const ayuda = waProfe ? `https://wa.me/${waProfe}?text=${encodeURIComponent(`Hola ${profe}! No puedo entrar a la app de Titanium 🙈\n${mail ? 'Mi correo: ' + mail : 'Entré sin correo'}${inv ? '\nCódigo que probé: ' + inv : ''}`)}` : '';
   $('#app').innerHTML = `<div class="center" style="justify-content:flex-start;padding-top:28px">
     <img src="icon-192.png" alt="" width="68" height="68" style="border-radius:16px">
     <h1>Tu código de invitación</h1>
@@ -208,7 +208,7 @@ while (!codigo) {
     <input id="inv-in" autocapitalize="characters" autocomplete="off" maxlength="12" placeholder="Ej: K7M2QX" style="width:100%;max-width:340px;min-height:56px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);text-align:center;letter-spacing:.25em;font:700 22px Barlow,sans-serif;text-transform:uppercase">
     <button class="btn pri" id="inv-ok" style="width:100%;max-width:340px">Entrar</button>
     ${ayuda ? `<a class="btn" href="${ayuda}" target="_blank" rel="noopener" style="width:100%;max-width:340px;background:#1f7a4d;border-color:#1f7a4d;color:#fff">💬 Pedir ayuda a ${esc(profe)}</a>` : ''}
-    <button class="btn" style="background:transparent;border:0;color:var(--muted)" onclick="tlLogout()">Usar otro correo (${esc(mail)})</button></div>`;
+    <button class="btn" style="background:transparent;border:0;color:var(--muted)" onclick="tlLogout()">${mail ? `Usar otro correo (${esc(mail)})` : 'Volver al inicio'}</button></div>`;
   const v = await new Promise(res => { const go = () => { const x = $('#inv-in').value.trim().toUpperCase(); if (x) res(x); };
     $('#inv-ok').onclick = go; $('#inv-in').onkeydown = e => { if (e.key === 'Enter') go(); }; });
   $('#inv-ok').disabled = true; $('#inv-ok').textContent = 'Revisando…';
