@@ -478,7 +478,8 @@
   function respaldoBtn() {
     if (document.getElementById('tl-bk')) return;
     const b = document.createElement('button'); b.id = 'tl-bk'; b.title = 'Descargar respaldo'; b.setAttribute('aria-label', 'Descargar respaldo de datos');
-    b.style.cssText = 'display:block;margin:8px auto calc(96px + env(safe-area-inset-bottom));background:none;border:0;padding:8px 12px;color:#8a8287;font:500 13px Barlow,system-ui,sans-serif;cursor:pointer;text-decoration:underline;text-underline-offset:3px';
+    b.style.cssText = 'display:none;margin:8px auto calc(96px + env(safe-area-inset-bottom));background:none;border:0;padding:8px 12px;color:#8a8287;font:500 13px Barlow,system-ui,sans-serif;cursor:pointer;text-decoration:underline;text-underline-offset:3px';
+    const mostrar = () => { const v = document.getElementById('view'); if (v && v.children.length && !v.querySelector('.empty, .notice')) b.style.display = 'block'; else setTimeout(mostrar, 400); }; setTimeout(mostrar, 400);
     const pintar = () => { const d = bkDias(); b.textContent = '💾 Descargar respaldo de datos · ' + (d === Infinity ? 'nunca descargado' : 'último hace ' + Math.floor(d) + ' día(s)'); b.style.color = d > 30 ? '#d71f30' : '#8a8287'; };
     b.onclick = async () => {
       if (b.disabled) return; const d = bkDias();
