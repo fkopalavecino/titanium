@@ -302,6 +302,8 @@ async function load() {
   ]);
   S.mensajes = msj?.data || [];
   try { const { data: rc } = await sb.rpc('mis_recuperaciones'); S.recup = rc || null; } catch (_) { S.recup = null; }
+  try { const [ep, sp] = await Promise.all([sb.rpc('mi_estado_pago'), sb.from('solicitudes').select('id,data,created_at').eq('alumno', codigo).eq('tipo', 'pago').eq('estado', 'pendiente').order('created_at', { ascending: false }).limit(1)]);
+    S.pago = ep.data || null; S.pagoPend = (sp.data || [])[0] || null; } catch (_) { S.pago = null; S.pagoPend = null; }
   S.conf = new Map((cfm.data || []).map(r => [r.fecha + '_' + r.hora, r.estado]));
   S.eventos = (ev.data || []).sort((x, y) => (x.fecha + (x.hora || '')).localeCompare(y.fecha + (y.hora || '')));
   S.a = a.data; S.planes = (p.data || []).sort((x, y) => String(x.inicio || '').localeCompare(String(y.inicio || '')));
@@ -447,6 +449,7 @@ function cuadrado(file, lado) { return new Promise((res, rej) => { const u = URL
 async function guardarPerfil(cambios) { const nuevo = Object.assign({}, S.perfil, cambios);
   const { error } = await sb.rpc('actualizar_mi_perfil', { p_perfil: nuevo }); if (error) { toast('No se pudo guardar: ' + error.message); return false; }
   await load(); render(); return true; }
+document.addEventListener('change', ev => { if (ev.target.id === 'pcomp') { const f = ev.target.files?.[0]; const l = document.getElementById('pcomp-l'); if (l) l.textContent = f ? '📎 ' + f.name : '📎 Adjuntar comprobante (opcional)'; } });
 document.addEventListener('change', async ev => { if (ev.target.id !== 'av-file' || !ev.target.files?.[0]) return; const lbl = ev.target.closest('.av-up'); if (lbl) lbl.style.opacity = '.5';
   try { const blob = await cuadrado(ev.target.files[0], 480); const id = 'alumno/' + codigo + '/avatar-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()) + '.jpg';
     const { error } = await sb.storage.from('fotos').upload(id, blob, { contentType: 'image/jpeg' }); if (error) throw error;
@@ -602,6 +605,7 @@ V.hoy = () => {
   </div>
   <section class="card"><div class="small">Este mes llevas <b>${delMes} clase${delMes === 1 ? '' : 's'}</b>. ${delMes >= 8 ? '¡Vas excelente!' : 'Cada clase suma.'}</div></section>
   ${proximoHTML()}
+  ${pagoBanner()}
   ${avisoBanner()}
   <div class="small muted" style="text-align:center;font-style:italic">«${esc(S.cfg.lema || 'El que abandona pierde')}» · ${esc(S.cfg.gimnasio || 'Titanium Sport')}</div>`;
 };
@@ -803,18 +807,7 @@ V.plan = () => {
   const p = planActual(); if (!p) return `<h1>Mi perfil</h1>${perfilCard()}${fichaCard()}${avisosCard()}<div class="card"><div class="muted">Todavía no tienes un plan registrado. Habla con Franco.</div></div><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
   const usadas = presentes(p.inicio, p.fin); const tot = p.clases || S.a.clases || 0; const ab = abonado(p); const saldo = Math.max(0, (p.monto || 0) - ab);
   const dias = (S.a.bloques || []).map(k => DL[k.split('-')[0]] + ' ' + k.split('-')[1]).join(' · ');
-  return `<h1>Mi perfil</h1>${perfilCard()}${fichaCard()}${avisosCard()}<details class="card blk" data-sec="plan" ${secAbiertos.has('plan') ? 'open' : ''}><summary><div><h2>Mi plan</h2><div class="small ${saldo ? 'warn' : 'muted'}">Plan ${tot || ''} clases · ${saldo ? 'Pendiente' : 'Pagado'} · renueva ${esc(fmtD(p.fin))}</div></div><span class="chev" aria-hidden="true">›</span></summary>
-  <div class="row" style="align-items:center"><div><div class="disp" style="font-size:26px">Plan ${tot || ''} clases</div><div class="small muted">${esc(fmtD(p.inicio))} → ${esc(fmtD(p.fin))}${dias ? ' · ' + esc(dias) : ''}</div></div>
-    <span class="small ${saldo ? 'warn' : 'ok'}" style="font-weight:700">${saldo ? 'Pendiente' : 'Pagado'}</span></div>
-    <div class="row small"><span class="muted">Clases usadas</span><b>${usadas} de ${tot || '—'}</b></div>${tot ? `<div class="bar"><i style="width:${Math.min(100, Math.round(usadas / tot * 100))}%"></i></div>` : ''}
-    <div class="row small"><span class="muted">Monto</span><b>${clp(p.monto)}</b></div>
-    <div class="row small"><span class="muted">Pagado</span><b>${clp(ab)}</b></div>
-    ${saldo ? `<div class="row small"><span class="muted">Saldo</span><b class="warn">${clp(saldo)}</b></div>` : ''}
-    <div class="row small"><span class="muted">Renovación</span><b>${esc(fmtD(p.fin))}</b></div></details>
-  <details class="card blk" data-sec="pago" ${secAbiertos.has('pago') ? 'open' : ''}><summary><div><h2>Avisar un pago</h2><div class="small muted">Si ya transferiste, avísale a Franco</div></div><span class="chev" aria-hidden="true">›</span></summary>
-    <label class="field">Monto transferido<input id="pmonto" inputmode="numeric" placeholder="${saldo ? saldo : (p.monto || '')}"></label>
-    <button class="btn pri" id="avisarPago">Avisar que pagué</button></details>
-  <details class="card blk" data-sec="pagos" ${secAbiertos.has('pagos') ? 'open' : ''}><summary><div><h2>Pagos registrados</h2><div class="small muted">${(p.pagos || []).length} pago${(p.pagos || []).length === 1 ? '' : 's'}</div></div><span class="chev" aria-hidden="true">›</span></summary>${(p.pagos || []).length ? p.pagos.map(x => `<div class="row small"><span>${esc(fmtD(x.fecha))} · ${esc(x.medio || '')}</span><b>${clp(x.monto)}</b></div>`).join('') : '<div class="small muted">Sin pagos registrados en este plan.</div>'}</details><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
+  return `<h1>Mi perfil</h1>${perfilCard()}${fichaCard()}${avisosCard()}${pagosCard(p, usadas, tot, ab, saldo, dias)}`;
 };
 function weekStrip(wk, sel, attr) { const t = today();
   return `<div class="wk">${Array.from({ length: 7 }, (_, i) => addDays(wk, i)).map(f => { const its = clasesDia(f); const done = its.some(x => x.rec?.asis === 'presente'); const ne = evDia(f).length;
@@ -891,6 +884,7 @@ function recupHTML() { const R = S.recup; if (!R || !R.activo) return '';
   const t = today(), ahora = new Date();
   const prox = (R.usadas || []).filter(u => u.f >= t && !u.asis);
   if (!R.disponibles && !prox.length) return '';
+  if (R.bloqueado && !prox.length) return `<section class="card" style="border-color:#4da3ff"><div class="row"><span class="eyebrow" style="color:#7fb9ff">🔁 Recuperar clases</span></div><div><b>Tienes ${R.disponibles} clase${R.disponibles === 1 ? '' : 's'} por recuperar</b><div class="small muted">Para agendarlas, primero regulariza tu pago.</div></div><button class="btn" data-gopago="1">💳 Ver mi pago</button></section>`;
   const dia = f => (f === t ? 'Hoy' : f === addDays(t, 1) ? 'Mañana' : DL[dayKey(f)] + ' ' + fmtD(f));
   const ops = (R.opciones || []).filter(o => !o.ya);
   return `<section class="card" style="border-color:#4da3ff;background:rgba(77,163,255,.07)">
@@ -955,6 +949,53 @@ function render() {
   applyDraft();
   window.scrollTo(0, 0); requestAnimationFrame(() => window.scrollTo(0, 0));
 }
+
+/* ---------- pagos: estado, datos de transferencia, "ya pagué" con comprobante ---------- */
+function pagoEstadoTxt() { const e = S.pago; if (!e || !e.plan) return null;
+  if (e.moroso) return { t: 'crit', l: e.dias != null && e.dias < 0 ? `Plan vencido hace ${-e.dias} día${e.dias === -1 ? '' : 's'}` : `Pago pendiente · ${clp(e.saldo)}` };
+  if (e.dias != null && e.dias < 0) return { t: 'warn', l: `Tu plan venció hace ${-e.dias} día${e.dias === -1 ? '' : 's'}` };
+  if (e.dias === 0) return { t: 'warn', l: 'Tu plan vence hoy' };
+  if (e.dias != null && e.dias <= 5) return { t: 'warn', l: `Tu plan vence en ${e.dias} día${e.dias === 1 ? '' : 's'}` };
+  if (e.saldo > 0) return { t: 'warn', l: `Saldo pendiente · ${clp(e.saldo)}` };
+  return { t: 'ok', l: 'Al día ✓' }; }
+function pagoBanner() { const e = S.pago, st = pagoEstadoTxt(); if (!st || st.t === 'ok' || S.pagoPend) return '';
+  return `<section class="card" style="border-color:${st.t === 'crit' ? 'var(--red)' : 'var(--warn)'};cursor:pointer" data-gopago="1" role="button" tabindex="0"><div class="row" style="align-items:center"><div><b>💳 ${esc(st.l)}</b><div class="small muted">${e.saldo > 0 ? 'Saldo ' + clp(e.saldo) : e.monto ? 'Renovación ' + clp(e.monto) : ''}${e.moroso && S.cfg?.pago?.bloquearRecup !== false ? ' · mientras tanto no puedes recuperar clases' : ''}</div></div><span class="btn" style="width:auto;min-height:40px;padding:0 14px">Pagar</span></div></section>`; }
+function pagosCard(p, usadas, tot, ab, saldo, dias) { const cp = S.cfg?.pago || {}, st = pagoEstadoTxt() || { t: 'muted', l: '' };
+  const abierto = secAbiertos.has('pagos') || (st.t !== 'ok' && st.t !== 'muted');
+  const datos = [['Banco', cp.banco], ['Tipo de cuenta', cp.tipo], ['N° de cuenta', cp.numero], ['RUT', cp.rut], ['Titular', cp.titular], ['Correo', cp.correo]].filter(([, v]) => v);
+  const todo = datos.map(([l, v]) => `${l}: ${v}`).join('\n');
+  const montoSug = saldo || p.monto || '';
+  const pend = S.pagoPend;
+  return `<details class="card blk" data-sec="pagos" id="pagos-card" ${abierto ? 'open' : ''}><summary><div><h2>💳 Pagos</h2><div class="small ${st.t === 'ok' ? 'ok' : st.t === 'crit' ? 'red' : 'warn'}">${esc(st.l)}${pend ? ' · comprobante en revisión' : ''}</div></div><span class="chev" aria-hidden="true">›</span></summary>
+    <div class="row" style="align-items:center"><div><div class="disp" style="font-size:24px">Plan ${tot || ''} clases</div><div class="small muted">${esc(fmtD(p.inicio))} → ${esc(fmtD(p.fin))}${dias ? ' · ' + esc(dias) : ''}</div></div><span class="small ${saldo ? 'warn' : 'ok'}" style="font-weight:700">${saldo ? 'Pendiente' : 'Pagado'}</span></div>
+    <div class="row small"><span class="muted">Clases usadas</span><b>${usadas} de ${tot || '—'}</b></div>${tot ? `<div class="bar"><i style="width:${Math.min(100, Math.round(usadas / tot * 100))}%"></i></div>` : ''}
+    <div class="row small"><span class="muted">Monto</span><b>${clp(p.monto)}</b></div>
+    <div class="row small"><span class="muted">Pagado</span><b>${clp(ab)}</b></div>
+    ${saldo ? `<div class="row small"><span class="muted">Saldo</span><b class="warn">${clp(saldo)}</b></div>` : ''}
+    <div class="row small"><span class="muted">Vence / renueva</span><b>${esc(fmtD(p.fin))}</b></div>
+    ${datos.length ? `<div style="display:grid;gap:6px;border-top:1px solid var(--line);padding-top:10px"><b class="small">Datos para transferir</b>${datos.map(([l, v]) => `<div class="row small" style="align-items:center"><span class="muted">${esc(l)}</span><button class="chip" data-copy="${esc(v)}" style="max-width:62%;overflow:hidden;text-overflow:ellipsis">${esc(v)} 📋</button></div>`).join('')}<button class="btn" data-copy="${esc(todo)}">📋 Copiar todos los datos</button></div>` : '<div class="small muted">Pídele a Franco los datos de transferencia.</div>'}
+    <div style="display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px">
+      ${pend ? `<div class="note small">⏳ Enviaste un comprobante por <b>${esc(pend.data?.monto || '')}</b> el ${esc(fmtD(String(pend.created_at).slice(0, 10)))}. Franco lo confirmará pronto.</div>`
+        : `<b class="small">¿Ya transferiste?</b><label class="field">Monto transferido<input id="pmonto" inputmode="numeric" placeholder="${esc(montoSug)}"></label>
+      <label class="btn" style="position:relative;overflow:hidden"><span id="pcomp-l">📎 Adjuntar comprobante (opcional)</span><input type="file" accept="image/*,application/pdf" id="pcomp" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label>
+      <button class="btn pri" id="avisarPago">Ya pagué</button>`}
+    </div>
+    ${(p.pagos || []).length ? `<div style="display:grid;gap:4px;border-top:1px solid var(--line);padding-top:10px"><b class="small">Pagos registrados</b>${p.pagos.map(x => `<div class="row small"><span>${esc(fmtD(x.fecha))} · ${esc(x.medio || '')}</span><b>${clp(x.monto)}</b></div>`).join('')}</div>` : ''}
+  </details>`; }
+async function avisarPagoComp() { const btn = $('#avisarPago'); const v = ($('#pmonto').value || '').replace(/\D/g, ''); const mon = Number(v) || Number($('#pmonto').placeholder) || 0;
+  if (!mon) { toast('Escribe el monto que transferiste.'); $('#pmonto').focus(); return; }
+  const f = $('#pcomp').files?.[0]; btn.disabled = true; btn.textContent = 'Enviando…'; let comprobante = null;
+  try { if (f) { if (f.size > 15 * 1024 * 1024) throw new Error('El archivo pesa más de 15 MB');
+      const pdf = f.type === 'application/pdf'; const blob = pdf ? f : await reducirImg(f, 1600);
+      comprobante = 'alumno/' + codigo + '/pago-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()) + (pdf ? '.pdf' : '.jpg');
+      const { error } = await sb.storage.from('fotos').upload(comprobante, blob, { contentType: pdf ? 'application/pdf' : 'image/jpeg' }); if (error) throw error; }
+    const { error } = await sb.from('solicitudes').insert({ alumno: codigo, tipo: 'pago', data: { nombre: S.a.nombre, monto: clp(mon), montoNum: mon, comprobante } });
+    if (error) throw error; toast('Enviado ✓ Franco confirmará tu pago.'); await load(); render();
+  } catch (e) { toast('No se pudo enviar: ' + (e.message || 'intenta de nuevo')); btn.disabled = false; btn.textContent = 'Ya pagué'; } }
+function reducirImg(file, max) { return new Promise((res, rej) => { const u = URL.createObjectURL(file), img = new Image();
+  img.onload = () => { const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); c.toBlob(b => b ? res(b) : rej(new Error('imagen')), 'image/jpeg', 0.85); };
+  img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('No se pudo leer la imagen')); }; img.src = u; }); }
 async function solicitar(tipo, data) {
   const { error } = await sb.from('solicitudes').insert({ alumno: codigo, tipo, data: Object.assign({ nombre: S.a.nombre }, data) });
   if (error) { toast('No se pudo enviar. Intenta de nuevo.'); return false; } toast('Enviado a Franco ✓'); return true;
@@ -1003,7 +1044,9 @@ document.addEventListener('click', async ev => {
   const nvy = ev.target.closest('[data-nov]'); if (nvy) { confirmar(nvy.dataset.nov, 'no_voy'); return; }
   const nv = ev.target.closest('[data-novoy]'); if (nv) { const x = proximas(4)[Number(nv.dataset.novoy)]; if (x && await confirmar(x.f + '_' + x.h, 'no_voy')) { nv.disabled = true; nv.style.opacity = '.6'; } return; }
   if (ev.target.id === 'recuperar') { const v = $('#pref').value.trim(); if (!v) { toast('Escribe qué día te acomoda.'); return; } if (await solicitar('recuperar', { prefiere: v })) $('#pref').value = ''; return; }
-  if (ev.target.id === 'avisarPago') { const v = $('#pmonto').value.trim(); if (await solicitar('pago', { monto: v ? clp(v.replace(/\D/g, '')) : 'sin monto' })) $('#pmonto').value = ''; return; }
+  if (ev.target.id === 'avisarPago') { avisarPagoComp(); return; }
+  const cpy = ev.target.closest('[data-copy]'); if (cpy) { try { await navigator.clipboard.writeText(cpy.dataset.copy); toast('Copiado ✓'); } catch (_) { toast(cpy.dataset.copy); } return; }
+  if (ev.target.closest('[data-gopago]')) { secAbiertos.add('pagos'); S.v = 'plan'; render(); setTimeout(() => document.getElementById('pagos-card')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50); return; }
   if (ev.target.id === 'guardar') {
     const rd = rutinaDeHoy(); const by = {};
     document.querySelectorAll('.set input').forEach(i => { const v = i.value.trim().replace(',', '.'); const o = (by[i.dataset.n] = by[i.dataset.n] || []); o[i.dataset.i] = o[i.dataset.i] || {}; if (v !== '' && !isNaN(v)) o[i.dataset.i][i.dataset.f] = Number(v); });
@@ -1035,6 +1078,7 @@ async function irAClase(k, r) { if (!/^\d{4}-\d\d-\d\d_\d\d:\d\d$/.test(k || '')
   if (r === 'voy') await confirmar(k, 'voy'); else if (r === 'no') await confirmar(k, 'no_voy'); }
 const revisarAviso = async () => { const id = await avisoPendiente(); if (!id) return; if (String(id).startsWith('clase|')) { const [, k, r] = String(id).split('|'); irAClase(k, r); } else irAEvento(id); };
 const qs0 = new URLSearchParams(location.search); const evq = qs0.get('ev'), clq = qs0.get('clase'); if (qs0.get('msg')) { history.replaceState(null, '', location.pathname); S.v = 'hoy'; }
+if (qs0.get('pago')) { history.replaceState(null, '', location.pathname); secAbiertos.add('pagos'); S.v = 'plan'; render(); }
 if (evq) { history.replaceState(null, '', location.pathname); avisoPendiente(); irAEvento(evq); }
 else if (clq) { history.replaceState(null, '', location.pathname); avisoPendiente(); irAClase(clq, qs0.get('r')); }
 else revisarAviso();

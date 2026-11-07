@@ -1277,6 +1277,14 @@ VIEWS.registro = () => {
       <label class="f">Horas de los bloques (separadas por coma)<input type="text" id="aj-horas" value="${esc(c.horas.join(', '))}"></label>
       <fieldset style="border:0;padding:0;margin:0;display:grid;gap:6px"><legend class="small muted" style="font-weight:600;margin-bottom:4px">Días con clases</legend>
         <div class="chips">${['lun','mar','mie','jue','vie','sab'].map(d => `<label class="chip"><input type="checkbox" name="aj-dia" value="${d}" ${c.dias.includes(d) ? 'checked' : ''} style="accent-color:var(--red)"> ${DNAME[d]}</label>`).join('')}</div></fieldset>
+      <fieldset style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:0;display:grid;gap:10px"><legend class="small" style="font-weight:700;padding:0 6px">💳 Pagos</legend>
+        <div class="small muted">Estos datos los ven tus alumnos en Perfil › Pagos, con botón para copiarlos. La app les avisa 5 días antes del vencimiento, el día que vence y 3 días después; y a ti te llega un resumen cada lunes a las 08:00.</div>
+        <div class="frow"><label class="f">Banco<input type="text" id="aj-pbanco" value="${esc(c.pago?.banco || '')}" placeholder="Banco Estado"></label><label class="f">Tipo de cuenta<input type="text" id="aj-ptipo" value="${esc(c.pago?.tipo || '')}" placeholder="Cuenta RUT / Vista / Corriente"></label></div>
+        <div class="frow"><label class="f">N° de cuenta<input type="text" id="aj-pnum" value="${esc(c.pago?.numero || '')}"></label><label class="f">RUT<input type="text" id="aj-prut" value="${esc(c.pago?.rut || '')}" placeholder="12.345.678-9"></label></div>
+        <div class="frow"><label class="f">Titular<input type="text" id="aj-ptit" value="${esc(c.pago?.titular || '')}" placeholder="Titanium Sport SPA"></label><label class="f">Correo para el comprobante<input type="email" id="aj-pmail" value="${esc(c.pago?.correo || '')}"></label></div>
+        <div class="frow" style="align-items:end"><label class="f">Días de gracia después del vencimiento<input type="number" id="aj-pgracia" min="0" max="30" value="${c.pago?.gracia ?? 5}"></label>
+          <label class="chip" style="min-height:44px"><input type="checkbox" id="aj-pbloq" ${c.pago?.bloquearRecup === false ? '' : 'checked'} style="accent-color:var(--red)"> Si debe, no puede recuperar clases</label></div>
+      </fieldset>
       <fieldset style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:0;display:grid;gap:10px"><legend class="small" style="font-weight:700;padding:0 6px">🔁 Recuperaciones automáticas</legend>
         <div class="small muted">Elige cuántos cupos de recuperación das en cada bloque (— = no se recupera ahí). Esos cupos salen de los ${c.cupos} del bloque: si el bloque ya está lleno con alumnos regulares, no se ofrece. Reglas: ganan 1 clase por recuperar si avisan "no voy" con 2 horas o más de anticipación; solo agendan en la semana en curso; lo que no recuperan en el mes se pierde.</div>
         <div class="blk-grid"><table><thead><tr><th></th>${['lun','mar','mie','jue','vie','sab'].filter(d => c.dias.includes(d)).map(d => `<th>${DSHORT[d]}</th>`).join('')}</tr></thead><tbody>
@@ -1995,6 +2003,8 @@ document.addEventListener('submit', e => {
     Object.assign(c, {coach: val('aj-coach') || 'Coach', lema: val('aj-lema'), cupos: Number(val('aj-cupos')) || 8, cicloDias: Number(val('aj-ciclo')) || 28, horas, dias,
       recup: Object.fromEntries([...document.querySelectorAll('select[name=aj-recup]')].map(x => [x.dataset.k, +x.value]).filter(([, n]) => n > 0))});
     delete c.recupCupo;
+    c.pago = {banco: val('aj-pbanco'), tipo: val('aj-ptipo'), numero: val('aj-pnum'), rut: val('aj-prut'), titular: val('aj-ptit'), correo: val('aj-pmail'),
+      gracia: Math.max(0, Number(val('aj-pgracia')) || 0), bloquearRecup: !!document.getElementById('aj-pbloq')?.checked};
     saveCfg(c); toast('Ajustes guardados.');
   }
 });
