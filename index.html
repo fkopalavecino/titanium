@@ -601,6 +601,15 @@ const LESIONES = [
   ['isquios', 'Isquiotibiales', 'Isquiotibiales · Desgarro y prevención'],
   ['ingle', 'Ingle / aductores', 'Ingle · Aductores y pubalgia'],
   ['codo', 'Codo', 'Codo · Epicondilalgia lateral (codo de tenista)'],
+  ['dorsal', 'Espalda alta / dorsal', ''],
+  ['hernia-disc', 'Hernia de disco / ciática', ''],
+  ['muneca', 'Muñeca / mano', ''],
+  ['cadera', 'Cadera', ''],
+  ['menisco', 'Rodilla · menisco o ligamentos', ''],
+  ['gemelo', 'Gemelos / pantorrilla', ''],
+  ['pie', 'Pie / fascitis plantar', ''],
+  ['fractura', 'Fractura o placa / tornillos', ''],
+  ['cirugia', 'Operación en el último año', ''],
 ];
 const DEPORTES = [['running', 'Running / trail', 'Prehab · Tobillo, pie y rodilla para trail y running'], ['mtb', 'MTB / ciclismo', 'Prehab · Cadera, rodilla y espalda para MTB'], ['fuerza', 'Fuerza / híbrido / HYROX', 'Prehab · Hombro y columna para fuerza e híbrido'], ['futbol', 'Fútbol', null]];
 const OBJETIVOS = ['Bajar grasa', 'Ganar músculo', 'Fuerza', 'Rendimiento deportivo', 'Salud y movilidad', 'Volver de una lesión'];
@@ -608,7 +617,7 @@ const PARQ = ['¿Algún médico le ha dicho que tiene un problema al corazón o 
 // junta la ficha de ingreso del coach con la ficha que completa el alumno en su app
 const ingDe = a => { const i = a.ingreso || {}, f = a.perfil?.ficha || {}; const u = (x, y) => [...new Set([...(x || []), ...(y || [])])];
   return Object.assign({}, i, {objetivo: i.objetivo || f.objetivo || null, lesiones: u(i.lesiones, f.lesiones), parq: u(i.parq, f.parq).sort((x, y) => x - y)}); };
-const F_ENF_L = {hta: 'Presión alta', diabetes: 'Diabetes', asma: 'Asma', corazon: 'Enfermedad al corazón', tiroides: 'Tiroides', colesterol: 'Colesterol alto', epilepsia: 'Epilepsia', artrosis: 'Artrosis / artritis', hernia: 'Hernia', embarazo: 'Embarazo o posparto'};
+const F_ENF_L = {hta: 'Presión alta', hipotension: 'Presión baja / mareos', corazon: 'Enfermedad al corazón', diabetes: 'Diabetes', insulina: 'Resistencia a la insulina', colesterol: 'Colesterol alto', higado: 'Hígado graso', tiroides: 'Tiroides', asma: 'Asma', anemia: 'Anemia', migrana: 'Migraña', epilepsia: 'Epilepsia', artrosis: 'Artrosis / artritis', osteoporosis: 'Osteoporosis', fibromialgia: 'Fibromialgia', hernia: 'Hernia (abdominal / inguinal)', renal: 'Enfermedad renal', autoinmune: 'Enfermedad autoinmune', sop: 'Ovario poliquístico (SOP)', ansiedad: 'Ansiedad / depresión', embarazo: 'Embarazo o posparto'};
 function fichaAlumnoHTML(a) { const f = a.perfil?.ficha; if (!f) return '';
   const e = f.emerg || {}, telE = String(e.tel || '').replace(/[^\d+]/g, '');
   const les = (f.lesiones || []).map(k => (LESIONES.find(l => l[0] === k) || [])[1] || k);

@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap">
-<style>[hidden]{display:none!important}/* sin zoom por doble toque */html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}button,a,summary,label,[data-go],[data-v],[data-act]{touch-action:manipulation}input,select,textarea{font-size:max(16px,1em)}
+<style>details.fx-sec{border:1px solid var(--line);border-radius:12px;background:var(--sunk)}details.fx-sec>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:14px;font:700 18px 'Barlow Condensed',sans-serif;letter-spacing:.02em}details.fx-sec>summary::-webkit-details-marker{display:none}details.fx-sec>summary .chev{color:var(--muted);transition:transform .2s}details.fx-sec[open]>summary .chev{transform:rotate(90deg)}.fx-b{display:grid;gap:12px;padding:0 14px 14px}[hidden]{display:none!important}/* sin zoom por doble toque */html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}button,a,summary,label,[data-go],[data-v],[data-act]{touch-action:manipulation}input,select,textarea{font-size:max(16px,1em)}
 :root{--bg:#121013;--ink:#0e0c0f;--surface:#1b181c;--sunk:#161317;--line:#2f2a2e;--fg:#f2eef0;--muted:#a69ea3;--red:#d71f30;--red-t:#ff5a68;--ok:#6fd39a;--warn:#f3b45b;--ev:#4da3ff}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--fg);font:16px Barlow,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
@@ -428,8 +428,8 @@ function perfilCard() { const pf = S.perfil || {};
     <button class="btn pri" id="pf-ok">Guardar perfil</button></div></details></section>`; }
 
 /* ---------- ficha de salud que completa el alumno (se guarda en perfil.ficha) ---------- */
-const F_LES = [['hombro', 'Hombro / manguito rotador'], ['lumbar', 'Zona lumbar'], ['cuello', 'Cuello / cervical'], ['rodilla-pf', 'Rodilla (dolor al frente)'], ['rotuliano', 'Tendón rotuliano'], ['tobillo', 'Tobillo (esguinces)'], ['aquiles', 'Tendón de Aquiles'], ['isquios', 'Isquiotibiales'], ['ingle', 'Ingle / aductores'], ['codo', 'Codo']];
-const F_ENF = [['hta', 'Presión alta'], ['diabetes', 'Diabetes'], ['asma', 'Asma'], ['corazon', 'Enfermedad al corazón'], ['tiroides', 'Tiroides'], ['colesterol', 'Colesterol alto'], ['epilepsia', 'Epilepsia'], ['artrosis', 'Artrosis / artritis'], ['hernia', 'Hernia'], ['embarazo', 'Embarazo o posparto']];
+const F_LES = [['hombro', 'Hombro / manguito rotador'], ['cuello', 'Cuello / cervical'], ['dorsal', 'Espalda alta / dorsal'], ['lumbar', 'Zona lumbar'], ['hernia-disc', 'Hernia de disco / ciática'], ['codo', 'Codo'], ['muneca', 'Muñeca / mano'], ['cadera', 'Cadera'], ['ingle', 'Ingle / aductores'], ['isquios', 'Isquiotibiales'], ['rodilla-pf', 'Rodilla (dolor al frente)'], ['menisco', 'Rodilla · menisco o ligamentos'], ['rotuliano', 'Tendón rotuliano'], ['gemelo', 'Gemelos / pantorrilla'], ['tobillo', 'Tobillo (esguinces)'], ['aquiles', 'Tendón de Aquiles'], ['pie', 'Pie / fascitis plantar'], ['fractura', 'Fractura o placa / tornillos'], ['cirugia', 'Operación en el último año']];
+const F_ENF = [['hta', 'Presión alta'], ['hipotension', 'Presión baja / mareos'], ['corazon', 'Enfermedad al corazón'], ['diabetes', 'Diabetes'], ['insulina', 'Resistencia a la insulina'], ['colesterol', 'Colesterol alto'], ['higado', 'Hígado graso'], ['tiroides', 'Tiroides'], ['asma', 'Asma'], ['anemia', 'Anemia'], ['migrana', 'Migraña'], ['epilepsia', 'Epilepsia'], ['artrosis', 'Artrosis / artritis'], ['osteoporosis', 'Osteoporosis'], ['fibromialgia', 'Fibromialgia'], ['hernia', 'Hernia (abdominal / inguinal)'], ['renal', 'Enfermedad renal'], ['autoinmune', 'Enfermedad autoinmune'], ['sop', 'Ovario poliquístico (SOP)'], ['ansiedad', 'Ansiedad / depresión'], ['embarazo', 'Embarazo o posparto']];
 const F_OBJ = ['Bajar grasa', 'Ganar músculo', 'Fuerza', 'Rendimiento deportivo', 'Salud y movilidad', 'Volver de una lesión'];
 const F_EXP = ['Nunca he entrenado', 'Menos de 6 meses', '6 meses a 2 años', 'Más de 2 años'];
 const F_PREV = ['Fonasa', 'Isapre', 'Otra', 'Ninguna'];
@@ -464,50 +464,51 @@ function onboardingHTML() {
 function fichaCard() { const f = S.perfil?.ficha || {}; const e = f.emerg || {}; const pq = f.parqResp || {};
   const estado = f.fecha ? `<span class="small ok">Actualizada el ${esc(fmtD(f.fecha))}</span>` : `<span class="small warn" style="font-weight:700">Pendiente · complétala antes de entrenar</span>`;
   return `<details class="card blk" data-sec="ficha" ${secAbiertos.has('ficha') ? 'open' : ''}><summary><div><h2>🩺 Mi ficha de salud</h2>${estado}</div><span class="chev" aria-hidden="true">›</span></summary>
-  <div style="display:grid;gap:14px;margin-top:12px">
-    <div class="note small">Esto lo ve solo Franco. Sirve para adaptar tu entrenamiento y saber qué hacer en una emergencia. Actualízala cada vez que algo cambie.</div>
-    <h3 style="margin:4px 0 0">Mis datos</h3>
+  <div style="display:grid;gap:12px;margin-top:12px">
+    <div class="note small">Esto lo ve solo Franco. Sirve para adaptar tu entrenamiento a ti. Actualízala cada vez que algo cambie.</div>
+    <details class="fx-sec" data-fx-sec="datos" open><summary>👤 Mis datos<span class="chev" aria-hidden="true">›</span></summary><div class="fx-b">
     <label class="field">Mi correo *<input id="fx-mail" type="email" inputmode="email" autocomplete="email" placeholder="nombre@correo.cl" value="${esc(S.a.email || '')}"></label>
     <div class="grid2"><label class="field">Mi teléfono *<input id="fx-tel" type="tel" inputmode="tel" placeholder="+56 9 …" value="${esc(f.tel || S.a.telefono || '')}"></label>
       <label class="field">Estatura (cm)<input id="fx-est" type="number" inputmode="numeric" min="100" max="230" value="${esc(f.estatura || '')}"></label></div>
     <div class="grid2"><label class="field">Ocupación<input id="fx-ocu" maxlength="60" placeholder="Ej: oficina, pie todo el día" value="${esc(f.ocupacion || '')}"></label>
       <label class="field">Previsión de salud<select id="fx-prev">${fOpt(F_PREV, f.prevision)}</select></label></div>
-    <h3 style="margin:4px 0 0">Contacto de emergencia</h3>
-    <div class="grid2"><label class="field">Nombre<input id="fx-en" maxlength="60" value="${esc(e.nombre || '')}"></label>
-      <label class="field">Parentesco<input id="fx-er" maxlength="30" placeholder="Ej: pareja, mamá" value="${esc(e.rel || '')}"></label></div>
-    <label class="field">Teléfono de emergencia *<input id="fx-et" type="tel" inputmode="tel" placeholder="+56 9 …" value="${esc(e.tel || '')}"></label>
-    <h3 style="margin:4px 0 0">Entrenamiento</h3>
+    </div></details>
+    <details class="fx-sec" data-fx-sec="entreno" ><summary>🏋️ Entrenamiento<span class="chev" aria-hidden="true">›</span></summary><div class="fx-b">
     <div class="grid2"><label class="field">Objetivo principal<select id="fx-obj">${fOpt(F_OBJ, f.objetivo)}</select></label>
       <label class="field">Experiencia entrenando<select id="fx-exp">${fOpt(F_EXP, f.experiencia)}</select></label></div>
-    <h3 style="margin:4px 0 0">Lesiones o molestias</h3>
+    </div></details>
+    <details class="fx-sec" data-fx-sec="les" ><summary>🦴 Lesiones o molestias<span class="chev" aria-hidden="true">›</span></summary><div class="fx-b">
     <div class="small muted">Marca las actuales o de los últimos 12 meses.</div>
     ${fChips('les', F_LES, f.lesiones)}
-    <label class="field">Detalle, otras lesiones u operaciones<textarea id="fx-lesd" rows="3" maxlength="600" placeholder="Ej: operado de rodilla derecha 2022, dolor al correr">${esc(f.lesDetalle || '')}</textarea></label>
-    <h3 style="margin:4px 0 0">Enfermedades y salud</h3>
+    <label class="field">Detalle u otras lesiones<textarea id="fx-lesd" rows="3" maxlength="600" placeholder="Ej: operado de rodilla derecha 2022, dolor al correr">${esc(f.lesDetalle || '')}</textarea></label>
+    </div></details>
+    <details class="fx-sec" data-fx-sec="enf" ><summary>❤️ Enfermedades y salud<span class="chev" aria-hidden="true">›</span></summary><div class="fx-b">
     ${fChips('enf', F_ENF, f.enfermedades)}
     <label class="field">Otras enfermedades<input id="fx-enfo" maxlength="200" value="${esc(f.enfOtra || '')}"></label>
     <label class="field">Medicamentos que tomas<input id="fx-med" maxlength="200" placeholder="Nombre y para qué" value="${esc(f.medicamentos || '')}"></label>
     <label class="field">Alergias<input id="fx-ale" maxlength="200" value="${esc(f.alergias || '')}"></label>
-    <h3 style="margin:4px 0 0">Cuestionario PAR-Q</h3>
+    </div></details>
+    <details class="fx-sec" data-fx-sec="parq" ><summary>📋 Cuestionario PAR-Q<span class="chev" aria-hidden="true">›</span></summary><div class="fx-b">
     <div class="small muted">Responde las 7 preguntas.</div>
     ${F_PARQ.map((q, i) => `<div style="display:grid;gap:6px"><div class="small">${i + 1}. ${esc(q)}</div><div class="chips"><button type="button" class="chip" data-pq="${i}" data-val="si" aria-pressed="${pq[i] === 'si'}">Sí</button><button type="button" class="chip" data-pq="${i}" data-val="no" aria-pressed="${pq[i] === 'no'}">No</button></div></div>`).join('')}
+    </div></details>
     <label class="small" style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" id="fx-ok" style="width:22px;height:22px;flex:none;margin:0" ${f.fecha ? 'checked' : ''}><span>Declaro que la información es verdadera y le avisaré a Franco si cambia algo de mi salud.</span></label>
     <button class="btn pri" id="fx-save">Guardar mi ficha</button></div></details>`; }
 async function guardarFicha(btn) {
   const v = id => ($('#' + id)?.value || '').trim();
   const sel = g => [...document.querySelectorAll(`[data-fx="${g}"][aria-pressed=true]`)].map(b => b.dataset.k);
   const resp = {}; document.querySelectorAll('[data-pq][aria-pressed=true]').forEach(b => { resp[b.dataset.pq] = b.dataset.val; });
-  if (Object.keys(resp).length < F_PARQ.length) { toast('Responde las 7 preguntas del PAR-Q.'); return; }
+  const abrir = k => { const d = document.querySelector(`[data-fx-sec="${k}"]`); if (d) { d.open = true; d.scrollIntoView({ block: 'start', behavior: 'smooth' }); } };
+  if (Object.keys(resp).length < F_PARQ.length) { toast('Responde las 7 preguntas del PAR-Q.'); abrir('parq'); return; }
   if (!$('#fx-ok').checked) { toast('Marca la declaración para guardar.'); return; }
-  if (!v('fx-mail')) { toast('Agrega tu correo.'); $('#fx-mail').focus(); return; }
-  if (!v('fx-tel')) { toast('Agrega tu teléfono.'); $('#fx-tel').focus(); return; }
-  if (!v('fx-et')) { toast('Agrega un teléfono de emergencia.'); $('#fx-et').focus(); return; }
+  if (!v('fx-mail')) { toast('Agrega tu correo.'); abrir('datos'); $('#fx-mail').focus(); return; }
+  if (!v('fx-tel')) { toast('Agrega tu teléfono.'); abrir('datos'); $('#fx-tel').focus(); return; }
   const mail = v('fx-mail').toLowerCase();
   if (mail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) { toast('Revisa tu correo: parece que está mal escrito.'); $('#fx-mail').focus(); return; }
   if (mail !== String(S.a.email || '').toLowerCase()) { const { error: em } = await sb.rpc('guardar_mi_correo', { p_email: mail });
     if (em) { toast('No se pudo guardar el correo: ' + em.message); return; } S.a.email = mail || null; }
   const ficha = { tel: v('fx-tel') || null, estatura: Number(v('fx-est')) || null, ocupacion: v('fx-ocu') || null, prevision: v('fx-prev') || null,
-    emerg: { nombre: v('fx-en') || null, rel: v('fx-er') || null, tel: v('fx-et') || null },
+    emerg: S.perfil?.ficha?.emerg || null,
     objetivo: v('fx-obj') || null, experiencia: v('fx-exp') || null,
     lesiones: sel('les'), lesDetalle: v('fx-lesd') || null, enfermedades: sel('enf'), enfOtra: v('fx-enfo') || null,
     medicamentos: v('fx-med') || null, alergias: v('fx-ale') || null,
