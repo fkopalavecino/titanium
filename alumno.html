@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <title>Titanium Sport</title>
 <link rel="manifest" href="manifest-alumno.json">
-<meta property="og:title" content="Titanium Sport · Tu app"><meta property="og:description" content="Tu rutina, tu agenda y tu progreso en el celular."><meta property="og:image" content="https://fkopalavecino.github.io/titanium/guia-app-titanium.jpg?v=1794075474"><meta property="og:image:width" content="1080"><meta property="og:image:height" content="1920"><meta property="og:type" content="website">
+<meta property="og:title" content="Titanium Sport · Tu app"><meta property="og:description" content="Tu rutina, tu agenda y tu progreso en el celular."><meta property="og:image" content="https://fkopalavecino.github.io/titanium/guia-app-titanium.jpg?v=1794075963"><meta property="og:image:width" content="1080"><meta property="og:image:height" content="1920"><meta property="og:type" content="website">
 <meta name="theme-color" content="#0e0c0f">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2"><meta name="apple-mobile-web-app-title" content="Titanium">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -188,8 +188,8 @@ const invGuardada = () => { try { return localStorage.getItem('tl-inv'); } catch
 const enApp = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const movil = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 if (movil && !enApp && !(await window.__sb.auth.getSession()).data?.session) { // en el computador se puede usar desde el navegador
-  document.getElementById('app').innerHTML = `<div style="position:fixed;inset:0;z-index:50;background:#0e0c0f;display:flex;align-items:center;justify-content:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)">
-    <img src="guia-app-titanium.jpg?v=1794075474" alt="Cómo instalar Titanium: 1) Toca el link. 2) Pásate a Safari con la brújula. 3) Toca Compartir. 4) Agregar a inicio y Agregar. 5) Abre Titanium desde tu pantalla. 6) Escribe tu código y toca Entrar. 7) Completa tu ficha y activa los avisos." style="display:block;width:100vw;max-width:100vw;max-height:100dvh;height:auto;object-fit:contain">
+  document.getElementById('app').innerHTML = `<div style="position:fixed;inset:0;z-index:50;background:#0e0c0f;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)">
+    <img src="guia-app-titanium.jpg?v=1794075963" alt="Cómo instalar Titanium: 1) Toca los 3 puntitos abajo a la derecha. 2) Toca Compartir. 3) Toca Ver más. 4) Toca Agregar a Inicio. 5) Toca Agregar. 6) Abre Titanium desde tu pantalla. 7) Escribe tu código y toca Entrar." style="display:block;width:100%;height:auto">
   </div>`;
   return; // solo se usa desde el ícono de la pantalla de inicio
 }
