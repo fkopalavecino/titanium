@@ -301,6 +301,7 @@ async function load() {
     sb.from('mensajes').select('id,titulo,cuerpo,enviado_at').not('enviado_at', 'is', null).gte('enviado_at', new Date(Date.now() - 7 * 864e5).toISOString()).order('enviado_at', { ascending: false }).limit(5),
   ]);
   S.mensajes = msj?.data || [];
+  try { const { data: rc } = await sb.rpc('mis_recuperaciones'); S.recup = rc || null; } catch (_) { S.recup = null; }
   S.conf = new Map((cfm.data || []).map(r => [r.fecha + '_' + r.hora, r.estado]));
   S.eventos = (ev.data || []).sort((x, y) => (x.fecha + (x.hora || '')).localeCompare(y.fecha + (y.hora || '')));
   S.a = a.data; S.planes = (p.data || []).sort((x, y) => String(x.inicio || '').localeCompare(String(y.inicio || '')));
@@ -592,6 +593,7 @@ V.hoy = () => {
     ${rd.r ? `<button class="btn pri" data-go="rutina">Ver mi rutina</button>` : ''}
     ${prox ? `<div class="small muted" style="margin-top:4px">¿Vienes ${esc(prox.f === t ? 'hoy' : DL[dayKey(prox.f)].toLowerCase() + ' ' + fmtD(prox.f))} a las ${esc(prox.h)}?</div>${asisBtns(prox.f, prox.h)}` : ''}
   </section>
+  ${recupHTML()}
   ${evDia(t).map(evHTML).join('')}
   ${!S.perfil?.ficha?.fecha ? `<section class="card" style="border-color:var(--red)"><div><h2 style="margin:0">🩺 Completa tu ficha de salud</h2><div class="small muted">Lesiones, enfermedades y contacto de emergencia. Toma 3 minutos.</div></div><button class="btn pri" data-go="plan" data-ficha="1">Completar mi ficha</button></section>` : ''}
   <div class="grid2">
@@ -880,7 +882,30 @@ function asisBtns(f, h) { const k = f + '_' + h, e = S.conf?.get(k), wa = waNoVo
 async function confirmar(k, estado) { const [f, h] = k.split('_');
   const { error } = await sb.rpc('confirmar_clase', { p_fecha: f, p_hora: h, p_estado: estado });
   if (error) { toast('No se pudo enviar: ' + error.message); return false; }
-  S.conf = S.conf || new Map(); S.conf.set(k, estado); toast(estado === 'voy' ? '¡Te esperamos! 💪 Franco ya sabe que vienes.' : 'Listo, Franco ya sabe que no vienes.'); render(); return true; }
+  S.conf = S.conf || new Map(); S.conf.set(k, estado);
+  const antes = S.recup?.disponibles || 0; try { const { data: rc } = await sb.rpc('mis_recuperaciones'); if (rc) S.recup = rc; } catch (_) {}
+  const gano = (S.recup?.disponibles || 0) > antes;
+  toast(estado === 'voy' ? '¡Te esperamos! 💪 Franco ya sabe que vienes.' : gano ? 'Listo, Franco ya sabe. Ganaste 1 clase para recuperar 🔁' : S.recup?.activo ? 'Franco ya sabe que no vienes. Avisaste con menos de 2 horas: esta no se puede recuperar.' : 'Listo, Franco ya sabe que no vienes.');
+  render(); return true; }
+function recupHTML() { const R = S.recup; if (!R || !R.activo) return '';
+  const t = today(), ahora = new Date();
+  const prox = (R.usadas || []).filter(u => u.f >= t && !u.asis);
+  if (!R.disponibles && !prox.length) return '';
+  const dia = f => (f === t ? 'Hoy' : f === addDays(t, 1) ? 'Mañana' : DL[dayKey(f)] + ' ' + fmtD(f));
+  const ops = (R.opciones || []).filter(o => !o.ya);
+  return `<section class="card" style="border-color:#4da3ff;background:rgba(77,163,255,.07)">
+    <div class="row"><span class="eyebrow" style="color:#7fb9ff">🔁 Recuperar clases</span><span class="small muted">vencen el ${esc(fmtD(R.vence))}</span></div>
+    ${R.disponibles ? `<div><b style="font-size:18px">Tienes ${R.disponibles} clase${R.disponibles === 1 ? '' : 's'} por recuperar</b><div class="small muted">Elige un bloque de esta semana. Lo que no recuperes este mes se pierde.</div></div>
+      ${ops.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">${ops.map(o => `<button class="btn" data-rec="${esc(o.f + '_' + o.h)}" ${o.libres ? '' : 'disabled'} style="flex-direction:column;align-items:flex-start;min-height:58px;text-align:left"><b>${esc(dia(o.f))} · ${esc(o.h)}</b><span class="small ${o.libres ? 'ok' : 'muted'}">${o.libres ? o.libres + (o.libres === 1 ? ' cupo' : ' cupos') : 'Lleno'}</span></button>`).join('')}</div>`
+        : '<div class="note small">Esta semana ya no quedan bloques para recuperar. El lunes se abren los de la próxima semana.</div>'}` : ''}
+    ${prox.length ? `<div style="display:grid;gap:6px"><div class="small muted">Tus recuperaciones agendadas</div>${prox.map(u => `<div class="row" style="align-items:center"><span>✅ <b>${esc(dia(u.f))} · ${esc(u.h)}</b></span>${u.cancelable ? `<button class="btn" data-rcx="${esc(u.f + '_' + u.h)}" style="min-height:36px;padding:0 12px;font-size:13px">Cancelar</button>` : '<span class="small muted">no se puede cancelar</span>'}</div>`).join('')}</div>` : ''}
+  </section>`; }
+async function recupAccion(k, cancelar) { const [f, h] = k.split('_');
+  const txt = (f === today() ? 'hoy' : DL[dayKey(f)].toLowerCase() + ' ' + fmtD(f)) + ' a las ' + h;
+  if (!confirm(cancelar ? `¿Cancelar tu recuperación del ${txt}? La clase vuelve a quedar disponible para recuperar.` : `¿Recuperar tu clase el ${txt}?`)) return;
+  const { data, error } = await sb.rpc(cancelar ? 'cancelar_recuperacion' : 'recuperar_clase', { p_fecha: f, p_hora: h });
+  if (error) { toast(String(error.message || 'No se pudo').replace(/^.*?: /, '')); try { const { data: rc } = await sb.rpc('mis_recuperaciones'); if (rc) S.recup = rc; } catch (_) {} render(); return; }
+  S.recup = data; toast(cancelar ? 'Recuperación cancelada.' : '¡Listo! Te esperamos ' + txt + ' 💪'); await load(); render(); }
 function noVoyBtn(i, f, h) { const n = waNum(); const nom = String(S.a.nombre || '').split(' ')[0];
   const msg = `Hola Franco, soy ${nom}. No puedo ir a mi clase del ${longD(f).toLowerCase()} a las ${h}.`;
   return n ? `<a class="btn" data-novoy="${i}" href="https://wa.me/${n}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">No puedo ir · avisar por WhatsApp</a>`
@@ -940,6 +965,8 @@ document.addEventListener('click', async ev => {
   const pa = ev.target.closest('[data-push]'); if (pa) { activarPush(pa); return; }
   const pt = ev.target.closest('[data-pushtest]'); if (pt) { probarPush(pt); return; }
   if (ev.target.closest('[data-pushoff]')) { desactivarPush(); return; }
+  const rec = ev.target.closest('[data-rec]'); if (rec) { recupAccion(rec.dataset.rec, false); return; }
+  const rcx = ev.target.closest('[data-rcx]'); if (rcx) { recupAccion(rcx.dataset.rcx, true); return; }
   const msx = ev.target.closest('[data-msx]'); if (msx) { try { const x = JSON.parse(localStorage.getItem('tl-msx') || '[]'); x.push(Number(msx.dataset.msx)); localStorage.setItem('tl-msx', JSON.stringify(x.slice(-30))); } catch (_) {} render(); return; }
   if (ev.target.closest('[data-pushx]')) { try { localStorage.setItem('tl-pushx', '1'); } catch (_) {} render(); return; }
   if (ev.target.closest('[data-ficha]')) secAbiertos.add('ficha');
