@@ -1678,6 +1678,7 @@ function msgModal(code, pid, tipo) {
   const n = firstName(a.nombre), c = cfg();
   let txt = mensaje(a, p);
   if (tipo === 'cumple') { const cu = cumple(a, today()); txt = `¡Feliz cumpleaños ${n}! 🎉 ${cu ? cu.edad + ' años' : 'Un año más'} y cada vez más fuerte. Todo el equipo de ${c.gimnasio} te desea un gran día. ¡Te esperamos para celebrarlo entrenando! 💪`; }
+  else if (tipo && tipo.startsWith('recuperar:')) { const [, f, h] = tipo.split(':').length > 3 ? [null, tipo.split(':')[1], tipo.split(':').slice(2).join(':')] : tipo.split(':'); txt = `Hola ${n}! Vi que no puedes venir a tu clase del ${longDate(f).toLowerCase()} a las ${h}. ¿Quieres recuperarla? Dime qué día te acomoda y te la agendo 💪`; }
   else if (tipo === 'vuelta') txt = `Hola ${n}! Te echamos de menos en ${c.gimnasio} 💪. ¿Cómo has estado? Si te acomoda, te reservo tu bloque de esta semana para retomar. ${c.lema}.`;
   else if (tipo && tipo.startsWith('record:')) { const [, ej, m] = tipo.split(':'); txt = `¡${n}, nuevo récord! 🏆 ${ej}: ${m}. Ese progreso es tuyo, sigue así. ${c.lema}.`; }
   openModal(`Mensaje para ${a.nombre}`, `
@@ -2008,23 +2009,30 @@ async function cpProbar(btn) { btn.disabled = true; const s = await (await cpReg
 async function cpDesactivar() { const s = await (await cpReg()).pushManager.getSubscription();
   if (s) await window.__sb.rpc('borrar_push_coach', { p_endpoint: s.endpoint });
   S.cpush = false; toast('Avisos de asistencia desactivados'); schedule(); }
+let confAbierta = false; // la tarjeta parte minimizada; recuerda si la abriste
+document.addEventListener('toggle', e => { if (e.target.id === 'conf-card') confAbierta = e.target.open; }, true);
 function confirmacionesHTML() {
   const t = today(), m = addDays(t, 1); const items = [];
   (S.conf || new Map()).forEach((est, k) => { const [f, h, code] = k.split('|'); if (f === t || f === m) items.push({ f, h, code, est }); });
   items.sort((a, b) => (a.f + a.h).localeCompare(b.f + b.h) || nombre(a.code).localeCompare(nombre(b.code)));
-  const e = cpEstado();
-  const ctrl = { on: `<span class="pill ok">🔔 Avisos activados</span><button class="btn sm" data-act="cp-test">Probar</button><button class="btn sm ghost" data-act="cp-off">Desactivar</button>`,
+  const e = cpEstado(); const no = items.filter(x => x.est !== 'voy'), si = items.filter(x => x.est === 'voy');
+  const cuando = x => (x.f === t ? 'Hoy' : 'Mañana') + ' ' + x.h;
+  const ctrl = { on: `<span class="small" style="color:var(--ok);font-weight:700">🔔 Avisos activados</span><button class="btn sm" data-act="cp-test">Probar</button><button class="btn sm ghost" data-act="cp-off">Desactivar</button>`,
     off: `<button class="btn sm pri" data-act="cp-on">🔔 Activar avisos en este teléfono</button>`,
-    instalar: `<span class="small muted">En iPhone: abre el panel en Safari › Compartir › «Agregar a inicio», entra desde ese ícono y activa los avisos aquí.</span>`,
+    instalar: `<span class="small muted">En iPhone: Safari › Compartir › «Agregar a inicio», entra desde ese ícono y activa los avisos aquí.</span>`,
     bloqueado: `<span class="small" style="color:var(--warn)">Avisos bloqueados: Ajustes del teléfono › Notificaciones › Titanium.</span>`,
     no: `<span class="small muted">Este navegador no permite avisos (usa Safari en iPhone o Chrome en Android).</span>` }[e];
-  const nV = items.filter(x => x.est === 'voy').length, nN = items.length - nV;
-  return `<section class="card pad" style="display:grid;gap:10px;align-content:start">
-    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div><div class="eyebrow">Avisos de asistencia</div><h2 style="font-size:22px;margin:0">Quién viene${items.length ? ` · <span style="color:var(--ok)">${nV} ✅</span>${nN ? ` · <span style="color:var(--crit)">${nN} ❌</span>` : ''}` : ''}</h2></div>
-      <div class="tools" style="align-items:center">${ctrl}</div></div>
-    ${items.length ? items.slice(0, 12).map(x => `<div class="li"><span class="grow"><b>${esc(nombre(x.code))}</b> <span class="small muted">· ${x.f === t ? 'Hoy' : 'Mañana'} ${esc(x.h)}</span></span>${x.est === 'voy' ? '<span class="pill ok">✅ Viene</span>' : '<span class="pill crit">❌ No viene</span>'}</div>`).join('') + (items.length > 12 ? `<div class="small muted">y ${items.length - 12} más en «Clase de hoy».</div>` : '')
-      : '<p class="small muted" style="margin:0">Cuando un alumno confirme o cancele desde su app para hoy o mañana, aparece aquí al instante y te llega un aviso al teléfono.</p>'}
-  </section>`; }
+  return `<details class="sec" id="conf-card" ${confAbierta ? 'open' : ''} style="background:var(--panel,var(--sunk));border:1px solid var(--line)">
+    <summary><span>Asistencia hoy y mañana</span>
+      <span class="pill ok">✅ ${si.length}</span>${no.length ? `<span class="pill crit">❌ ${no.length}</span>` : ''}
+      ${e === 'on' ? '<span title="Avisos activados">🔔</span>' : '<span class="small muted" style="font-weight:500">· activa los avisos</span>'}</summary>
+    <div style="display:grid;gap:8px">
+      <div class="tools" style="align-items:center">${ctrl}</div>
+      ${no.length ? `<div class="small muted" style="font-weight:700;margin-top:4px">No vienen</div>` + no.map(x => `<div class="li" style="padding:7px 0"><span class="grow"><b>${esc(nombre(x.code))}</b> <span class="small muted">· ${esc(cuando(x))}</span></span><button class="btn sm" data-act="msg" data-id="${esc(x.code)}" data-tipo="${esc('recuperar:' + x.f + ':' + x.h)}">💬 Recuperar</button></div>`).join('') : ''}
+      ${si.length ? `<div class="small muted" style="font-weight:700;margin-top:4px">Vienen</div><div class="small" style="line-height:1.7">${si.map(x => `<span style="white-space:nowrap">✅ ${esc(firstName(nombre(x.code)))} <span class="muted">${esc(cuando(x))}</span></span>`).join(' · ')}</div>` : ''}
+      ${!items.length ? '<p class="small muted" style="margin:0">Cuando un alumno confirme o cancele desde su app, aparece aquí al instante.</p>' : ''}
+    </div>
+  </details>`; }
 
 /* ---------- actualización de la biblioteca de workouts ---------- */
 const LIB_VER = 3; let libMig = false;
