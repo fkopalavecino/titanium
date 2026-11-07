@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <title>Titanium Sport</title>
 <link rel="manifest" href="manifest-alumno.json">
-<meta property="og:title" content="Titanium Sport · Tu app"><meta property="og:description" content="Tu rutina, tu agenda y tu progreso en el celular."><meta property="og:image" content="https://fkopalavecino.github.io/titanium/guia-app-titanium.jpg?v=1794068213"><meta property="og:image:width" content="1080"><meta property="og:image:height" content="1920"><meta property="og:type" content="website">
+<meta property="og:title" content="Titanium Sport · Tu app"><meta property="og:description" content="Tu rutina, tu agenda y tu progreso en el celular."><meta property="og:image" content="https://fkopalavecino.github.io/titanium/guia-app-titanium.jpg?v=1794069156"><meta property="og:image:width" content="1080"><meta property="og:image:height" content="1920"><meta property="og:type" content="website">
 <meta name="theme-color" content="#0e0c0f">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2"><meta name="apple-mobile-web-app-title" content="Titanium">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -189,47 +189,31 @@ const enApp = matchMedia('(display-mode: standalone)').matches || navigator.stan
 const movil = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 if (movil && !enApp && !(await window.__sb.auth.getSession()).data?.session) { // en el computador se puede usar desde el navegador
   document.getElementById('app').innerHTML = `<div style="position:fixed;inset:0;z-index:50;background:#0e0c0f;display:flex;align-items:center;justify-content:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)">
-    <img src="guia-app-titanium.jpg?v=1794067868" alt="Cómo dejar Titanium en tu pantalla: 1) Abre el link en Safari. 2) Compartir › Agregar a inicio. 3) Abre Titanium desde el ícono y entra con tu correo. 4) Busca tu nombre." style="display:block;width:100vw;max-width:100vw;max-height:100dvh;height:auto;object-fit:contain">
+    <img src="guia-app-titanium.jpg?v=1794069156" alt="Cómo dejar Titanium en tu pantalla: 1) Abre el link en Safari. 2) Compartir › Agregar a inicio. 3) Abre Titanium desde el ícono y entra con tu correo. 4) Busca tu nombre." style="display:block;width:100vw;max-width:100vw;max-height:100dvh;height:auto;object-fit:contain">
   </div>`;
   return; // solo se usa desde el ícono de la pantalla de inicio
 }
 await window.tlSession();
 let { data: codigo, error: e1 } = await sb.rpc('vincular_alumno', { p_inv: invGuardada() });
+const { data: cfgRow } = await sb.from('config').select('data').eq('id', 1).maybeSingle();
+const waProfe = String(cfgRow?.data?.whatsapp || '').replace(/\D/g, ''); const profe = cfgRow?.data?.coach || 'tu profe';
 while (!codigo) {
-  const { data: u } = await sb.auth.getUser(); const inv = invGuardada();
-  const { data: pend } = await sb.rpc('mi_vinculo_pendiente');
-  if (pend) { // ya pidió entrar: espera la aprobación de Franco
-    $('#app').innerHTML = `<div class="center"><div style="font-size:44px">⏳</div><h1>Esperando a Franco</h1>
-      <p class="muted">Le avisamos que <b style="color:var(--fg)">${esc(pend)}</b> quiere entrar a la app. Apenas te apruebe, entras directo.</p>
-      <button class="btn pri" id="vin-rev" style="width:100%;max-width:320px">Revisar de nuevo</button>
-      <button class="btn" id="vin-otro" style="width:100%;max-width:320px">No soy yo, elegir otro nombre</button>
-      <button class="btn" style="background:transparent;border:0;color:var(--muted)" onclick="tlLogout()">Usar otro correo</button></div>`;
-    const r = await new Promise(res => { $('#vin-rev').onclick = () => res('rev'); $('#vin-otro').onclick = () => res('otro'); });
-    if (r === 'rev') { ({ data: codigo } = await sb.rpc('vincular_alumno', { p_inv: invGuardada() })); if (!codigo) toast('Aún no te aprueba. Te avisamos apenas lo haga.'); continue; }
-  }
-  const { data: lista } = await sb.rpc('lista_para_vincular');
-  const L = lista || [];
-  $('#app').innerHTML = `<div class="center" style="justify-content:flex-start;padding-top:24px"><h1>¿Quién eres?</h1>
-    <p class="muted">Busca tu nombre y tócalo. Franco confirmará que eres tú y quedas listo.</p>
-    <input id="vin-q" type="search" placeholder="Escribe tu nombre" autocomplete="off" style="width:100%;max-width:360px;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);padding:0 14px;font:500 17px Barlow,sans-serif">
-    <div id="vin-l" style="width:100%;max-width:360px;display:grid;gap:8px;max-height:46vh;overflow:auto"></div>
-    <details style="width:100%;max-width:360px"><summary class="small muted" style="cursor:pointer">Tengo un código de invitación</summary>
-      <div style="display:grid;gap:8px;margin-top:8px"><input id="inv-in" autocapitalize="characters" autocomplete="off" maxlength="12" placeholder="Ej: K7M2QX" value="${esc(inv && !pend ? '' : '')}" style="min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);text-align:center;letter-spacing:.2em;font:700 17px Barlow,sans-serif;text-transform:uppercase"><button class="btn pri" id="inv-ok">Entrar con mi código</button></div></details>
-    <button class="btn" style="background:transparent;border:0;color:var(--muted)" onclick="tlLogout()">Usar otro correo (${esc(u?.user?.email || '')})</button></div>`;
-  const pintar = () => { const q = $('#vin-q').value.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-    const f = q ? L.filter(x => x.nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q)) : [];
-    $('#vin-l').innerHTML = !q ? '<div class="small muted" style="text-align:center">Escribe al menos tu primer nombre.</div>'
-      : f.length ? f.slice(0, 20).map(x => `<button class="btn" data-vin="${esc(x.codigo)}" data-n="${esc(x.nombre)}" style="justify-content:flex-start">👤 ${esc(x.nombre)}</button>`).join('')
-      : '<div class="small muted" style="text-align:center">No aparece. Pídele a Franco que te agregue.</div>'; };
-  $('#vin-q').oninput = pintar; pintar();
-  const elegido = await new Promise(res => {
-    $('#vin-l').onclick = e => { const b = e.target.closest('[data-vin]'); if (b && confirm(`¿Eres ${b.dataset.n}?`)) res({ cod: b.dataset.vin }); };
-    $('#inv-ok').onclick = () => { const v = $('#inv-in').value.trim().toUpperCase(); if (v) res({ inv: v }); };
-  });
-  if (elegido.inv) { try { localStorage.setItem('tl-inv', elegido.inv); } catch (_) {} ({ data: codigo } = await sb.rpc('vincular_alumno', { p_inv: elegido.inv }));
-    if (!codigo) { toast('Ese código no es válido o ya se usó.'); try { localStorage.removeItem('tl-inv'); } catch (_) {} } continue; }
-  const { error: ev } = await sb.rpc('solicitar_vinculo', { p_codigo: elegido.cod });
-  if (ev) toast('No se pudo enviar: ' + ev.message);
+  const { data: u } = await sb.auth.getUser(); const inv = invGuardada(); const mail = u?.user?.email || '';
+  const ayuda = waProfe ? `https://wa.me/${waProfe}?text=${encodeURIComponent(`Hola ${profe}! No puedo entrar a la app de Titanium 🙈\nMi correo: ${mail}${inv ? '\nCódigo que probé: ' + inv : ''}`)}` : '';
+  $('#app').innerHTML = `<div class="center" style="justify-content:flex-start;padding-top:28px">
+    <img src="icon-192.png" alt="" width="68" height="68" style="border-radius:16px">
+    <h1>Tu código de invitación</h1>
+    <p class="muted" style="margin:0">Escribe el código de 6 letras que te mandó ${esc(profe)} por WhatsApp.</p>
+    ${inv ? `<div class="note small" style="max-width:340px;border:1px solid var(--warn)">El código <b>${esc(inv)}</b> no funcionó o ya se usó. Revísalo o pide ayuda.</div>` : ''}
+    <input id="inv-in" autocapitalize="characters" autocomplete="off" maxlength="12" placeholder="Ej: K7M2QX" style="width:100%;max-width:340px;min-height:56px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);text-align:center;letter-spacing:.25em;font:700 22px Barlow,sans-serif;text-transform:uppercase">
+    <button class="btn pri" id="inv-ok" style="width:100%;max-width:340px">Entrar</button>
+    ${ayuda ? `<a class="btn" href="${ayuda}" target="_blank" rel="noopener" style="width:100%;max-width:340px;background:#1f7a4d;border-color:#1f7a4d;color:#fff">💬 Pedir ayuda a ${esc(profe)}</a>` : ''}
+    <button class="btn" style="background:transparent;border:0;color:var(--muted)" onclick="tlLogout()">Usar otro correo (${esc(mail)})</button></div>`;
+  const v = await new Promise(res => { const go = () => { const x = $('#inv-in').value.trim().toUpperCase(); if (x) res(x); };
+    $('#inv-ok').onclick = go; $('#inv-in').onkeydown = e => { if (e.key === 'Enter') go(); }; });
+  $('#inv-ok').disabled = true; $('#inv-ok').textContent = 'Revisando…';
+  try { localStorage.setItem('tl-inv', v); } catch (_) {}
+  ({ data: codigo } = await sb.rpc('vincular_alumno', { p_inv: v }));
 }
 try { localStorage.removeItem('tl-inv'); } catch (_) {}
 

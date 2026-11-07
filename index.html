@@ -1085,7 +1085,6 @@ VIEWS.alumnos = () => {
       <select id="a-f" aria-label="Filtrar">
         ${[['activos','Activos'],['sinprog','Sin programa'],['progpronto','Programa termina en 7 días'],['progfin','Programa terminado'],['lesion','Con lesiones o PAR-Q'],['riesgo','En riesgo de abandonar'],['sinapp',`Sin app · por invitar (${activos().filter(a => !a.vinculado).length})`],['inactivos','Inactivos'],['todos','Todos']].map(([v,l]) => `<option value="${v}" ${F === v ? 'selected' : ''}>${l}</option>`).join('')}
       </select>
-      <button class="btn" data-act="link-grupo" title="Un solo link para mandar al grupo de WhatsApp">📣 Link para el grupo</button>
       <button class="btn pri" data-act="nuevo-alumno">+ Nuevo alumno</button>
     </div>
   </div>
@@ -1988,7 +1987,7 @@ let toastT = 0;
 function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (err ? ' err' : ''); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
 /* ---------- guía en imagen que va junto a las invitaciones ---------- */
 let GUIA = null; // se precarga para poder compartirla al instante (iPhone exige compartir dentro del toque)
-fetch('guia-app-titanium.jpg?v=1794067868').then(r => r.ok ? r.blob() : null).then(b => { if (b) GUIA = new File([b], 'guia-app-titanium.jpg', { type: 'image/jpeg' }); }).catch(() => {});
+fetch('guia-app-titanium.jpg?v=1794069156').then(r => r.ok ? r.blob() : null).then(b => { if (b) GUIA = new File([b], 'guia-app-titanium.jpg', { type: 'image/jpeg' }); }).catch(() => {});
 let INV = null; // mensaje pendiente de enviar {msg, tel}
 const esMovil = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 async function compartirTexto(msg, tel) {
@@ -2025,7 +2024,7 @@ async function invitarAlumno(code, btn) {
   if (btn) { btn.disabled = false; btn.textContent = txt0; }
   if (error || !inv) { toast('No se pudo crear la invitación: ' + (error?.message || ''), true); return; }
   const url = location.origin + location.pathname.replace(/[^/]*$/, '') + 'alumno.html?i=' + inv;
-  const c = cfg(); const msg = `Hola ${firstName(a.nombre)}! 💪 Ya tienes tu app de ${c.gimnasio || 'Titanium Sport'}: tu rutina, tu agenda y tu progreso en el celular.\n\n👉 ${url}\n\nÁbrelo y sigue los pasos que aparecen. Si te pide código de invitación, es: *${inv}*\n\n¡Nos vemos en el gym!`;
+  const c = cfg(); const msg = `Hola ${firstName(a.nombre)}! 💪 Ya tienes tu app de ${c.gimnasio || 'Titanium Sport'}: tu rutina, tu agenda y tu progreso en el celular.\n\n👉 ${url}\n\nÁbrelo y sigue los pasos que aparecen. Tu código de invitación es: *${inv}*\n\n¡Nos vemos en el gym!`;
   const tel = String(a.telefono || '').replace(/\D/g, '');
   INV = { msg, tel }; openModal(`📲 Invitar a ${firstName(a.nombre)}`, previewInvitacion(msg));
 }
