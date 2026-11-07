@@ -186,7 +186,8 @@ try { const qi = new URLSearchParams(location.search).get('i'); if (qi) { localS
 const invGuardada = () => { try { return localStorage.getItem('tl-inv'); } catch (_) { return null; } };
 /* guía de instalación: si abrió el link en el navegador (no desde el ícono), primero le mostramos cómo dejarla en su pantalla */
 const enApp = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-if (!enApp && !(await window.__sb.auth.getSession()).data?.session) {
+const movil = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+if (movil && !enApp && !(await window.__sb.auth.getSession()).data?.session) { // en el computador se puede usar desde el navegador
   document.getElementById('app').innerHTML = `<div style="display:grid;gap:12px">
     <img src="guia-app-titanium.jpg" alt="Cómo dejar Titanium en tu pantalla: 1) Abre el link en Safari. 2) Compartir › Agregar a inicio. 3) Abre Titanium desde el ícono y entra con tu correo. 4) Busca tu nombre." style="width:100%;height:auto;border-radius:16px;border:1px solid var(--line);display:block">
   </div>`;
