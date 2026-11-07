@@ -31,7 +31,7 @@
       ${step === 'elige' ? `<p>¿Es tu primera vez en la app? Si te llegó un código del profe por WhatsApp, elige «Primera vez».</p>
         <div style="width:100%;display:flex;flex-direction:column;gap:12px"><button type="button" id="tl-nuevo">🆕 Primera vez · tengo código</button><button type="button" class="sec" id="tl-ya">👋 Ya tengo cuenta</button></div>`
       : step === 'inv' ? `<p>Escribe el código de 6 letras que te mandó el profe por WhatsApp. Vale 24 horas y se usa una sola vez.</p>
-        <form id="tl-fi" style="display:flex;flex-direction:column;gap:12px"><label>Código de invitación<input id="tl-inv" autocapitalize="characters" autocomplete="off" maxlength="12" required placeholder="Ej: K7M2QX" style="text-align:center;letter-spacing:.25em;font-weight:700;text-transform:uppercase"></label><button>Entrar</button><button type="button" class="sec" id="tl-back0">Volver</button></form>`
+        <form id="tl-fi" style="display:flex;flex-direction:column;gap:12px"><label>Código de invitación<input id="tl-inv" autocapitalize="characters" autocomplete="off" maxlength="12" required placeholder="Ej: K7M2QX" style="text-align:center;letter-spacing:.25em;font-weight:700;text-transform:uppercase"></label><button>Entrar</button></form><button type="button" id="tl-back0" style="height:auto;background:none;border:0;color:#a69ea3;font:500 14px Barlow,sans-serif;text-decoration:underline;padding:6px">Ya tenía cuenta con correo</button>`
       : step === 'email' ? `<p>${(() => { try { return localStorage.getItem('tl-inv') && /alumno\.html/.test(location.pathname) ? 'Invitación lista ✓ Ahora escribe tu correo (el que quieras): te enviamos un código para entrar.' : 'Entra con tu correo. Te enviamos un código para entrar.'; } catch (e) { return 'Entra con tu correo. Te enviamos un código para entrar.'; } })()}</p>
         <form id="tl-f1" style="display:flex;flex-direction:column;gap:12px"><label>Tu correo<input id="tl-email" type="email" autocomplete="email" required value="${email || ''}"></label><button>Enviarme el código</button></form>`
       : `<p>Revisa tu correo <b style="color:#f2eef0">${email}</b> y escribe aquí el código que te llegó (si no lo ves, mira en Spam).</p>
@@ -74,7 +74,9 @@
     };
     const stepInv = () => {
       g.innerHTML = gateHTML('inv', email);
-      document.getElementById('tl-back0').onclick = step0;
+      let pre = ''; try { pre = localStorage.getItem('tl-inv') || ''; } catch (e) {}
+      if (pre) { const i = document.getElementById('tl-inv'); i.value = pre; setTimeout(() => document.getElementById('tl-fi').requestSubmit(), 50); }
+      document.getElementById('tl-back0').onclick = () => { try { localStorage.removeItem('tl-inv'); } catch (e) {} step1(); };
       document.getElementById('tl-fi').onsubmit = async ev => { ev.preventDefault();
         const v = document.getElementById('tl-inv').value.trim().toUpperCase(); if (!v) return;
         try { localStorage.setItem('tl-inv', v); } catch (e) {}
@@ -84,7 +86,7 @@
         if (error) { console.warn('ingreso sin correo no disponible:', error.message); step1(); return; }
         g.remove(); onDone(); };
     };
-    if (esAlumno && !tieneInv()) step0(); else step1();
+    if (esAlumno) stepInv(); else step1();
     const { data: sub } = sb.auth.onAuthStateChange((ev, ses) => { if (ses && document.getElementById('tl-gate')) { sub.subscription.unsubscribe(); g.remove(); onDone(); } });
   }
   async function ensureSession() {
