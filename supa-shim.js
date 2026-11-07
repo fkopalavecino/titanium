@@ -136,11 +136,12 @@
 
   /* ---------- colecciones ---------- */
   const loaders = {
-    alumnos: async () => { const [al, pl] = await Promise.all([all('alumnos'), all('planes')]);
+    alumnos: async () => { const [al, pl, ps] = await Promise.all([all('alumnos'), all('planes'), sb.from('push_subs').select('alumno').then(r => r.data || [], () => [])]);
+      const conPush = new Set(ps.map(x => x.alumno));
       const byA = {}; pl.forEach(p => (byA[p.alumno] = byA[p.alumno] || []).push(R2P(p)));
       Object.values(byA).forEach(l => l.sort((x, y) => String(x.inicio || x.mes || '').localeCompare(String(y.inicio || y.mes || ''))));
       await firmarFotos(al.flatMap(r => (Array.isArray(r.fotos) ? r.fotos : []).flatMap(x => [x.frente, x.perfil, x.espalda]).concat((Array.isArray(r.inbody) ? r.inbody : []).map(x => x && x.img)).concat(r.perfil && r.perfil.avatar ? [r.perfil.avatar] : [])));
-      return al.map(r => [r.codigo, R2A(r, byA[r.codigo])]); },
+      return al.map(r => { const a = R2A(r, byA[r.codigo]); if (r.ultima_vez) a.ultimaVez = r.ultima_vez; if (conPush.has(r.codigo)) a.push = true; return [r.codigo, a]; }); },
     rutinas: async () => (await all('rutinas')).map(r => [r.id, r.data]),
     dias: async () => { const rows = await all('clases'); const m = {};
       rows.forEach(r => { const d = m[r.fecha] = m[r.fecha] || { fecha: r.fecha, bloques: {} }; (d.bloques[r.hora] = d.bloques[r.hora] || {})[r.alumno] = row2rec(r); });

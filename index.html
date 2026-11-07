@@ -548,6 +548,15 @@ function asistencias(code, desde, hasta) {
 // horas fuera del horario normal que ese día tienen alumnos (bloques extra de recuperación, clases a otra hora)
 const horasFuera = fecha => { const c = cfg(), b = S.dias.get(fecha)?.bloques || {};
   return Object.keys(b).filter(h => /^\d\d:\d\d$/.test(h) && !c.horas.includes(h) && Object.values(b[h]).some(v => v.extra && !v.quitado)); };
+// estado de la app del alumno: vinculado, último uso, avisos activos y lectura de la información
+const haceTxt = iso => { if (!iso) return ''; const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
+  return m < 60 ? 'hace ' + Math.max(1, m) + ' min' : m < 1440 ? 'hace ' + Math.round(m / 60) + ' h' : m < 2880 ? 'ayer' : 'hace ' + Math.round(m / 1440) + ' días'; };
+function appEstado(a) { if (!a.vinculado) return {k: 'no', l: 'Sin app', t: 'muted'};
+  const d = a.ultimaVez ? (Date.now() - Date.parse(a.ultimaVez)) / 864e5 : Infinity;
+  return {k: 'si', t: d <= 7 ? 'ok' : d <= 21 ? 'warn' : 'crit', l: (a.ultimaVez ? 'Abrió ' + haceTxt(a.ultimaVez) : 'Vinculado · sin uso registrado'),
+    push: !!a.push, reglas: !!a.perfil?.reglas?.v, reglasF: a.perfil?.reglas?.f || ''}; }
+const appChips = a => { const e = appEstado(a); if (e.k === 'no') return '<span class="sub">📵 Sin app</span>';
+  return `<span class="sub" title="${e.push ? 'Avisos activos' : 'Avisos apagados'} · ${e.reglas ? 'Leyó la información el ' + esc(e.reglasF) : 'No ha leído la información'}">📱 <b class="${e.t}" style="font-weight:600">${esc(e.l)}</b> · ${e.push ? '🔔' : '🔕'} · ${e.reglas ? '✅' : '⏳'}</span>`; };
 function horasDelDia(fecha) {
   const c = cfg(), dk = dayKey(fecha);
   return [...c.horas.filter(h => !c.noDisponible.includes(dk+'-'+h)).filter(h => roster(fecha, h).length || Object.keys(S.dias.get(fecha)?.bloques?.[h]||{}).length), ...horasFuera(fecha)].sort();
@@ -1108,7 +1117,7 @@ VIEWS.alumnos = () => {
       const as = p?.inicio ? asistencias(a.codigo, p.inicio, p.fin) : {pres:0, aus:0};
       const pct = as.pres + as.aus ? Math.round(100 * as.pres / (as.pres + as.aus)) + ' %' : 'Sin registro';
       return `<tr class="click" data-act="ficha" data-id="${esc(a.codigo)}">
-        <td><b>${esc(a.nombre)}</b><span class="sub">${esc(a.codigo)}${a.estado === 'inactivo' ? ' · inactivo' : ''}${(() => { const pg = progEstado(a); return pg ? ' · ' + esc(progTexto(pg)) + ' · sem ' + Math.min(pg.semana, pg.total) + '/' + pg.total + (pg.terminado ? ' ✓' : '') : ''; })()}</span></td>
+        <td><b>${esc(a.nombre)}</b>${a.estado !== 'inactivo' ? appChips(a) : ''}<span class="sub">${esc(a.codigo)}${a.estado === 'inactivo' ? ' · inactivo' : ''}${(() => { const pg = progEstado(a); return pg ? ' · ' + esc(progTexto(pg)) + ' · sem ' + Math.min(pg.semana, pg.total) + '/' + pg.total + (pg.terminado ? ' ✓' : '') : ''; })()}</span></td>
         <td class="small">${esc(bloquesTexto(a))}</td>
         <td class="r num">${tot || '—'}${p?.inicio ? `<span class="sub">${fmtD(p.inicio)}–${fmtD(p.fin)}</span>` : ''}</td>
         <td class="r num">${as.pres}</td>
@@ -1395,7 +1404,7 @@ function fichaAlumno(code) {
         ${tile('Horario', esc(bloquesTexto(a) || '—'), (a.clases || '—') + ' clases por ciclo')}
         ${tile('Contacto', tel ? `<a href="https://wa.me/${tel}" target="_blank" rel="noopener">${esc(a.telefono)}</a>` : '<span class="muted">Sin teléfono</span>', a.email ? (a.vinculado ? 'App activa ✓' : 'Correo cargado · aún no entra') : (a.vinculado ? 'App activa ✓' : 'Aún no entra a la app'))}
       </div>`; })()}
-    ${a.vinculado ? `<div class="card pad" style="box-shadow:none;background:var(--sunk);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="grow small">📱 <b>Usa la app${a.email ? ' con ' + esc(a.email) : ''}.</b> Si borró la app o cambió de teléfono, mándale un código nuevo con Reinvitar (vale 24 horas).</span><button type="button" class="btn sm" data-act="reinvitar" data-id="${esc(a.codigo)}">🔄 Reinvitar</button></div>` : ''}
+    ${a.vinculado ? `<div class="card pad" style="box-shadow:none;background:var(--sunk);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="grow small">📱 <b>Usa la app${a.email ? ' con ' + esc(a.email) : ''}.</b> ${(() => { const e = appEstado(a); return `<span class="${e.t}">${esc(e.l)}</span> · ${e.push ? '🔔 Avisos activos' : '🔕 Avisos apagados'} · ${e.reglas ? '✅ Leyó la información (' + esc(e.reglasF) + ')' : '⏳ No ha leído la información'}`; })()}<br>Si borró la app o cambió de teléfono, mándale un código nuevo con Reinvitar (vale 24 horas).</span><button type="button" class="btn sm" data-act="reinvitar" data-id="${esc(a.codigo)}">🔄 Reinvitar</button></div>` : ''}
     ${!a.vinculado ? `<div class="card pad" style="box-shadow:none;background:var(--sunk);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="grow small">📲 <b>${esc(firstName(a.nombre))} aún no usa la app.</b> Mándale su link personal por WhatsApp: entra con el correo que quiera y queda vinculado a esta ficha.</span><button type="button" class="btn sm pri" data-act="invitar" data-id="${esc(a.codigo)}">Invitar a la app</button></div>` : ''}
     <label class="f">Notas · lesiones, objetivos, preferencias<textarea id="fa-notas" rows="3">${esc(a.notas)}</textarea></label>
     <details class="sec" ${!a.programa?.familia ? 'open' : ''}><summary>Cambiar programa <span class="small muted" style="font-weight:500">· ${esc(a.programa?.familia ? a.programa.familia + ' · ' + (a.programa.nivel || '') : 'sin programa')}</span></summary>

@@ -301,6 +301,7 @@ async function load() {
     sb.from('mensajes').select('id,titulo,cuerpo,enviado_at').not('enviado_at', 'is', null).gte('enviado_at', new Date(Date.now() - 7 * 864e5).toISOString()).order('enviado_at', { ascending: false }).limit(5),
   ]);
   S.mensajes = msj?.data || [];
+  sb.rpc('marcar_uso').then(() => {}, () => {});
   try { const { data: rc } = await sb.rpc('mis_recuperaciones'); S.recup = rc || null; } catch (_) { S.recup = null; }
   try { const [ep, sp] = await Promise.all([sb.rpc('mi_estado_pago'), sb.from('solicitudes').select('id,data,created_at').eq('alumno', codigo).eq('tipo', 'pago').eq('estado', 'pendiente').order('created_at', { ascending: false }).limit(1)]);
     S.pago = ep.data || null; S.pagoPend = (sp.data || [])[0] || null; } catch (_) { S.pago = null; S.pagoPend = null; }
