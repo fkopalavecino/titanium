@@ -1862,7 +1862,7 @@ document.addEventListener('click', e => {
   if (act === 'reinvitar') { e.preventDefault(); e.stopPropagation(); const al = S.alumnos.get(id);
     if (al && confirm(`¿Mandarle un código nuevo a ${firstName(al.nombre)}? Le llega un código nuevo que vale 24 horas; su sesión anterior se cierra (sus datos y su rutina no se pierden).`)) invitarAlumno(id, el, true); return; }
   if (act === 'invitar') { e.preventDefault(); e.stopPropagation(); invitarAlumno(id, el); return; }
-  if (act === 'ag-abrir') { e.preventDefault(); document.getElementById('tl-agb')?.click(); return; }
+  if (act === 'ag-abrir') { e.preventDefault(); if (window.tlAbrirAgenda) window.tlAbrirAgenda('prox'); else document.getElementById('tl-agb')?.click(); return; }
   if (act === 'cp-on') { cpActivar(el); return; }
   if (act === 'cp-test') { cpProbar(el); return; }
   if (act === 'cp-off') { cpDesactivar(); return; }
@@ -2089,7 +2089,7 @@ function proximosAgendaHTML() {
       ${!L ? '<div class="small muted">Cargando…</div>' : !L.length ? '<div class="small muted">No hay evaluaciones, reuniones ni actividades agendadas para los próximos 7 días.</div>'
         : L.slice(0, 6).map(e => `<div class="li" style="padding:7px 0"><span style="font-size:18px">${EV_ICO[e.tipo] || '📌'}</span><span class="grow"><b>${esc(e.titulo || e.tipo)}</b><span class="small muted"> · ${e.alumno ? esc(firstName(nombre(e.alumno))) : 'Todos'}</span></span><span class="small ${e.fecha === t ? 'warn' : 'muted'}" style="white-space:nowrap;font-weight:600">${esc(cuando(e.fecha))}${e.hora ? ' ' + esc(String(e.hora).slice(0, 5)) : ''}</span></div>`).join('')
           + (L.length > 6 ? `<div class="small muted">y ${L.length - 6} más…</div>` : '')}
-      <div class="tools" style="margin-top:6px"><button class="btn sm" data-act="ag-abrir">Abrir agenda completa</button></div>
+      <div class="tools" style="margin-top:6px"><button class="btn sm" data-act="ag-abrir">Ver todos los próximos</button></div>
     </div></details>`; }
 let confAbierta = false; // la tarjeta parte minimizada; recuerda si la abriste
 document.addEventListener('toggle', e => { if (e.target.id === 'conf-card') confAbierta = e.target.open; }, true);

@@ -345,7 +345,7 @@
   const masDias = n => { const d = new Date(); d.setDate(d.getDate() + n); return isoD(d); };
   const diaLargo = f => { const t = new Date(f + 'T12:00:00'); const s = t.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
     return f === masDias(0) ? 'Hoy · ' + s : f === masDias(1) ? 'Mañana · ' + s : s; };
-  async function abrirAgenda() {
+  async function abrirAgenda(v0) {
     if (document.getElementById('tl-agp')) return;
     const iso = masDias(0);
     const p = document.createElement('div'); p.id = 'tl-agp';
@@ -534,8 +534,10 @@
         } finally { ok.disabled = false; }
       }
     };
+    if (typeof v0 === 'string' && ['prox', 'hist', 'fot', 'msj'].includes(v0)) ver(v0);
     lista();
   }
+  window.tlAbrirAgenda = v => abrirAgenda(v);
 
   /* ---------- acceso de cada alumno a su app (ficha) ---------- */
   async function pintarAcceso(el) {
