@@ -1994,8 +1994,10 @@ const esMovil = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (
 async function compartirTexto(msg, tel) {
   if (!esMovil()) { // computador: WhatsApp Web (o la app de escritorio) con el mensaje listo; además queda copiado
     try { await navigator.clipboard.writeText(msg); } catch (_) {}
-    window.open(tel ? `https://web.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(msg)}` : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
-    toast('Se abrió WhatsApp Web: elige el chat o el grupo y envía. El mensaje también quedó copiado.'); return true; }
+    // siempre la MISMA pestaña de WhatsApp Web (así no pide cerrar la otra sesión)
+    const w = window.open(tel ? `https://web.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(msg)}` : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`, 'tl-whatsapp');
+    try { w && w.focus(); } catch (_) {}
+    toast('WhatsApp Web: elige el chat o el grupo y envía. El mensaje también quedó copiado (Ctrl + V).'); return true; }
   if (tel) { window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank'); return true; }
   if (navigator.share) { try { await navigator.share({ text: msg }); return true; } catch (e) { if (e && e.name === 'AbortError') return false; } }
   try { await navigator.clipboard.writeText(msg); toast('Mensaje copiado. Pégalo en WhatsApp.'); return true; } catch (_) { window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank'); return true; }
