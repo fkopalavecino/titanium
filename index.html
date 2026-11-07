@@ -761,7 +761,7 @@ VIEWS.inicio = () => {
     </div>
     <div class="tools"><a class="btn pri" href="#clase">Abrir clase de hoy</a><a class="btn" href="#pagos">Registrar pago</a></div>
   </section>
-  ${confirmacionesHTML()}
+  <div class="grid2" style="align-items:start">${confirmacionesHTML()}${proximosAgendaHTML()}</div>
   <section class="kpis">
     <div class="card kpi"><div class="l">Alumnos activos</div><div class="v">${al.length}</div><div class="s">${S.alumnos.size - al.length} inactivos</div></div>
     <div class="card kpi"><div class="l">Recibido · ${esc(fmtMes(mes))}</div><div class="v">${clp(recibido)}</div><div class="s">de ${clp(acordado)} acordado</div></div>
@@ -1862,6 +1862,7 @@ document.addEventListener('click', e => {
   if (act === 'reinvitar') { e.preventDefault(); e.stopPropagation(); const al = S.alumnos.get(id);
     if (al && confirm(`¿Mandarle un código nuevo a ${firstName(al.nombre)}? Le llega un código nuevo que vale 24 horas; su sesión anterior se cierra (sus datos y su rutina no se pierden).`)) invitarAlumno(id, el, true); return; }
   if (act === 'invitar') { e.preventDefault(); e.stopPropagation(); invitarAlumno(id, el); return; }
+  if (act === 'ag-abrir') { e.preventDefault(); document.getElementById('tl-agb')?.click(); return; }
   if (act === 'cp-on') { cpActivar(el); return; }
   if (act === 'cp-test') { cpProbar(el); return; }
   if (act === 'cp-off') { cpDesactivar(); return; }
@@ -2070,6 +2071,26 @@ async function cpProbar(btn) { btn.disabled = true; const s = await (await cpReg
 async function cpDesactivar() { const s = await (await cpReg()).pushManager.getSubscription();
   if (s) await window.__sb.rpc('borrar_push_coach', { p_endpoint: s.endpoint });
   S.cpush = false; toast('Avisos de asistencia desactivados'); schedule(); }
+/* ---------- Inicio: lo próximo en la agenda de alumnos (7 días) ---------- */
+const EV_ICO = { 'Reunión': '👥', 'Evaluación': '📋', 'Nutrición': '🥗', 'Documento': '📄', 'Actividad': '🏃', 'Evento': '⭐', 'Otro': '📌' };
+let agAbierta = true;
+document.addEventListener('toggle', e => { if (e.target.id === 'ag-card') agAbierta = e.target.open; }, true);
+async function cargarProxEventos() { if (!window.__sb) return; const t = today();
+  const { data } = await window.__sb.from('eventos').select('id,alumno,fecha,hora,tipo,titulo').gte('fecha', t).lte('fecha', addDays(t, 7)).order('fecha').order('hora', { nullsFirst: true });
+  // los entrenamientos personales del plan (Actividad de un alumno) no llenan esta lista
+  S.proxEv = (data || []).filter(e => !(e.tipo === 'Actividad' && e.alumno)); schedule(); }
+function proximosAgendaHTML() {
+  const L = S.proxEv; const t = today(), m = addDays(t, 1);
+  const cuando = f => f === t ? 'Hoy' : f === m ? 'Mañana' : DNAME[DKEYS[parseISO(f).getDay()]].slice(0, 3) + ' ' + fmtD(f);
+  const nHoy = (L || []).filter(e => e.fecha === t).length;
+  return `<details class="sec" id="ag-card" ${agAbierta ? 'open' : ''} style="background:var(--sunk);border:1px solid var(--line)">
+    <summary><span>📅 Próximos en la agenda</span>${L ? `<span class="pill ${nHoy ? 'warn' : 'muted'}">${nHoy ? nHoy + ' hoy' : (L.length || 'Nada') + (L.length ? ' en 7 días' : ' esta semana')}</span>` : ''}</summary>
+    <div style="display:grid;gap:2px">
+      ${!L ? '<div class="small muted">Cargando…</div>' : !L.length ? '<div class="small muted">No hay evaluaciones, reuniones ni actividades agendadas para los próximos 7 días.</div>'
+        : L.slice(0, 6).map(e => `<div class="li" style="padding:7px 0"><span style="font-size:18px">${EV_ICO[e.tipo] || '📌'}</span><span class="grow"><b>${esc(e.titulo || e.tipo)}</b><span class="small muted"> · ${e.alumno ? esc(firstName(nombre(e.alumno))) : 'Todos'}</span></span><span class="small ${e.fecha === t ? 'warn' : 'muted'}" style="white-space:nowrap;font-weight:600">${esc(cuando(e.fecha))}${e.hora ? ' ' + esc(String(e.hora).slice(0, 5)) : ''}</span></div>`).join('')
+          + (L.length > 6 ? `<div class="small muted">y ${L.length - 6} más…</div>` : '')}
+      <div class="tools" style="margin-top:6px"><button class="btn sm" data-act="ag-abrir">Abrir agenda completa</button></div>
+    </div></details>`; }
 let confAbierta = false; // la tarjeta parte minimizada; recuerda si la abriste
 document.addEventListener('toggle', e => { if (e.target.id === 'conf-card') confAbierta = e.target.open; }, true);
 function confirmacionesHTML() {
@@ -2140,7 +2161,7 @@ route();
       const nuevo = new Map((data || []).map(r => [r.fecha + '|' + r.hora + '|' + r.alumno, r.estado]));
       if (S.conf) nuevo.forEach((est, k) => { if (S.conf.get(k) !== est) { const [f, h, code] = k.split('|'); if (f >= today()) toast(`${est === 'voy' ? '✅' : '❌'} ${nombre(code)} ${est === 'voy' ? 'viene' : 'no viene'} · ${f === today() ? 'hoy' : fmtD(f)} ${h}`, est !== 'voy'); } });
       S.conf = nuevo; schedule(); };
-    cpRevisar();
+    cpRevisar(); cargarProxEventos(); sbc.channel('tl-ev-ini').on('postgres_changes', { event: '*', schema: 'public', table: 'eventos' }, cargarProxEventos).subscribe();
     cargarConf(); sbc.channel('tl-conf').on('postgres_changes', { event: '*', schema: 'public', table: 'confirmaciones' }, cargarConf).subscribe(); }
   db.doc('config/general').onSnapshot(d => { S.cfg = d.exists ? clone(d.data()) : null; S.loaded.cfg = true; schedule(); maybeMigrateLib(); }, fail);
 })();
