@@ -2011,7 +2011,7 @@ function previewInvitacion(msg) {
 }
 /* ---------- link único para el grupo de WhatsApp: cada alumno busca su nombre y el profe aprueba ---------- */
 function linkGrupo() {
-  const c = cfg(); const url = location.origin + location.pathname.replace(/[^/]*$/, '') + 'alumno.html';
+  const c = cfg(); const url = location.origin + location.pathname.replace(/[^/]*$/, '') + 'alumno.html?app=8213';
   const msg = `¡Hola equipo ${c.gimnasio || 'Titanium Sport'}! 💪 Ya está lista nuestra app: tu rutina, tu agenda, confirmar tus clases y ver tu progreso.\n\n👉 ${url}\n\nÁbrelo, sigue los pasos que aparecen y busca tu nombre: yo confirmo que eres tú.\n\n¡Nos vemos en el gym!`;
   INV = { msg, tel: null }; openModal('📣 Link para el grupo', previewInvitacion(msg));
 }
