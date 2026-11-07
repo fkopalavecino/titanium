@@ -73,7 +73,7 @@
   window.tlLogout = async () => { await sb.auth.signOut(); location.reload(); };
 
   /* ---------- conversión de filas ---------- */
-  const A2R = a => ({ codigo: a.codigo, nombre: a.nombre || a.codigo, email: a.email ? String(a.email).trim().toLowerCase() : null, telefono: a.telefono || null,
+  const A2R = a => ({ codigo: a.codigo, nombre: a.nombre || a.codigo, ...(a.email ? { email: String(a.email).trim().toLowerCase() } : {}), telefono: a.telefono || null,
     estado: a.estado || 'activo', bloques: a.bloques || [], clases: a.clases == null || a.clases === '' ? null : Number(a.clases),
     nacimiento: a.nacimiento || null, notas: a.notas || null, ingreso: a.ingreso || null, programa: a.programa || null,
     programas_hechos: a.programasHechos || [], fotos: a.fotos || [], medidas: a.medidas || [], inbody: a.inbody || [], updated_at: new Date().toISOString() });
