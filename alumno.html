@@ -188,8 +188,8 @@ const invGuardada = () => { try { return localStorage.getItem('tl-inv'); } catch
 const enApp = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const movil = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 if (movil && !enApp && !(await window.__sb.auth.getSession()).data?.session) { // en el computador se puede usar desde el navegador
-  document.getElementById('app').innerHTML = `<div style="display:grid;gap:12px">
-    <img src="guia-app-titanium.jpg?v=1794067868" alt="Cómo dejar Titanium en tu pantalla: 1) Abre el link en Safari. 2) Compartir › Agregar a inicio. 3) Abre Titanium desde el ícono y entra con tu correo. 4) Busca tu nombre." style="width:100%;height:auto;border-radius:16px;border:1px solid var(--line);display:block">
+  document.getElementById('app').innerHTML = `<div style="position:fixed;inset:0;z-index:50;background:#0e0c0f;display:flex;align-items:center;justify-content:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)">
+    <img src="guia-app-titanium.jpg?v=1794067868" alt="Cómo dejar Titanium en tu pantalla: 1) Abre el link en Safari. 2) Compartir › Agregar a inicio. 3) Abre Titanium desde el ícono y entra con tu correo. 4) Busca tu nombre." style="display:block;width:100vw;max-width:100vw;max-height:100dvh;height:auto;object-fit:contain">
   </div>`;
   return; // solo se usa desde el ícono de la pantalla de inicio
 }
