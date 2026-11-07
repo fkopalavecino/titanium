@@ -752,6 +752,7 @@ VIEWS.inicio = () => {
     </div>
     <div class="tools"><a class="btn pri" href="#clase">Abrir clase de hoy</a><a class="btn" href="#pagos">Registrar pago</a></div>
   </section>
+  ${confirmacionesHTML()}
   <section class="kpis">
     <div class="card kpi"><div class="l">Alumnos activos</div><div class="v">${al.length}</div><div class="s">${S.alumnos.size - al.length} inactivos</div></div>
     <div class="card kpi"><div class="l">Recibido · ${esc(fmtMes(mes))}</div><div class="v">${clp(recibido)}</div><div class="s">de ${clp(acordado)} acordado</div></div>
@@ -1842,6 +1843,9 @@ document.addEventListener('click', e => {
   const act = el.dataset.act, id = el.dataset.id;
   if (el.tagName === 'SELECT' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return;
   if (act === 'cerrar') { closeModal(); return; }
+  if (act === 'cp-on') { cpActivar(el); return; }
+  if (act === 'cp-test') { cpProbar(el); return; }
+  if (act === 'cp-off') { cpDesactivar(); return; }
   if (act === 'w-fav') { e.preventDefault(); e.stopPropagation(); const r = clone(S.rutinas.get(id)); r.favorito = !r.favorito; saveRutina(id, r); return; }
   switch (act) {
     case 'nuevo-alumno': fichaAlumno(null); break;
@@ -1974,6 +1978,53 @@ setInterval(() => { if (!document.hidden && S.view === 'inicio' && $('#modal').h
 
 let toastT = 0;
 function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (err ? ' err' : ''); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
+/* ---------- avisos push para el profe: cuando un alumno confirma o cancela su clase ---------- */
+const CP_FN = 'https://lnovgbpxdnqgsojkfzwy.supabase.co/functions/v1/notificar';
+const CP_H = { 'Content-Type': 'application/json', Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxub3ZnYnB4ZG5xZ3Nvamtmend5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4ODcwNjYsImV4cCI6MjEwOTQ2MzA2Nn0.7S4U0MtHCPRlhIYpaPE-AD5LEFKqZn0Kt82bKlYqNWE' }; // clave pública (anon)
+const cpIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const cpInst = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const cpOK = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const cpB64 = x => { const r = atob((x + '='.repeat((4 - x.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(r, c => c.charCodeAt(0)); };
+const cpReg = () => navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready);
+const cpEstado = () => S.cpush ? 'on' : (cpIOS && !cpInst()) ? 'instalar' : !cpOK() ? 'no' : Notification.permission === 'denied' ? 'bloqueado' : 'off';
+const cpGuardar = async s => !(await window.__sb.rpc('guardar_push_coach', { p_sub: s.toJSON(), p_ua: navigator.userAgent })).error;
+async function cpRevisar() { try { if (!cpOK() || !window.__sb) return;
+    const s = await (await cpReg()).pushManager.getSubscription();
+    if (s && Notification.permission === 'granted') { const { data } = await window.__sb.rpc('tiene_push_coach', { p_endpoint: s.endpoint }); S.cpush = !!data; }
+    else S.cpush = false; schedule(); } catch (e) { console.error(e); } }
+async function cpActivar(btn) {
+  if (!cpOK()) { toast('Este navegador no permite avisos.', true); return; }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { toast(perm === 'denied' ? 'Avisos bloqueados. Actívalos en Ajustes del teléfono.' : 'No se activaron los avisos.', true); schedule(); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Activando…'; }
+  try { const reg = await cpReg(); const { pub } = await fetch(CP_FN, { method: 'POST', headers: CP_H, body: '{"init":true}' }).then(r => r.json());
+    const s = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: cpB64(pub) }));
+    if (!(await cpGuardar(s))) throw new Error('save');
+    S.cpush = true; toast('Avisos de asistencia activados 🔔'); schedule();
+  } catch (e) { console.error(e); toast('No se pudieron activar los avisos. Intenta de nuevo.', true); if (btn) { btn.disabled = false; btn.textContent = '🔔 Activar avisos'; } } }
+async function cpProbar(btn) { btn.disabled = true; const s = await (await cpReg()).pushManager.getSubscription();
+  const r = s ? await fetch(CP_FN, { method: 'POST', headers: CP_H, body: JSON.stringify({ prueba: s.endpoint }) }).then(x => x.json()).catch(() => ({})) : {};
+  btn.disabled = false; toast(r.ok ? 'Aviso de prueba enviado ✓' : 'No llegó la prueba. Desactiva y vuelve a activar.', !r.ok); }
+async function cpDesactivar() { const s = await (await cpReg()).pushManager.getSubscription();
+  if (s) await window.__sb.rpc('borrar_push_coach', { p_endpoint: s.endpoint });
+  S.cpush = false; toast('Avisos de asistencia desactivados'); schedule(); }
+function confirmacionesHTML() {
+  const t = today(), m = addDays(t, 1); const items = [];
+  (S.conf || new Map()).forEach((est, k) => { const [f, h, code] = k.split('|'); if (f === t || f === m) items.push({ f, h, code, est }); });
+  items.sort((a, b) => (a.f + a.h).localeCompare(b.f + b.h) || nombre(a.code).localeCompare(nombre(b.code)));
+  const e = cpEstado();
+  const ctrl = { on: `<span class="pill ok">🔔 Avisos activados</span><button class="btn sm" data-act="cp-test">Probar</button><button class="btn sm ghost" data-act="cp-off">Desactivar</button>`,
+    off: `<button class="btn sm pri" data-act="cp-on">🔔 Activar avisos en este teléfono</button>`,
+    instalar: `<span class="small muted">En iPhone: abre el panel en Safari › Compartir › «Agregar a inicio», entra desde ese ícono y activa los avisos aquí.</span>`,
+    bloqueado: `<span class="small" style="color:var(--warn)">Avisos bloqueados: Ajustes del teléfono › Notificaciones › Titanium.</span>`,
+    no: `<span class="small muted">Este navegador no permite avisos (usa Safari en iPhone o Chrome en Android).</span>` }[e];
+  const nV = items.filter(x => x.est === 'voy').length, nN = items.length - nV;
+  return `<section class="card pad" style="display:grid;gap:10px;align-content:start">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div><div class="eyebrow">Avisos de asistencia</div><h2 style="font-size:22px;margin:0">Quién viene${items.length ? ` · <span style="color:var(--ok)">${nV} ✅</span>${nN ? ` · <span style="color:var(--crit)">${nN} ❌</span>` : ''}` : ''}</h2></div>
+      <div class="tools" style="align-items:center">${ctrl}</div></div>
+    ${items.length ? items.slice(0, 12).map(x => `<div class="li"><span class="grow"><b>${esc(nombre(x.code))}</b> <span class="small muted">· ${x.f === t ? 'Hoy' : 'Mañana'} ${esc(x.h)}</span></span>${x.est === 'voy' ? '<span class="pill ok">✅ Viene</span>' : '<span class="pill crit">❌ No viene</span>'}</div>`).join('') + (items.length > 12 ? `<div class="small muted">y ${items.length - 12} más en «Clase de hoy».</div>` : '')
+      : '<p class="small muted" style="margin:0">Cuando un alumno confirme o cancele desde su app para hoy o mañana, aparece aquí al instante y te llega un aviso al teléfono.</p>'}
+  </section>`; }
 
 /* ---------- actualización de la biblioteca de workouts ---------- */
 const LIB_VER = 3; let libMig = false;
@@ -2017,7 +2068,10 @@ route();
   // confirmaciones de asistencia que marcan los alumnos en su app (✅ / ❌ en Clase de hoy)
   const sbc = window.__sb;
   if (sbc) { const cargarConf = async () => { const { data } = await sbc.from('confirmaciones').select('fecha,hora,alumno,estado').gte('fecha', addDays(today(), -1));
-      S.conf = new Map((data || []).map(r => [r.fecha + '|' + r.hora + '|' + r.alumno, r.estado])); schedule(); };
+      const nuevo = new Map((data || []).map(r => [r.fecha + '|' + r.hora + '|' + r.alumno, r.estado]));
+      if (S.conf) nuevo.forEach((est, k) => { if (S.conf.get(k) !== est) { const [f, h, code] = k.split('|'); if (f >= today()) toast(`${est === 'voy' ? '✅' : '❌'} ${nombre(code)} ${est === 'voy' ? 'viene' : 'no viene'} · ${f === today() ? 'hoy' : fmtD(f)} ${h}`, est !== 'voy'); } });
+      S.conf = nuevo; schedule(); };
+    cpRevisar();
     cargarConf(); sbc.channel('tl-conf').on('postgres_changes', { event: '*', schema: 'public', table: 'confirmaciones' }, cargarConf).subscribe(); }
   db.doc('config/general').onSnapshot(d => { S.cfg = d.exists ? clone(d.data()) : null; S.loaded.cfg = true; schedule(); maybeMigrateLib(); }, fail);
 })();

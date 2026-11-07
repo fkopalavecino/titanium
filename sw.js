@@ -24,8 +24,10 @@ self.addEventListener('notificationclick', e => {
     // deja anotado a qué ir: la app lo lee al abrirse o al volver a primer plano
     if (ev) { const c = await caches.open('tl-push'); await c.put('pending', new Response(JSON.stringify({ ev, t: Date.now() }))); }
     const cs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    const c = cs.find(x => x.url.includes('alumno.html')) || cs[0];
-    if (c) { c.postMessage({ ev: url }); try { await c.focus(); } catch (_) {} return; }
+    const ruta = u => new URL(u).pathname.replace(/index\.html$/, '');
+    const esAlumno = ruta(url).endsWith('alumno.html');
+    const c = cs.find(x => ruta(x.url) === ruta(url)) || (esAlumno ? cs.find(x => x.url.includes('alumno.html')) || cs[0] : null);
+    if (c) { if (esAlumno) c.postMessage({ ev: url }); else if (new URL(url).hash) { try { await c.navigate(url); } catch (_) {} } try { await c.focus(); } catch (_) {} return; }
     await self.clients.openWindow(url);
   })());
 });
