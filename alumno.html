@@ -58,6 +58,7 @@ h2{font-size:22px}
 .tour-card.mid{transform:translateY(-50%)}.tour-card.in{animation:tourIn .32s ease both}.tour-card.mid.in{animation:tourInMid .32s ease both}
 @keyframes tourIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes tourInMid{from{opacity:0;transform:translateY(-46%)}to{opacity:1;transform:translateY(-50%)}}
 .tour-dots{display:flex;gap:5px}.tour-dots i{height:4px;flex:1;border-radius:3px;background:var(--line);transition:background .3s}.tour-dots i.ok{background:rgba(215,31,48,.5)}.tour-dots i.on{background:var(--red)}
+#tour .tour-card{transition:opacity .18s ease}#tour.cambia .tour-card{opacity:0;pointer-events:none}#tour.cambia .tour-hole{width:0!important;height:0!important;transition:none!important}
 .tour-eb{font:600 11px/1 Barlow,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--red-t);margin-top:2px}
 .tour-t{font:700 30px/1.02 'Barlow Condensed',sans-serif;letter-spacing:.005em;margin:0;text-wrap:balance}
 .tour-x{margin:0;font:400 16px/1.5 Barlow,sans-serif;color:#cfc8cc;text-wrap:pretty}.tour-x b{color:var(--fg);font-weight:600}
@@ -905,6 +906,8 @@ function iniciarTour() { if (document.getElementById('tour')) return; finDescans
     if (a === 'sig') tourIr(TR.i + 1, 1); else if (a === 'ant') tourIr(TR.i - 1, -1); else tourFin(); });
   tourIr(0, 1); }
 function tourIr(i, dir) { if (!TR) return; if (i < 0) i = 0; if (i >= TOUR.length) return tourFin(); const st = TOUR[i]; TR.i = i; TR.dir = dir;
+  // mientras cambia de pantalla, la tarjeta y lo iluminado se ocultan (nada del paso anterior encima de la pantalla nueva)
+  TR.tgt = null; TR.el.classList.add('cambia');
   if (st.v && S.v !== st.v) { S.v = st.v; S.evSel = null; S.foco = null; render(); }
   if (st.pre) st.pre();
   setTimeout(() => { if (!TR || TR.i !== i) return;
@@ -923,7 +926,9 @@ function tourUbicar() { if (!TR) return; const hole = TR.el.querySelector('.tour
   else { Object.assign(hole.style, { left: '50%', top: '50%', width: '0px', height: '0px', opacity: 1 }); card.classList.add('mid'); Object.assign(card.style, { top: '50%', bottom: 'auto' }); } }
 function tourPintar(st, tgt) { if (!TR) return; const hole = TR.el.querySelector('.tour-hole'), card = TR.el.querySelector('.tour-card');
   const n = TOUR.length, i = TR.i, H = window.innerHeight;
-  TR.tgt = tgt; tourUbicar();
+  TR.tgt = tgt; const salto = TR.el.classList.contains('cambia');
+  if (salto) hole.style.transition = 'none'; TR.el.classList.remove('cambia'); tourUbicar();
+  if (salto) { void hole.offsetWidth; hole.style.transition = ''; }
   card.innerHTML = `<div class="tour-dots">${TOUR.map((_, k) => `<i class="${k === i ? 'on' : k < i ? 'ok' : ''}"></i>`).join('')}</div>
     <div class="tour-eb">${st.fin ? 'Todo listo' : i === 0 ? 'Bienvenida' : 'Cómo usar tu app'}</div>
     <h2 class="tour-t">${esc(st.t)}</h2><p class="tour-x">${esc(st.x).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</p>
