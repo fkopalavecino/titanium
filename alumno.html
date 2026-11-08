@@ -153,7 +153,7 @@ details.ses summary::-webkit-details-marker{display:none}
 <nav class="tabs" id="tabs" hidden>
   <button data-v="hoy"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Hoy</button>
   <button data-v="agenda"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Agenda</button>
-  <button data-v="rutina"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg>Rutina</button>
+  <button data-v="rutina"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg>Entreno</button>
   <button data-v="progreso"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Progreso</button>
   <button data-v="plan"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>Perfil</button>
 </nav>
@@ -295,16 +295,17 @@ function avisoBanner() { const e = pushEstado(); let x = null; try { x = localSt
 
 async function load() {
   const desde = addDays(today(), -120);
-  const [a, p, c, cf, ev, cfm, msj] = await Promise.all([
+  const [a, p, c, cf, ev, cfm, ah, msj] = await Promise.all([
     sb.from('alumnos').select('*').eq('codigo', codigo).single(),
     sb.from('planes').select('*').eq('alumno', codigo),
     sb.from('clases').select('*').eq('alumno', codigo).gte('fecha', desde).order('fecha'),
     sb.from('config').select('data').eq('id', 1).maybeSingle(),
     sb.from('eventos').select('*').gte('fecha', desde).order('fecha'),
     sb.from('confirmaciones').select('fecha,hora,estado,cambios').eq('alumno', codigo).gte('fecha', today()),
+    sb.from('actividades_hechas').select('evento,fecha,minutos,rpe,nota').eq('alumno', codigo).gte('fecha', desde),
     sb.from('mensajes').select('id,titulo,cuerpo,enviado_at').not('enviado_at', 'is', null).gte('enviado_at', new Date(Date.now() - 7 * 864e5).toISOString()).order('enviado_at', { ascending: false }).limit(5),
   ]);
-  S.mensajes = msj?.data || [];
+  S.mensajes = msj?.data || []; S.hechas = new Map((ah?.data || []).map(r => [String(r.evento), r]));
   sb.rpc('marcar_uso').then(() => {}, () => {});
   try { const { data: rc } = await sb.rpc('mis_recuperaciones'); S.recup = rc || null; } catch (_) { S.recup = null; }
   try { const [ep, sp] = await Promise.all([sb.rpc('mi_estado_pago'), sb.from('solicitudes').select('id,data,created_at').eq('alumno', codigo).eq('tipo', 'pago').eq('estado', 'pendiente').order('created_at', { ascending: false }).limit(1)]);
@@ -388,8 +389,11 @@ const nSer = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\
 const fmtSet = s => s ? (s.kg != null ? String(s.kg).replace('.', ',') + ' kg' : '') + (s.r != null ? ' × ' + s.r : '') : '';
 
 /* ---------- borrador de la sesión (no se pierde si se cierra la app) ---------- */
-const DKEY = () => 'tl-draft-' + codigo + '-' + (S.ses ? S.ses.f + '-' + String(S.ses.h).replace(':', '') : today()) + (S.rutSel ? '-' + S.rutSel : '');
-const getDraft = () => { try { return JSON.parse(localStorage.getItem(DKEY()) || 'null') || { sets: {} }; } catch (e) { return { sets: {} }; } };
+const DKEY = () => { const rd = rutinaDeHoy(); return 'tl-draft-' + codigo + '-' + rd.fecha + '-' + String(rd.hora || 'libre').replace(':', '') + (S.rutSel ? '-' + S.rutSel : ''); };
+const getDraft = () => { try { const k = DKEY(); let v = localStorage.getItem(k);
+  // borradores antiguos (guardados solo con la fecha de hoy)
+  if (!v && !S.rutSel) { const old = 'tl-draft-' + codigo + '-' + today(); const ov = localStorage.getItem(old); if (ov && k.startsWith(old + '-')) { v = ov; localStorage.setItem(k, ov); localStorage.removeItem(old); } }
+  return JSON.parse(v || 'null') || { sets: {} }; } catch (e) { return { sets: {} }; } };
 const putDraft = d => { try { localStorage.setItem(DKEY(), JSON.stringify(d)); } catch (e) {} };
 const clearDraft = () => { try { localStorage.removeItem(DKEY()); Object.keys(localStorage).filter(k => k.startsWith('tl-draft-' + codigo + '-') && k !== DKEY() && k.slice(('tl-draft-' + codigo + '-').length, ('tl-draft-' + codigo + '-').length + 10) < addDays(today(), -30)).forEach(k => localStorage.removeItem(k)); } catch (e) {} };
 function applyDraft() { if (S.v !== 'rutina') return; const d = getDraft();
@@ -617,7 +621,10 @@ V.hoy = () => {
   const t = today(); const nombre = S.perfil?.apodo || String(S.a.nombre || '').split(' ')[0]; const nombreC = nombre.charAt(0).toUpperCase() + nombre.slice(1);
   const p = planActual(); const usadas = p ? presentes(p.inicio, p.fin) : 0; const tot = p?.clases || S.a.clases || 0;
   const saldo = p ? Math.max(0, (p.monto || 0) - abonado(p)) : 0;
-  const rd = rutinaDeHoy(); const prox = proximas(1)[0];
+  const rd0 = rutinaDeHoy(); const prox = proximas(1)[0];
+  // la tarjeta muestra la rutina de la clase de la que habla (hoy o la próxima) y el botón abre esa misma clase
+  const idProx = prox ? (recOf(prox.f, prox.h)?.rutina || prediccion().get(prox.f + '|' + prox.h) || rd0.id) : rd0.id;
+  const rd = Object.assign({}, rd0, idProx && S.rutinas.get(idProx) ? { id: idProx, r: S.rutinas.get(idProx) } : {});
   const linea = rd.pe && rd.r ? progLinea(rd.r, rd.pe.semana) : '';
   const mes = t.slice(0, 7); const delMes = S.clases.filter(r => r.fecha.startsWith(mes) && r.asis === 'presente').length;
   return `
@@ -631,7 +638,7 @@ V.hoy = () => {
     <div class="row"><span class="eyebrow red">${rd.hoy ? 'Tu clase de hoy' : 'Tu próxima clase'}</span><span class="small muted">${prox ? esc((prox.f === t ? 'Hoy' : DL[dayKey(prox.f)] + ' ' + fmtD(prox.f)) + ' · ' + prox.h) : 'Sin clases agendadas'}</span></div>
     ${rd.r ? `<div><div class="disp" style="font-size:28px;line-height:1.05">${esc(rd.r.tipo || 'Rutina')}</div><div class="small muted">${esc(rd.r.familia || '')} · ${esc(rd.r.nivel || '')}</div></div>` : `<div class="muted">Franco te asigna la rutina en la clase.</div>`}
     ${linea ? `<div class="note"><b class="red">Semana ${Math.min(rd.pe.semana, rd.pe.total)} de ${rd.pe.total}</b> · ${esc(linea.replace(/^Semana \d+ · /, ''))}</div>` : ''}
-    ${rd.r ? `<button class="btn pri" data-go="rutina">Ver mi rutina</button>` : ''}
+    ${rd.r ? (prox ? `<button class="btn pri" data-abrses="${esc(prox.f + '|' + prox.h + '|' + (rd.id || ''))}">${prox.f === t ? 'Entrenar ahora' : 'Ver mi rutina'}</button>` : `<button class="btn pri" data-go="rutina">Ver mi rutina</button>`) : ''}
     ${prox ? `<div class="small muted" style="margin-top:4px">¿Vienes ${esc(prox.f === t ? 'hoy' : DL[dayKey(prox.f)].toLowerCase() + ' ' + fmtD(prox.f))} a las ${esc(prox.h)}?</div>${asisBtns(prox.f, prox.h)}` : ''}
   </section>
   ${recupHTML()}
@@ -641,7 +648,7 @@ V.hoy = () => {
     <div class="card kpi"><div class="small muted">Clases del plan</div><div class="v">${usadas} <span class="muted" style="font-size:18px">de ${tot || '—'}</span></div>${tot ? `<div class="bar"><i style="width:${Math.min(100, Math.round(usadas / tot * 100))}%"></i></div>` : ''}</div>
     <div class="card kpi"><div class="small muted">Renueva</div><div class="v">${p ? esc(fmtD(p.fin)) : '—'}</div><div class="small ${saldo ? 'warn' : 'ok'}">${p ? (saldo ? 'Saldo ' + clp(saldo) : 'Al día ✓') : ''}</div></div>
   </div>
-  <section class="card"><div class="small">Este mes llevas <b>${delMes} clase${delMes === 1 ? '' : 's'}</b>. ${delMes >= 8 ? '¡Vas excelente!' : 'Cada clase suma.'}</div></section>
+  ${(() => { const am = actsMes(mes); return `<section class="card"><div class="small">Este mes llevas <b>${delMes} clase${delMes === 1 ? '' : 's'}</b>${am ? ` y <b>${am} actividad${am === 1 ? '' : 'es'}</b>` : ''}. ${delMes + am >= 8 ? '¡Vas excelente!' : 'Cada entrenamiento suma.'}</div></section>`; })()}
   ${proximoHTML()}
   ${pagoBanner()}
   ${avisoBanner()}
@@ -741,7 +748,7 @@ V.rutina = () => {
   const evsHoy = evDia(tHoy).slice().sort((a, b) => String(a.hora || '').localeCompare(String(b.hora || '')));
   if (!S.ses && !S.rutSel && !claseHoy) {
     if (evsHoy.length) return evDetalleHTML(evsHoy[0], true);
-    return `<h1>Rutina</h1><section class="card"><b style="font-size:18px">😌 Hoy es día de descanso</b><div class="small muted">No tienes clase ni actividad agendada para hoy. Revisa la Agenda para ver lo que viene.</div><button class="btn" data-go="agenda">Ver mi agenda</button></section>`; }
+    return `<h1>Entreno</h1><section class="card"><b style="font-size:18px">😌 Hoy es día de descanso</b><div class="small muted">No tienes clase ni actividad agendada para hoy. Si igual quieres entrenar, abre la sesión que te toca.</div>${progEstado() ? '<button class="btn pri" data-entrenar="1">💪 Entrenar igual</button>' : ''}<button class="btn" data-go="agenda">Ver mi agenda</button></section>`; }
   const rd = rutinaDeHoy(); const r = rd.r;
   if (!r) return `<h1>Rutina</h1><div class="card"><div class="muted">Aún no tienes una rutina asignada. Franco te la asigna en la clase.</div></div>`;
   const H = historial(); const cur = {}; (rd.rec?.ej || []).forEach(e => cur[e.n] = e);
@@ -749,8 +756,12 @@ V.rutina = () => {
   const selHTML = '';
   const cuandoTxt = rd.fecha === today() ? 'Sesión de hoy' : 'Sesión del ' + longD(rd.fecha).toLowerCase();
   const otro = S.ses ? `<section class="card" style="border-color:var(--ev);background:rgba(77,163,255,.08)"><div class="row" style="align-items:center"><b>📅 ${esc(cuandoTxt)}${rd.hora && rd.hora !== 'libre' ? ' · ' + esc(rd.hora) : ''}</b><button class="chip" data-sesx="1">‹ Agenda</button></div>${rd.futuro ? '<div class="small muted">Vista previa: podrás anotarla ese día.</div>' : rd.otroDia ? '<div class="small muted">Lo que anotes se guarda en ese día.</div>' : ''}</section>` : '';
+  const cIdx = (() => { let k = -1; bloques.forEach((b, bi) => { if (!/bloque b/i.test(b.titulo || '') && (/bloque c/i.test(b.titulo || '') || bi >= 2)) k = bi; }); return k; })();
+  const cNom = cIdx >= 0 ? (String(bloques[cIdx].titulo || '').replace(/^bloque\s+[a-z]\s*[·:-]?\s*/i, '').split('·')[0].trim() || 'bloque final') : '';
+  const guardada = rd.rec && ((rd.rec.ej || []).length || rd.rec.carga || rd.rec.rpe != null);
+  const okCard = guardada ? `<section class="card" style="border-color:var(--ok);background:rgba(111,211,154,.08)"><b class="ok" style="font-size:18px">✅ Sesión guardada</b><div class="small muted">${[(rd.rec.ej || []).length ? rd.rec.ej.length + ' ejercicio' + (rd.rec.ej.length === 1 ? '' : 's') + ' anotados' : '', rd.rec.carga ? 'Resultado: ' + rd.rec.carga : '', rd.rec.rpe != null ? 'RPE ' + rd.rec.rpe : ''].filter(Boolean).map(esc).join(' · ')}</div><div class="small muted">Si cambias algo, toca «Actualizar mi entrenamiento».</div></section>` : '';
   const tambien = !S.ses && claseHoy && evsHoy.length ? `<div class="chips">${evsHoy.map(x => `<button class="chip" data-evid="${esc(x.id)}">También hoy: ${EVI[x.tipo] || '📌'} ${esc(x.titulo)} ›</button>`).join('')}</div>` : '';
-  return `${otro}${tambien}
+  return `${otro}${tambien}${okCard}
   <div style="display:grid;gap:6px"><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total : ''}</div><h1 style="font-size:30px;line-height:1.05">${esc(r.tipo || 'Rutina')}</h1>${(() => { const l = rd.pe ? progLinea(r, rd.pe.semana) : ''; return l ? `<div class="small muted">💡 ${esc(l.replace(/^Semana \d+ · /, ''))}</div>` : ''; })()}
     <div class="chips" style="margin-top:2px">${r.minutos ? `<span class="chip">⏱ ~${esc(r.minutos)} min</span>` : ''}<span class="chip">${bloques.reduce((n, b) => n + (b.ejercicios || []).length, 0)} ejercicios</span>${rd.hora && rd.hora !== 'libre' ? `<span class="chip">🕒 ${esc(rd.hora)}</span>` : ''}</div>${selHTML}</div>
   ${bloques.map((b, bi) => { const isB = /bloque b/i.test(b.titulo || '');
@@ -766,9 +777,9 @@ V.rutina = () => {
             return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span><span class="prev">${p ? esc(fmtSet(p)) : '—'}</span><input inputmode="decimal" placeholder="${p && p.kg != null ? esc(String(p.kg).replace('.', ',')) : 'kg'}" aria-label="kg serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s.kg != null ? esc(String(s.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${p && p.r != null ? esc(p.r) : 'reps'}" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s.r != null ? esc(s.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }).join('')}</div>`; })() : ''}</div>`; }).join('')}
     </details>`; }).join('')}
   ${rd.futuro ? '<section class="card"><div class="small muted">Esta sesión es de un día que aún no llega. Ábrela desde la Agenda ese día para anotar tus series.</div></section>' : `<section class="card">
-    <label class="field">Resultado del bloque C<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>
+    ${cIdx >= 0 ? `<label class="field">Resultado · ${esc(cNom)}<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>` : ''}
     <div class="field">¿Qué tan duro fue? (RPE)<div class="chips">${[5,6,7,8,9,10].map(v => `<button class="chip" data-rpe="${v}" aria-pressed="${String(rd.rec?.rpe ?? S.rpe) === String(v)}">${v}</button>`).join('')}</div></div>
-    <button class="btn pri" id="guardar">Guardar mi entrenamiento</button>
+    <button class="btn pri" id="guardar">${guardada ? 'Actualizar mi entrenamiento' : 'Guardar mi entrenamiento'}</button>
     ${rd.otroDia ? `<div class="small muted">Se guarda en tu sesión del ${esc(fmtD(rd.fecha))}.</div>` : rd.hoy ? '' : '<div class="small muted">Hoy no tienes clase agendada: se guarda como entrenamiento libre.</div>'}
   </section>`}`;
 };
@@ -849,9 +860,9 @@ V.progreso = () => {
   ${top ? `<section class="card"><div class="row"><h2 style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nom(top[0]))}</h2><span class="small muted" style="white-space:nowrap">mejor ${esc(fmtSet(top[1]))}</span></div>
     ${chart || '<div class="small muted">Anota más sesiones de este ejercicio para ver tu gráfico.</div>'}
     ${best.length > 1 ? `<div class="chips">${best.slice(0, 8).map(([n]) => `<button class="chip" data-pej="${esc(n)}" aria-pressed="${n === top[0]}">${esc(nom(n).split(' (')[0])}</button>`).join('')}</div>` : ''}</section>` : ''}
-  <section class="card"><h2>Tus mejores marcas</h2>${best.length ? verTodas.map(([n, bb]) => `<div class="row small"><span style="min-width:0">${esc(nom(n))}</span><b style="white-space:nowrap">${esc(fmtSet(bb))}</b></div>`).join('') + (best.length > 5 ? `<button class="chip" data-mall="1" style="justify-self:start">${S.mAll ? 'Ver menos' : 'Ver todas (' + best.length + ')'}</button>` : '') : '<div class="small muted">Cuando anotes tus series en «Rutina», aquí verás tus récords.</div>'}</section>`;
+  <section class="card"><h2>Tus mejores marcas</h2>${best.length ? verTodas.map(([n, bb]) => `<div class="row small"><span style="min-width:0">${esc(nom(n))}</span><b style="white-space:nowrap">${esc(fmtSet(bb))}</b></div>`).join('') + (best.length > 5 ? `<button class="chip" data-mall="1" style="justify-self:start">${S.mAll ? 'Ver menos' : 'Ver todas (' + best.length + ')'}</button>` : '') : '<div class="small muted">Cuando anotes tus series en «Entreno», aquí verás tus récords.</div>'}</section>`;
   return `<h1>${tab === 'cuerpo' && S.evalFirst ? 'Mis evaluaciones' : 'Mi progreso'}</h1>
-  <section class="card" style="flex-direction:row;padding:12px 6px">${[['Clases del mes', delMes, ''], ['Asistencia', marcadas ? Math.round(delMes / marcadas * 100) + '%' : '—', ''], ['Récords', best.length, 'red']].map(([l, v, c], i) => `<div style="flex:1;text-align:center;${i ? 'border-left:1px solid var(--line)' : ''}"><div class="disp ${c}" style="font-size:26px;line-height:1">${v}</div><div class="small muted" style="font-size:12px">${l}</div></div>`).join('')}</section>
+  <section class="card" style="flex-direction:row;padding:12px 6px">${[['Clases del mes', delMes, ''], ...(actsMes(mes) ? [['Actividades', actsMes(mes), '']] : []), ['Asistencia', marcadas ? Math.round(delMes / marcadas * 100) + '%' : '—', ''], ['Récords', best.length, 'red']].map(([l, v, c], i) => `<div style="flex:1;text-align:center;${i ? 'border-left:1px solid var(--line)' : ''}"><div class="disp ${c}" style="font-size:26px;line-height:1">${v}</div><div class="small muted" style="font-size:12px">${l}</div></div>`).join('')}</section>
   <div class="seg" role="tablist">${TABS.map(([k, l]) => `<button role="tab" data-ptab="${k}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>
   ${tab === 'entreno' ? entreno : tab === 'cuerpo' ? inbCard + medCard : fotosCard}`;
 };
@@ -902,7 +913,7 @@ const evColor = e => { const t = String(e?.titulo || '').toLowerCase();
   if (e?.tipo === 'Actividad') return /yoga|movilidad|estir|pilates/.test(t) ? '#b48cff' : /bici|mtb|ciclis|rodillo|🚴/.test(t) ? '#2fd0c4' : /run|trote|rodaje|series|carrera|🏃|trek|cerro/.test(t) ? '#ff8a3d' : '#4da3ff';
   return { 'Evaluación': '#f3b45b', 'Reunión': '#4da3ff', 'Nutrición': '#6fd39a', 'Documento': '#a69ea3', 'Evento': '#ff7ab6', 'Otro': '#8fa0b3' }[e?.tipo] || '#4da3ff'; };
 const EVA = { 'Evaluación': 'Ver mis evaluaciones ›', 'Nutrición': 'Ver mi pauta ›', 'Reunión': 'Ver detalle y agendar ›', 'Documento': 'Abrir documento ›' };
-const evHTML = e => { const c = evColor(e); return `<section class="card" style="border-color:${c};border-left-width:5px;cursor:pointer" data-evid="${esc(e.id)}" role="button" tabindex="0"><div class="row"><div class="disp" style="font-size:22px">${e.hora ? esc(e.hora) : 'Todo el día'}</div><span class="chip" style="cursor:inherit;background:${c};border-color:${c};color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span></div><b>${esc(e.titulo)}</b>${e.detalle ? `<div class="small muted" style="white-space:pre-line;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(e.detalle)}</div>` : ''}<div class="small" style="color:${c};font-weight:700">${(e.adjunto || e.link) ? '📎 ' : ''}${esc(EVA[e.tipo] || 'Ver detalle ›')}</div></section>`; };
+const evHTML = e => { const c = evColor(e); return `<section class="card" style="border-color:${c};border-left-width:5px;cursor:pointer" data-evid="${esc(e.id)}" role="button" tabindex="0"><div class="row"><div class="disp" style="font-size:22px">${e.hora ? esc(e.hora) : 'Todo el día'}</div><span class="chip" style="cursor:inherit;background:${c};border-color:${c};color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span></div><b>${esc(e.titulo)}${hechaDe(e) ? ' <span class="small ok" style="font-weight:700">✅ Hecha</span>' : ''}</b>${e.detalle ? `<div class="small muted" style="white-space:pre-line;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(e.detalle)}</div>` : ''}<div class="small" style="color:${c};font-weight:700">${(e.adjunto || e.link) ? '📎 ' : ''}${esc(EVA[e.tipo] || 'Ver detalle ›')}</div></section>`; };
 function icsDe(e) { const d = e.fecha.replace(/-/g, ''); const h = e.hora ? e.hora.replace(':', '') + '00' : null; const fin = h ? String(Number(h.slice(0, 2)) + 1).padStart(2, '0') + h.slice(2) : null;
   const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Titanium Sport//ES', 'BEGIN:VEVENT', 'UID:' + e.id + '@titanium', h ? 'DTSTART;TZID=America/Santiago:' + d + 'T' + h : 'DTSTART;VALUE=DATE:' + d, h ? 'DTEND;TZID=America/Santiago:' + d + 'T' + fin : 'DTEND;VALUE=DATE:' + addDays(e.fecha, 1).replace(/-/g, ''),
     'SUMMARY:' + (e.titulo || '').replace(/[,;\n]/g, ' ') + ' · Titanium', 'DESCRIPTION:' + (e.detalle || '').replace(/\n/g, '\\n').replace(/[,;]/g, ' '), 'LOCATION:Titanium Sport', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
@@ -916,6 +927,21 @@ function evActs(e) { const n = waNum(); const nom = String(S.perfil?.apodo || S.
   if (e.fecha >= today()) acts.push(`<a class="btn" href="${icsDe(e)}" download="titanium-${esc(e.fecha)}.ics">📅 Agregar a mi calendario</a>`);
   if (n) acts.push(`<a class="btn" href="https://wa.me/${n}?text=${encodeURIComponent(`Hola Franco, soy ${nom}. Te escribo por: ${e.titulo} (${longD(e.fecha).toLowerCase()}${e.hora ? ' a las ' + e.hora : ''}).`)}" target="_blank" rel="noopener" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">💬 Escribir a Franco</a>`);
   return { acts, doc, esPdf }; }
+const esEntreno = e => e && (e.tipo === 'Actividad' || e.tipo === 'Evento' || e.tipo === 'Otro');
+const hechaDe = e => S.hechas?.get(String(e.id));
+const actsMes = mes => [...(S.hechas?.values() || [])].filter(r => String(r.fecha).startsWith(mes)).length;
+function hechaCard(e) { if (!esEntreno(e)) return ''; const h = hechaDe(e); const t = today();
+  if (e.fecha > t) return `<section class="card"><div class="small muted">Cuando llegue el día podrás marcarla como hecha ✅</div></section>`;
+  if (e.fecha < addDays(t, -30)) return h ? `<section class="card"><b class="ok">✅ La hiciste</b></section>` : '';
+  if (h && !S.actEdit) return `<section class="card" style="border-color:var(--ok)"><div class="row" style="align-items:center"><b class="ok" style="font-size:18px">✅ La hiciste</b><button class="chip" data-actedit="1">Editar</button></div><div class="small muted">${[h.minutos ? h.minutos + ' min' : '', h.rpe != null ? 'RPE ' + h.rpe : '', h.nota || ''].filter(Boolean).map(esc).join(' · ') || 'Sin detalles'}</div></section>`;
+  const sug = h?.minutos || (String(e.detalle || e.titulo || '').match(/(\d{1,3})\s*(?:[–-]\s*\d{1,3}\s*)?min/i) || [])[1] || '';
+  const rpeSel = S.actRpe ?? h?.rpe;
+  return `<section class="card"><h2 style="margin:0">¿La hiciste?</h2>
+    <label class="field">Minutos<input id="act-min" inputmode="numeric" placeholder="Ej: 40" value="${esc(sug)}"></label>
+    <div class="field">¿Qué tan duro fue? (RPE)<div class="chips">${[3,4,5,6,7,8,9,10].map(v => `<button class="chip" data-actrpe="${v}" aria-pressed="${String(rpeSel) === String(v)}">${v}</button>`).join('')}</div></div>
+    <label class="field">Nota (opcional)<input id="act-nota" maxlength="300" placeholder="Cómo te sentiste, distancia, etc." value="${esc(h?.nota || '')}"></label>
+    <button class="btn pri" data-acthecha="${esc(e.id)}">✅ La hice</button>
+    ${h ? `<button class="btn" data-actdel="${esc(e.id)}">Quitar como hecha</button>` : ''}</section>`; }
 // detalle de una actividad de la Agenda, abierto en la pestaña Rutina
 function evDetalleHTML(e, deHoy) { const { acts, doc, esPdf } = evActs(e); const c = evColor(e);
   const otros = deHoy ? evDia(today()).filter(x => x !== e) : [];
@@ -925,7 +951,9 @@ function evDetalleHTML(e, deHoy) { const { acts, doc, esPdf } = evActs(e); const
     <h1 style="font-size:30px;line-height:1.05">${esc(e.titulo)}</h1><div class="small muted">${e.alumno ? 'Agendada para ti' : 'Para todo Titanium'}</div></div>
   ${e.detalle ? `<section class="card" style="border-color:${c};border-left-width:5px"><div style="white-space:pre-line;line-height:1.5">${esc(e.detalle)}</div></section>` : ''}
   ${doc && !esPdf ? `<img src="${esc(doc)}" alt="${esc(e.titulo)}" data-zoom="1" style="width:100%;max-height:360px;object-fit:contain;border-radius:12px;background:var(--sunk)">` : ''}
-  ${acts.length ? `<div style="display:grid;gap:10px">${acts.join('')}</div>` : ''}`; }
+  ${hechaCard(e)}
+  ${acts.length ? `<div style="display:grid;gap:10px">${acts.join('')}</div>` : ''}
+  ${deHoy && !S.ses && !S.rutSel && progEstado() ? '<button class="btn" data-entrenar="1">💪 Hacer también una sesión de fuerza</button>' : ''}`; }
 function abrirEvento(id) { const e = S.eventos.find(x => String(x.id) === String(id)); if (!e) return;
   const { acts, doc, esPdf } = evActs(e);
   const sh = document.createElement('div'); sh.id = 'sheet';
@@ -1169,7 +1197,16 @@ document.addEventListener('click', async ev => {
   const ibi = ev.target.closest('[data-ibi]'); if (ibi) { S.ibInfo = S.ibInfo === ibi.dataset.ibi ? null : ibi.dataset.ibi; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'fup-open') { S.fotoUp = !S.fotoUp; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'ib-cancel') { if (S.ibNew?.prev) URL.revokeObjectURL(S.ibNew.prev); S.ibNew = null; render(); return; }
-  const ei = ev.target.closest('[data-evid]'); if (ei) { S.evSel = ei.dataset.evid; S.ses = null; S.rutSel = null; S.v = 'rutina'; render(); window.scrollTo(0, 0); return; }
+  if (ev.target.closest('[data-entrenar]')) { const pe = progEstado(); if (!pe) return; const id = pe.next[0]; S.evSel = null; S.ses = { f: today(), h: 'libre', id }; S.rutSel = id; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
+  if (ev.target.closest('[data-actedit]')) { S.actEdit = true; S.actRpe = null; render(); return; }
+  const arp = ev.target.closest('[data-actrpe]'); if (arp) { S.actRpe = Number(arp.dataset.actrpe); document.querySelectorAll('[data-actrpe]').forEach(b => b.setAttribute('aria-pressed', b === arp)); return; }
+  const ahe = ev.target.closest('[data-acthecha]'); if (ahe) { const mn = parseInt(($('#act-min')?.value || '').replace(/\D/g, ''), 10); const nota = ($('#act-nota')?.value || '').trim();
+    const e0 = S.eventos.find(x => String(x.id) === ahe.dataset.acthecha); const rpe = S.actRpe ?? (e0 && hechaDe(e0)?.rpe) ?? null;
+    ahe.disabled = true; const { error } = await sb.rpc('marcar_mi_actividad', { p_evento: ahe.dataset.acthecha, p_minutos: mn > 0 ? mn : null, p_rpe: rpe, p_nota: nota || null });
+    ahe.disabled = false; if (error) { toast('No se pudo guardar: ' + error.message); return; }
+    S.actEdit = false; S.actRpe = null; await load(); toast('¡Actividad registrada! 💪'); render(); return; }
+  const adl = ev.target.closest('[data-actdel]'); if (adl) { const { error } = await sb.rpc('desmarcar_mi_actividad', { p_evento: adl.dataset.actdel }); if (error) { toast('No se pudo quitar: ' + error.message); return; } S.actEdit = false; S.actRpe = null; await load(); toast('Listo, quedó sin marcar'); render(); return; }
+  const ei = ev.target.closest('[data-evid]'); if (ei) { S.actEdit = false; S.actRpe = null; S.evSel = ei.dataset.evid; S.ses = null; S.rutSel = null; S.v = 'rutina'; render(); window.scrollTo(0, 0); return; }
   const eg = ev.target.closest('[data-evgo]'); if (eg) { S.evSel = null; S.v = eg.dataset.evgo; S.evalFirst = S.v === 'progreso'; if (S.evalFirst) S.ptab = 'cuerpo'; render(); return; }
   const gd = ev.target.closest('[data-goday]'); if (gd) { S.dia = gd.dataset.goday; S.wk = lunesDe(S.dia); S.v = 'agenda'; render(); return; }
   const zf = ev.target.closest('[data-zoom]'); if (zf) { const lb = document.createElement('div'); lb.id = 'lightbox'; lb.innerHTML = `<img src="${zf.getAttribute('src')}" alt="Foto ampliada">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); return; }
@@ -1197,7 +1234,7 @@ document.addEventListener('click', async ev => {
       const top = ss.reduce((b, s) => (s.kg || 0) > (b.kg || 0) ? s : b, ss[0]); return { n, kg: top.kg, r: top.r, s: ss.length, sets: ss }; }).filter(Boolean);
     const btn = ev.target; btn.disabled = true;
     const rpe = S.rpe ?? rd.rec?.rpe ?? null;
-    const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: rd.fecha || today(), p_hora: rd.hora, p_ej: ej, p_carga: $('#carga').value.trim() || null, p_rpe: rpe, p_rutina: rd.id || null });
+    const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: rd.fecha || today(), p_hora: rd.hora, p_ej: ej, p_carga: $('#carga') ? ($('#carga').value.trim() || null) : (rd.rec?.carga || null), p_rpe: rpe, p_rutina: rd.id || null });
     btn.disabled = false;
     if (error) { toast('No se pudo guardar: ' + error.message); return; }
     clearDraft(); await load(); toast('Entrenamiento guardado 💪'); render();
