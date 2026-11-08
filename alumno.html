@@ -735,6 +735,7 @@ function abrirTimer(b) { cerrarTimer(); const c = detectarTimer(b); const el = d
   document.body.appendChild(el); pintar(); }
 function cerrarTimer() { clearInterval(TM); TM = null; document.getElementById('tmr')?.remove(); try { window.SND && SND.cerrarPanel(); } catch (_) {} }
 V.rutina = () => {
+  if (S.evSel) { const e = S.eventos.find(x => String(x.id) === String(S.evSel)); if (e) return evDetalleHTML(e); S.evSel = null; }
   const rd = rutinaDeHoy(); const r = rd.r;
   if (!r) return `<h1>Rutina</h1><div class="card"><div class="muted">Aún no tienes una rutina asignada. Franco te la asigna en la clase.</div></div>`;
   const H = historial(); const cur = {}; (rd.rec?.ej || []).forEach(e => cur[e.n] = e);
@@ -899,8 +900,7 @@ function icsDe(e) { const d = e.fecha.replace(/-/g, ''); const h = e.hora ? e.ho
   const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Titanium Sport//ES', 'BEGIN:VEVENT', 'UID:' + e.id + '@titanium', h ? 'DTSTART;TZID=America/Santiago:' + d + 'T' + h : 'DTSTART;VALUE=DATE:' + d, h ? 'DTEND;TZID=America/Santiago:' + d + 'T' + fin : 'DTEND;VALUE=DATE:' + addDays(e.fecha, 1).replace(/-/g, ''),
     'SUMMARY:' + (e.titulo || '').replace(/[,;\n]/g, ' ') + ' · Titanium', 'DESCRIPTION:' + (e.detalle || '').replace(/\n/g, '\\n').replace(/[,;]/g, ' '), 'LOCATION:Titanium Sport', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
   return URL.createObjectURL(new Blob([ics], { type: 'text/calendar' })); }
-function abrirEvento(id) { const e = S.eventos.find(x => String(x.id) === String(id)); if (!e) return;
-  const n = waNum(); const nom = String(S.perfil?.apodo || S.a.nombre || '').split(' ')[0];
+function evActs(e) { const n = waNum(); const nom = String(S.perfil?.apodo || S.a.nombre || '').split(' ')[0];
   const doc = e.adjunto && S.urls[e.adjunto]; const esPdf = /\.pdf$/i.test(e.adjunto || '');
   const acts = [];
   if (doc) acts.push(`<a class="btn pri" href="${esc(doc)}" target="_blank" rel="noopener">${esPdf ? '📄 Abrir documento' : '🖼️ Ver imagen'}</a>`);
@@ -908,6 +908,17 @@ function abrirEvento(id) { const e = S.eventos.find(x => String(x.id) === String
   if (e.tipo === 'Evaluación') acts.push(`<button class="btn ${doc || e.link ? '' : 'pri'}" data-evgo="progreso">📋 Ir a mis evaluaciones</button>`);
   if (e.fecha >= today()) acts.push(`<a class="btn" href="${icsDe(e)}" download="titanium-${esc(e.fecha)}.ics">📅 Agregar a mi calendario</a>`);
   if (n) acts.push(`<a class="btn" href="https://wa.me/${n}?text=${encodeURIComponent(`Hola Franco, soy ${nom}. Te escribo por: ${e.titulo} (${longD(e.fecha).toLowerCase()}${e.hora ? ' a las ' + e.hora : ''}).`)}" target="_blank" rel="noopener" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">💬 Escribir a Franco</a>`);
+  return { acts, doc, esPdf }; }
+// detalle de una actividad de la Agenda, abierto en la pestaña Rutina
+function evDetalleHTML(e) { const { acts, doc, esPdf } = evActs(e); const c = evColor(e);
+  return `<section class="card" style="border-color:var(--ev);background:rgba(77,163,255,.08)"><div class="row" style="align-items:center"><b>📅 ${esc(e.fecha === today() ? 'Hoy' : longD(e.fecha))}${e.hora ? ' · ' + esc(e.hora) : ' · todo el día'}</b><button class="chip" data-sesx="1">‹ Agenda</button></div></section>
+  <div style="display:grid;gap:8px"><div><span class="chip" style="cursor:default;background:${c};border-color:${c};color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span></div>
+    <h1 style="font-size:30px;line-height:1.05">${esc(e.titulo)}</h1><div class="small muted">${e.alumno ? 'Agendada para ti' : 'Para todo Titanium'}</div></div>
+  ${e.detalle ? `<section class="card" style="border-color:${c};border-left-width:5px"><div style="white-space:pre-line;line-height:1.5">${esc(e.detalle)}</div></section>` : ''}
+  ${doc && !esPdf ? `<img src="${esc(doc)}" alt="${esc(e.titulo)}" data-zoom="1" style="width:100%;max-height:360px;object-fit:contain;border-radius:12px;background:var(--sunk)">` : ''}
+  ${acts.length ? `<div style="display:grid;gap:10px">${acts.join('')}</div>` : ''}`; }
+function abrirEvento(id) { const e = S.eventos.find(x => String(x.id) === String(id)); if (!e) return;
+  const { acts, doc, esPdf } = evActs(e);
   const sh = document.createElement('div'); sh.id = 'sheet';
   sh.innerHTML = `<div class="in" role="dialog" aria-modal="true" aria-label="${esc(e.titulo)}"><div class="row"><span class="chip" style="cursor:default;background:${evColor(e)};border-color:${evColor(e)};color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span><button class="btn" data-close="1" style="width:auto;min-height:36px" aria-label="Cerrar">✕</button></div>
     <h2 style="font-size:26px">${esc(e.titulo)}</h2><div class="small muted">${esc(longD(e.fecha))}${e.hora ? ' · ' + esc(e.hora) : ' · todo el día'}${e.alumno ? '' : ' · para todo Titanium'}</div>
@@ -1025,10 +1036,7 @@ V.agenda = () => {
   ${weekStrip(S.wk, S.dia, 'data-dia')}
 
   <div class="eyebrow">${esc(longD(S.dia))}</div>
-  ${items.length || evs.length ? [...items.map(x => ({ k: x.h, html: card(x) })), ...evs.map(e => ({ k: e.hora || '00:00', html: evHTML(e) }))].sort((a, b) => a.k.localeCompare(b.k)).map(x => x.html).join('') : `<div class="card"><div class="muted">${S.dia < t ? 'No tuviste clase este día.' : 'No tienes nada agendado este día. ¡Descansa o muévete libre!'}</div></div>`}
-  ${(() => { const pe = progEstado(); if (!pe || !pe.ses.length || S.dia < addDays(t, -30)) return '';
-    return `<div class="eyebrow" style="margin-top:6px">Tu programa · toca una sesión para ${S.dia > t ? 'verla' : 'entrenarla'}</div>
-    ${pe.ses.map(([id, x]) => `<button class="card ag-ses" data-progses="${esc(id)}"><div style="flex:1;min-width:0"><div class="row" style="justify-content:flex-start;gap:8px"><b class="blk-t">${esc(x.tipo || 'Sesión')}</b>${id === pe.next[0] ? '<span class="small red" style="font-weight:700">Te toca</span>' : ''}</div><div class="small muted">${x.minutos ? '⏱ ~' + esc(x.minutos) + ' min · ' : ''}${(x.bloques || []).reduce((n, b) => n + (b.ejercicios || []).length, 0)} ejercicios</div></div><span class="chev" aria-hidden="true">›</span></button>`).join('')}`; })()}`;
+  ${items.length || evs.length ? [...items.map(x => ({ k: x.h, html: card(x) })), ...evs.map(e => ({ k: e.hora || '00:00', html: evHTML(e) }))].sort((a, b) => a.k.localeCompare(b.k)).map(x => x.html).join('') : `<div class="card"><div class="muted">${S.dia < t ? 'No tuviste clase este día.' : 'No tienes nada agendado este día. ¡Descansa o muévete libre!'}</div></div>`}`;
 };
 V.clases = () => {
   const t = today(); const pas = S.clases.filter(r => r.fecha < t && r.fecha >= addDays(t, -14) && (r.asis || r.quitado)).slice(-6).reverse();
@@ -1132,11 +1140,10 @@ document.addEventListener('click', async ev => {
   const fx = ev.target.closest('[data-fx]'); if (fx) { fx.setAttribute('aria-pressed', String(fx.getAttribute('aria-pressed') !== 'true')); return; }
   const pqb = ev.target.closest('[data-pq]'); if (pqb) { document.querySelectorAll(`[data-pq="${pqb.dataset.pq}"]`).forEach(b => b.setAttribute('aria-pressed', String(b === pqb))); return; }
   if (ev.target.id === 'fx-save') { guardarFicha(ev.target); return; }
-  const pses = ev.target.closest('[data-progses]'); if (pses) { const f = S.dia || today(); const id = pses.dataset.progses; const h = (clasesDia(f).find(x => !x.rec?.reag_a && x.rec?.asis !== 'ausente') || {}).h || 'libre'; S.ses = { f, h, id }; S.rutSel = id; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
-  const abr = ev.target.closest('[data-abrses]'); if (abr) { const [f, h, id] = abr.dataset.abrses.split('|'); S.ses = { f, h, id }; S.rutSel = null; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
+  const abr = ev.target.closest('[data-abrses]'); if (abr) { const [f, h, id] = abr.dataset.abrses.split('|'); S.ses = { f, h, id }; S.rutSel = null; S.evSel = null; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
   const rsel = ev.target.closest('[data-rsel]'); if (rsel) { if (rsel.dataset.rsel === rutinaDeHoy().id) return; S.rutSel = rsel.dataset.rsel; S.rpe = null; blkAbiertos.clear(); render(); return; }
-  if (ev.target.closest('[data-sesx]')) { S.ses = null; S.rutSel = null; S.rpe = null; S.v = 'agenda'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
-  const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { if ((go.dataset.go || go.dataset.v) === 'rutina') { S.ses = null; S.rutSel = null; } S.v = go.dataset.go || go.dataset.v; S.evalFirst = false; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
+  if (ev.target.closest('[data-sesx]')) { S.evSel = null; S.ses = null; S.rutSel = null; S.rpe = null; S.v = 'agenda'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
+  const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.evSel = null; if ((go.dataset.go || go.dataset.v) === 'rutina') { S.ses = null; S.rutSel = null; } S.v = go.dataset.go || go.dataset.v; S.evalFirst = false; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
   const chk = ev.target.closest('[data-chk]'); if (chk) { const row = chk.closest('.set'); const ins = [...row.querySelectorAll('input')];
     if (row.dataset.ok) { delete row.dataset.ok; finDescanso(); return; }
     ins.forEach(i => { if (i.value.trim() === '' && !/kg|reps/.test(i.placeholder)) { i.value = i.placeholder; i.dispatchEvent(new Event('input', { bubbles: true })); } });
@@ -1153,8 +1160,8 @@ document.addEventListener('click', async ev => {
   const ibi = ev.target.closest('[data-ibi]'); if (ibi) { S.ibInfo = S.ibInfo === ibi.dataset.ibi ? null : ibi.dataset.ibi; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'fup-open') { S.fotoUp = !S.fotoUp; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'ib-cancel') { if (S.ibNew?.prev) URL.revokeObjectURL(S.ibNew.prev); S.ibNew = null; render(); return; }
-  const ei = ev.target.closest('[data-evid]'); if (ei) { abrirEvento(ei.dataset.evid); return; }
-  const eg = ev.target.closest('[data-evgo]'); if (eg) { S.v = eg.dataset.evgo; S.evalFirst = S.v === 'progreso'; if (S.evalFirst) S.ptab = 'cuerpo'; render(); return; }
+  const ei = ev.target.closest('[data-evid]'); if (ei) { S.evSel = ei.dataset.evid; S.ses = null; S.rutSel = null; S.v = 'rutina'; render(); window.scrollTo(0, 0); return; }
+  const eg = ev.target.closest('[data-evgo]'); if (eg) { S.evSel = null; S.v = eg.dataset.evgo; S.evalFirst = S.v === 'progreso'; if (S.evalFirst) S.ptab = 'cuerpo'; render(); return; }
   const gd = ev.target.closest('[data-goday]'); if (gd) { S.dia = gd.dataset.goday; S.wk = lunesDe(S.dia); S.v = 'agenda'; render(); return; }
   const zf = ev.target.closest('[data-zoom]'); if (zf) { const lb = document.createElement('div'); lb.id = 'lightbox'; lb.innerHTML = `<img src="${zf.getAttribute('src')}" alt="Foto ampliada">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); return; }
   const fa = ev.target.closest('[data-fang]'); if (fa) { S.fang = fa.dataset.fang; render(); return; }
