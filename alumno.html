@@ -58,7 +58,11 @@ h2{font-size:22px}
 .tour-card.mid{transform:translateY(-50%)}.tour-card.in{animation:tourIn .32s ease both}.tour-card.mid.in{animation:tourInMid .32s ease both}
 @keyframes tourIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes tourInMid{from{opacity:0;transform:translateY(-46%)}to{opacity:1;transform:translateY(-50%)}}
 .tour-dots{display:flex;gap:5px}.tour-dots i{height:4px;flex:1;border-radius:3px;background:var(--line);transition:background .3s}.tour-dots i.ok{background:rgba(215,31,48,.5)}.tour-dots i.on{background:var(--red)}
-.tour-nav{display:flex;align-items:center;gap:8px}.tour-skip{background:none;border:0;color:var(--muted);font:600 14px Barlow,sans-serif;cursor:pointer;padding:8px 4px}
+.tour-eb{font:600 11px/1 Barlow,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--red-t);margin-top:2px}
+.tour-t{font:700 30px/1.02 'Barlow Condensed',sans-serif;letter-spacing:.005em;margin:0;text-wrap:balance}
+.tour-x{margin:0;font:400 16px/1.5 Barlow,sans-serif;color:#cfc8cc;text-wrap:pretty}.tour-x b{color:var(--fg);font-weight:600}
+.tour-card{gap:12px!important;padding:18px 18px 16px!important}
+.tour-nav{display:flex;align-items:center;gap:8px;margin-top:2px}.tour-skip{background:none;border:0;color:var(--muted);font:600 14px Barlow,sans-serif;cursor:pointer;padding:8px 4px}
 @media (prefers-reduced-motion:reduce){.tour-hole{transition:none}.tour-card.in,.tour-card.mid.in{animation:none}}
 .tg{display:inline-block;align-self:flex-start;font-size:12px;font-weight:700;letter-spacing:.02em;padding:2px 8px;border-radius:999px;margin-bottom:3px;white-space:nowrap}
 .tg.ev{color:#7fb9ff;background:rgba(77,163,255,.14);border:1px solid rgba(77,163,255,.45)}.tg.warn{color:var(--warn);background:rgba(243,180,91,.12);border:1px solid rgba(243,180,91,.4)}
@@ -885,19 +889,13 @@ function tourMuestra() { // si hoy no hay sesión para mostrar, abre la próxima
   S.ses = { f: px.f, h: px.h, id }; S.tourSes = true; render(); }
 function tourAbrirB() { const d = [...document.querySelectorAll('#app details.blk')].find(x => x.querySelector('.set')); if (d) d.open = true; }
 const TOUR = [
-  { t: 'Bienvenido a tu app 💪', x: 'Te muestro cómo funciona en menos de un minuto.' },
-  { v: 'hoy', sel: '#tabs [data-v="hoy"]', t: 'Hoy', x: 'Tu resumen del día: próxima clase, recuperaciones, actividades y lo que viene.' },
-  { v: 'hoy', sel: '#app .ag-rut', t: 'Tu próxima clase', x: 'Toca la sesión para ver la rutina. Debajo confirmas si vienes o avisas que no puedes: si avisas con 2 horas o más, ganas una clase para recuperar.' },
-  { v: 'hoy', sel: '#recup-card', t: 'Recuperar clases', x: 'Cuando tienes clases por recuperar aparece esta tarjeta: tócala y elige día y hora. Es una sola oportunidad y vence cuando termina tu plan.' },
-  { v: 'agenda', sel: '#app .wk', t: 'Agenda', x: 'Tu semana completa. Toca un día para ver sus clases y actividades; con ‹ › cambias de semana.' },
-  { v: 'rutina', sel: '#tabs [data-v="rutina"]', t: 'Entreno', x: 'Aquí entrenas: tu sesión con sus 3 bloques. Ábrela también desde Hoy o Agenda.', pre: tourMuestra },
-  { v: 'rutina', sel: '#app .foco-go', t: 'Modo clase', x: 'En el gimnasio toca aquí: un ejercicio a la vez, en grande, con temporizador y descanso automático.' },
-  { v: 'rutina', sel: '#app .set', t: 'Anota tus series', x: 'Escribe kg y reps y toca ✓. Se guarda solo y parte el descanso. A la izquierda ves lo que hiciste la vez anterior.', pre: tourAbrirB },
-  { v: 'rutina', sel: '#app .com-add', t: 'Comentarios', x: '¿Fueron 20 kg por mano? Déjalo anotado aquí: la próxima vez te lo recuerda.' },
-  { v: 'rutina', sel: '#app .tec-b', t: '¿Cómo se hace?', x: 'Toca ? para ver las 3 claves técnicas del ejercicio y un video.' },
-  { v: 'progreso', sel: '#tabs [data-v="progreso"]', t: 'Progreso', x: 'Tus récords, fotos de antes y después y tus medidas.' },
-  { v: 'plan', sel: '#tabs [data-v="plan"]', t: 'Perfil', x: 'Tu ficha de salud, avisos, plan y pagos. Aquí también puedes volver a ver este tour.' },
-  { t: '¡Listo! 🎉', x: 'Ya sabes usar tu app. Nos vemos en Titanium.', fin: true },
+  { t: 'Bienvenido a tu app 💪', x: 'En 30 segundos te muestro lo esencial para tu primera clase.' },
+  { v: 'hoy', sel: '#app .ag-rut', t: 'Tu próxima clase', x: 'Tócala para ver la rutina. Debajo confirmas si vienes; si avisas con **2 h o más**, ganas una clase para recuperar.' },
+  { v: 'hoy', sel: '#recup-card', t: 'Recuperar clases', x: 'Cuando tengas clases por recuperar, toca aquí y elige día y hora. Es **una sola oportunidad**.' },
+  { v: 'agenda', sel: '#app .wk', t: 'Agenda', x: 'Tu semana completa: toca un día para ver sus clases y actividades.' },
+  { v: 'rutina', sel: '#app .foco-go', t: 'Modo clase', x: 'En el gimnasio toca aquí: **un ejercicio a la vez**, en grande, con temporizador y descanso automático.', pre: tourMuestra },
+  { v: 'rutina', sel: '#app .set', t: 'Anota tus series', x: 'Escribe las reps y toca **✓**: se guarda solo. Con 💬 dejas una nota (ej. «20 kg por mano») y con ? ves la técnica.', pre: tourAbrirB },
+  { t: '¡Listo! 🎉', x: 'Tu progreso, tu ficha y tus pagos están en Progreso y Perfil. En **Perfil** puedes volver a ver este tour.', fin: true },
 ];
 let TR = null;
 function iniciarTour() { if (document.getElementById('tour')) return; finDescanso(); cerrarTimer(); document.getElementById('sheet')?.remove();
@@ -927,8 +925,9 @@ function tourPintar(st, tgt) { if (!TR) return; const hole = TR.el.querySelector
   const n = TOUR.length, i = TR.i, H = window.innerHeight;
   TR.tgt = tgt; tourUbicar();
   card.innerHTML = `<div class="tour-dots">${TOUR.map((_, k) => `<i class="${k === i ? 'on' : k < i ? 'ok' : ''}"></i>`).join('')}</div>
-    <h2 style="font-size:24px;margin:0">${esc(st.t)}</h2><div style="line-height:1.45">${esc(st.x)}</div>
-    <div class="tour-nav">${st.fin ? '' : '<button class="tour-skip" data-tr="fin">Saltar</button>'}<span style="flex:1"></span>${i > 0 && !st.fin ? '<button class="btn" data-tr="ant" style="width:auto;min-height:44px;padding:0 16px">‹</button>' : ''}<button class="btn pri" data-tr="${st.fin ? 'fin' : 'sig'}" style="width:auto;min-height:44px;padding:0 20px">${st.fin ? 'Empezar' : i === 0 ? 'Vamos' : 'Siguiente'}</button></div>`;
+    <div class="tour-eb">${st.fin ? 'Todo listo' : i === 0 ? 'Bienvenida' : 'Cómo usar tu app'}</div>
+    <h2 class="tour-t">${esc(st.t)}</h2><p class="tour-x">${esc(st.x).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</p>
+    <div class="tour-nav">${st.fin ? '' : '<button class="tour-skip" data-tr="fin">Saltar</button>'}<span style="flex:1"></span>${i > 0 && !st.fin ? '<button class="btn" data-tr="ant" style="width:auto;min-height:44px;padding:0 16px">‹</button>' : ''}<button class="btn pri" data-tr="${st.fin ? 'fin' : 'sig'}" style="width:auto;min-height:44px;padding:0 20px">${st.fin ? 'Empezar 💪' : i === 0 ? 'Vamos ›' : 'Siguiente ›'}</button></div>`;
   card.classList.remove('in'); void card.offsetWidth; card.classList.add('in'); card.querySelector('[data-tr="sig"],[data-tr="fin"].btn')?.focus({ preventScroll: true });
   setTimeout(tourUbicar, 350); } // vuelve a medir por si la pantalla terminó de moverse
 window.addEventListener('scroll', () => { if (TR) tourUbicar(); }, { passive: true }); window.addEventListener('resize', () => { if (TR) tourUbicar(); });
