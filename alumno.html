@@ -351,7 +351,9 @@ function proximas(n) {
   return out;
 }
 function progSes() { const pr = S.a.programa; if (!pr?.familia) return [];
-  return [...S.rutinas.entries()].filter(([, r]) => r.familia === pr.familia && String(r.nivel).toLowerCase() === String(pr.nivel || 'Básico').toLowerCase()).sort((a, b) => (a[1].dia || 0) - (b[1].dia || 0)); }
+  const fam = [...S.rutinas.entries()].filter(([, r]) => r.familia === pr.familia);
+  const m = fam.filter(([, r]) => String(r.nivel).toLowerCase() === String(pr.nivel || 'Básico').toLowerCase());
+  return (m.length ? m : fam).sort((a, b) => (a[1].dia || 0) - (b[1].dia || 0)); }
 function progEstado() {
   const pr = S.a.programa; const ses = progSes(); if (!ses.length) return null;
   const ids = new Set(ses.map(([id]) => id)); const pos = new Map(ses.map(([id], i) => [id, i])); const t = today();

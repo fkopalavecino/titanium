@@ -492,7 +492,10 @@ const pillPago = (e, code, pid) => `<button type="button" class="pill go ${e.t}"
 const activos = () => [...S.alumnos.values()].filter(a => a.estado !== 'inactivo').sort((x,y) => norm(x.nombre).localeCompare(norm(y.nombre)));
 const nombre = code => S.alumnos.get(code)?.nombre || code;
 const CATS = ['Fuerza','Híbrido y metcon','Deportes','Rehabilitación y prevención','Movilidad','Mis workouts'];
-const progSesiones = pr => [...S.rutinas.entries()].filter(([,r]) => r.familia === pr.familia && norm(r.nivel) === norm(pr.nivel)).sort((a,b) => (a[1].dia ?? 0) - (b[1].dia ?? 0));
+const progSesiones = pr => { const fam = [...S.rutinas.entries()].filter(([,r]) => r.familia === pr.familia); const m = fam.filter(([,r]) => norm(r.nivel) === norm(pr.nivel));
+  return (m.length ? m : fam).sort((a,b) => (a[1].dia ?? 0) - (b[1].dia ?? 0)); };
+// niveles que ofrece el selector: los 3 de siempre + los que tenga el programa (ej. "Personal") + el actual
+const nivOpts = (fam, cur) => { const s = ['Básico','Intermedio','Avanzado']; [...S.rutinas.values()].forEach(r => { if (fam && r.familia === fam && r.nivel && !s.some(x => norm(x) === norm(r.nivel))) s.push(r.nivel); }); if (cur && !s.some(x => norm(x) === norm(cur))) s.push(cur); return s; };
 function progEstado(a, fecha) {
   const pr = a && a.programa; if (!pr || !pr.familia) return null;
   const ses = progSesiones(pr); if (!ses.length) return null;
@@ -1380,7 +1383,7 @@ function fichaAlumno(code) {
       <b>Programa de entrenamiento</b>
       <div class="frow">
         <label class="f">Programa<select id="fa-prog"><option value="">Sin programa</option>${progOptions(a.programa?.familia)}</select></label>
-        <label class="f">Nivel<select id="fa-pniv">${['Básico','Intermedio','Avanzado'].map(n => `<option ${(a.programa?.nivel || 'Básico') === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+        <label class="f">Nivel<select id="fa-pniv">${nivOpts(a.programa?.familia, a.programa?.nivel).map(n => `<option ${(a.programa?.nivel || 'Básico') === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
       </div>
       <div class="frow">
         <label class="f">Inicio<input type="date" id="fa-pini" value="${esc(a.programa?.inicio || today())}"></label>
@@ -1420,7 +1423,7 @@ function fichaAlumno(code) {
     <div style="display:grid;gap:10px;margin-top:8px">
       <div class="frow">
         <label class="f">Programa<select id="fa-prog"><option value="">Sin programa</option>${progOptions(a.programa?.familia)}</select></label>
-        <label class="f">Nivel<select id="fa-pniv">${['Básico','Intermedio','Avanzado'].map(n => `<option ${(a.programa?.nivel || 'Básico') === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+        <label class="f">Nivel<select id="fa-pniv">${nivOpts(a.programa?.familia, a.programa?.nivel).map(n => `<option ${(a.programa?.nivel || 'Básico') === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
       </div>
       <div class="frow">
         <label class="f">Inicio<input type="date" id="fa-pini" value="${esc(a.programa?.inicio || today())}"></label>
@@ -1800,7 +1803,7 @@ function asignarProgModal(fam) {
   const al = activos();
   openModal(`Asignar · ${fam}`, `
     <div class="frow">
-      <label class="f">Nivel<select id="ap-niv">${['Básico','Intermedio','Avanzado'].map(n => `<option>${n}</option>`).join('')}</select></label>
+      <label class="f">Nivel<select id="ap-niv">${nivOpts(fam).map(n => `<option>${esc(n)}</option>`).join('')}</select></label>
       <label class="f">Inicio<input type="date" id="ap-ini" value="${today()}"></label>
       <label class="f">Duración<select id="ap-sem">${[4,6,8,12].map(n => `<option value="${n}" ${n === 6 ? 'selected' : ''}>${n} semanas</option>`).join('')}</select></label>
     </div>
