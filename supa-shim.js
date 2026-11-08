@@ -214,6 +214,12 @@
       must(await sb.from('config').upsert({ id: 1, data: v }));
     }
   }
+  async function patchClase(fecha, hora, code, patch, borrar) {
+    if (borrar) { must(await sb.from('clases').delete().eq('fecha', fecha).eq('hora', hora).eq('alumno', code)); return; }
+    const row = { fecha, hora, alumno: code, updated_at: new Date().toISOString() };
+    for (const k in patch) { const f = CMAP[k] || k; if (!CFIELDS.includes(f)) continue; let v = patch[k]; if (v === '' || v === undefined) v = null; if (f === 'rpe' && v != null && isNaN(Number(v))) v = null; row[f] = v; }
+    must(await sb.from('clases').upsert(row, { onConflict: 'fecha,hora,alumno' }));
+  }
   async function delDoc(path) {
     const [col, id] = path.split('/');
     if (col === 'alumnos') must(await sb.from('alumnos').delete().eq('codigo', id));
@@ -225,6 +231,7 @@
     collection: name => ({
       onSnapshot(ok, err) { subs[name].push({ ok, err }); listen(); refresh(name); return () => { subs[name] = subs[name].filter(x => x.ok !== ok); }; },
     }),
+    patchClase,
     doc: path => ({
       set: v => setDoc(path, v),
       delete: () => delDoc(path),

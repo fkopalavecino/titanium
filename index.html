@@ -454,7 +454,9 @@ function patchDia(fecha, hora, code, patch) {
   if (Object.keys(next).length) cur.bloques[hora][code] = next; else delete cur.bloques[hora][code];
   S.dias.set(fecha, cur); schedule();
   if (!db) return noDb();
-  enqueue('dias/'+fecha, () => db.doc('dias/'+fecha).set(clone(S.dias.get(fecha))));
+  // solo esta fila y solo los campos que cambiaron: nunca pisa lo que los alumnos están anotando en vivo
+  const vacia = !Object.keys(next).length;
+  enqueue('clase/'+fecha+'|'+hora+'|'+code, () => db.patchClase ? db.patchClase(fecha, hora, code, patch, vacia) : db.doc('dias/'+fecha).set(clone(S.dias.get(fecha))));
 }
 function saveCfg(c) {
   S.cfg = c; schedule();
@@ -469,7 +471,7 @@ function planesOrden(a) { return [...(a.planes||[])].sort((x,y) => (x.inicio||'9
 function planActual(a) {
   const ps = planesOrden(a); if (!ps.length) return null;
   const t = today();
-  const vig = ps.filter(p => p.inicio && p.inicio <= t && p.fin && p.fin >= t);
+  const vig = ps.filter(p => p.inicio && p.inicio <= t && p.fin && p.fin > t); // el día de renovación ya es del plan nuevo
   return vig.length ? vig[vig.length-1] : ps[ps.length-1];
 }
 function tieneSiguiente(a, p) { const ps = planesOrden(a); const i = ps.findIndex(x => x.id === p.id); return i > -1 && i < ps.length-1; }
@@ -880,7 +882,7 @@ VIEWS.clase = () => {
 function studentCard(f, hora, code, ruts) {
   const a = S.alumnos.get(code); if (!a) return '';
   const r = rec(f, hora, code), p = planActual(a);
-  const usadas = p?.inicio ? (x => x.pres + x.aus)(asistencias(code, p.inicio, p.fin)) : 0; // la falta sin aviso cuenta como usada
+  const usadas = p?.inicio ? (x => x.pres + x.aus)(asistencias(code, p.inicio, p.fin ? addDays(p.fin, -1) : null)) : 0; // la falta sin aviso cuenta como usada
   const tot = p?.clases || a.clases;
   const pg = progEstado(a, f);
   const sug = !r.rutina && pg ? pg.next[0] : '';
@@ -933,10 +935,10 @@ const limpiarEj = n => String(n || '').replace(/^(min(uto)?\s*\d+|\d+[ab]?)\s*·
 const nSerieD = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? Math.min(6, Number(m[1])) : 1; };
 function enVivo(f, hora, code, rut, r) {
   if (f !== today() || !rut) return '';
-  const cur = r.ej || []; const hechas = cur.reduce((n, x) => n + setsOf(x).length, 0);
+  const llenos = x => setsOf(x).filter(z => z.kg != null || z.r != null); const cur = r.ej || []; const hechas = cur.reduce((n, x) => n + llenos(x).length, 0);
   if (!hechas && r.rpe == null) return '';
   const ejs = ejsDe(rut); const plan = ejs.reduce((n, x) => n + nSerieD(x.d), 0); const orden = ejs.map(x => x.n);
-  const ult = [...cur].sort((a, b) => orden.indexOf(b.n) - orden.indexOf(a.n))[0]; const ls = ult ? setsOf(ult).slice(-1)[0] : null;
+  const ult = [...cur].sort((a, b) => orden.indexOf(b.n) - orden.indexOf(a.n))[0]; const ls = ult ? llenos(ult).slice(-1)[0] : null;
   const prev = cargasDe(code).filter(c => c.f < f); const al = [];
   if (r.rpe != null && Number(r.rpe) >= 9) al.push('RPE ' + r.rpe);
   cur.forEach(x => { const pv = prev.find(c => c.n === x.n); if (pv && pv.kg > 0 && x.kg > pv.kg * 1.15) al.push(`${limpiarEj(x.n)} +${Math.round((x.kg / pv.kg - 1) * 100)}%`); });
@@ -957,7 +959,7 @@ function cargasDe(code) { // [{f,h,n,kg,r}] más reciente primero
   return out.sort((a, b) => (b.f + b.h).localeCompare(a.f + a.h));
 }
 const fmtSet = x => [x.kg != null ? String(x.kg).replace('.', ',') + ' kg' : '', x.r != null ? '× ' + x.r : ''].filter(Boolean).join(' ');
-const setsOf = x => x?.sets?.length ? x.sets : (x && (x.kg != null || x.r != null) ? [{kg: x.kg ?? null, r: x.r ?? null}] : []);
+const setsOf = x => x?.sets?.length ? x.sets.map(s => s || {}) : (x && (x.kg != null || x.r != null) ? [{kg: x.kg ?? null, r: x.r ?? null}] : []);
 const fmtSets = x => { const ss = setsOf(x).filter(s => s.kg != null || s.r != null); return ss.length > 1 ? ss.map(s => (s.kg != null ? String(s.kg).replace('.', ',') : '–') + '×' + (s.r ?? '–')).join(' · ') : fmtSet(x); };
 function setSerie(k, n, i, patch) {
   const [f, h, code] = k.split('|');
@@ -1147,7 +1149,7 @@ VIEWS.alumnos = () => {
     <tbody>
     ${list.length ? list.map(a => {
       const p = planActual(a); const tot = p?.clases || a.clases;
-      const as = p?.inicio ? asistencias(a.codigo, p.inicio, p.fin) : {pres:0, aus:0};
+      const as = p?.inicio ? asistencias(a.codigo, p.inicio, p.fin ? addDays(p.fin, -1) : null) : {pres:0, aus:0};
       const pct = as.pres + as.aus ? Math.round(100 * as.pres / (as.pres + as.aus)) + ' %' : 'Sin registro';
       return `<tr class="click" data-act="ficha" data-id="${esc(a.codigo)}">
         <td><b>${esc(a.nombre)}</b>${a.estado !== 'inactivo' ? appChips(a) : ''}<span class="sub">${esc(a.codigo)}${a.estado === 'inactivo' ? ' · inactivo' : ''}${(() => { const pg = progEstado(a); return pg ? ' · ' + esc(progTexto(pg)) + ' · sem ' + Math.min(pg.semana, pg.total) + '/' + pg.total + (pg.terminado ? ' ✓' : '') : ''; })()}</span></td>
@@ -2054,7 +2056,7 @@ document.addEventListener('click', e => {
         break; }
       patchDia(f, h, code, Object.assign({asis: nv}, nv === 'presente' && el.dataset.r ? {rutina: el.dataset.r} : {}));
       if (nv === 'ausente' && S.conf?.get(f + '|' + h + '|' + code) === 'no_voy') toast(`${firstName(nombre(code))} había avisado desde su app. Como Ausente se le descuenta y no recupera; si quieres darle recuperación usa «Avisó».`);
-      if (cur === 'aviso') window.__sb.rpc('dar_recuperacion', {p_alumno: code, p_fecha: f, p_hora: h, p_dar: false}).then(({error}) => { if (!error) toast('Recuperación quitada.'); });
+      if (cur === 'aviso') window.__sb.rpc('dar_recuperacion', {p_alumno: code, p_fecha: f, p_hora: h, p_dar: false}).then(({error}) => { if (!error) toast('Marca quitada.'); });
       break; }
     case 'aviso-si': case 'aviso-no': { const {f,h,code} = toggleOne(el.dataset.k); const dar = act === 'aviso-si'; closeModal();
       patchDia(f, h, code, {asis: dar ? 'aviso' : 'ausente'});

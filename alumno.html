@@ -348,7 +348,7 @@ async function load() {
 await load();
 
 /* ---------- lógica ---------- */
-const planActual = () => { const t = today(); return S.planes.find(p => p.inicio && p.fin && p.inicio <= t && t <= p.fin) || S.planes[S.planes.length - 1] || null; };
+const planActual = () => { const t = today(); return [...S.planes].reverse().find(p => p.inicio && p.fin && p.inicio <= t && t < p.fin) || S.planes[S.planes.length - 1] || null; };
 // clases usadas del plan: las que asistió + las que faltó sin avisar (esas se pierden)
 const presentes = (desde, hasta) => S.clases.filter(r => (r.asis === 'presente' || r.asis === 'ausente') && (!desde || r.fecha >= desde) && (!hasta || r.fecha <= hasta)).length;
 const abonado = p => (p?.pagos || []).reduce((s, x) => s + (Number(x.monto) || 0), 0);
@@ -373,7 +373,7 @@ function progEstado() {
   const pr = S.a.programa; const ses = progSes(); if (!ses.length) return null;
   const ids = new Set(ses.map(([id]) => id)); const pos = new Map(ses.map(([id], i) => [id, i])); const t = today();
   let last = -1, hechas = 0;
-  for (const r of S.clases) { if (r.fecha >= t || (pr.inicio && r.fecha < pr.inicio)) continue;
+  for (const r of S.clases) { if (r.fecha > t || (pr.inicio && r.fecha < pr.inicio)) continue;
     if (r.hora === 'libre' || r.asis === 'ausente' || !(r.asis === 'presente' || r.aprobada || r.rpe != null)) continue; if (r.rutina && !ids.has(r.rutina)) continue;
     hechas++; last = r.rutina ? pos.get(r.rutina) : (last + 1) % ses.length; }
   const semana = pr.inicio ? Math.max(1, Math.floor(diffDays(pr.inicio, t) / 7) + 1) : 1; const total = Number(pr.semanas) || 6;
@@ -387,14 +387,14 @@ function rutinaDeHoy() {
   const t = today(); const pe = progEstado();
   if (S.ses) { const { f, h } = S.ses; const rec = recOf(f, h); const id = S.rutSel || rec?.rutina || S.ses.id || (pe ? pe.next[0] : null); const r = id ? S.rutinas.get(id) : null;
     return { id, r: rec?.sesion && !S.rutSel ? Object.assign({}, r || {}, { bloques: rec.sesion }) : r, hora: h, fecha: f, rec, pe, hoy: f === t && h !== 'libre', otroDia: f !== t, futuro: f > t }; }
-  const prox = proximas(1)[0]; const hora = prox && prox.f === t ? prox.h : (bloquesDe(t)[0] || 'libre');
+  const prox = proximas(1)[0]; const hora = prox && prox.f === t ? prox.h : (bloquesDe(t)[0] || S.clases.find(r => r.fecha === t && !r.quitado && /^\d\d:\d\d$/.test(r.hora))?.hora || 'libre');
   const rec = recOf(t, hora);
   let id = S.rutSel || rec?.rutina || (pe ? pe.next[0] : null);
   const r = id ? S.rutinas.get(id) : null;
   return { id, r: rec?.sesion && !S.rutSel ? Object.assign({}, r || {}, { bloques: rec.sesion }) : r, hora, fecha: t, rec, pe, hoy: !!(prox && prox.f === t) };
 }
 function historial() { // {nombre: [{f, kg, r}]}
-  const h = {}; for (const r of S.clases) for (const e of r.ej || []) { const sets = e.sets && e.sets.length ? e.sets : [{ kg: e.kg, r: e.r }];
+  const h = {}; for (const r of S.clases) for (const e of r.ej || []) { const sets = e.sets && e.sets.length ? e.sets.filter(z => z && (z.kg != null || z.r != null)) : [{ kg: e.kg, r: e.r }];
     for (const s of sets) if (s.kg != null || s.r != null) (h[e.n] = h[e.n] || []).push({ f: r.fecha, kg: s.kg, r: s.r }); }
   return h;
 }
@@ -519,7 +519,7 @@ const appBloqueada = () => !!(S.a && S.pago?.moroso && S.cfg?.pago?.bloquearApp 
 function bloqueoHTML() { const p = planActual(); const st = pagoEstadoTxt() || { l: 'Pago pendiente' }; const e = S.pago || {};
   const nombre = S.perfil?.apodo || String(S.a.nombre || '').split(' ')[0]; const prof = String(S.cfg?.coach || 'Franco').split(' ')[0]; const n = waNum();
   const debe = e.saldo > 0 ? e.saldo : (e.monto || p?.monto || 0);
-  const usadas = p ? presentes(p.inicio, p.fin) : 0; const tot = p?.clases || S.a.clases || 0;
+  const usadas = p ? presentes(p.inicio, p.fin ? addDays(p.fin, -1) : null) : 0; const tot = p?.clases || S.a.clases || 0;
   const wa = n ? `https://wa.me/${n}?text=${encodeURIComponent(`Hola ${prof}, soy ${nombre}. Quiero ponerme al día con mi plan de Titanium.`)}` : '';
   return `<div style="display:flex;justify-content:center;padding:2px 0 6px;border-bottom:1px solid var(--line)">${TL_LOGO}</div>
   <section class="card" style="border-color:var(--red);background:linear-gradient(135deg,#2a0d12,#1b181c 70%)">
@@ -650,7 +650,7 @@ const V = {};
 const TL_LOGO = '<svg class="brand" viewBox="123 138 2331 461" role="img" aria-label="Titanium Sport Center"><path fill="#ea203a" fill-rule="evenodd" d="M480,198 393,198 393,534 512,431 512,323 478,352 478,415 431,456 427,457 427,233 453,232 478,288 478,308 512,279ZM160,198 123,285 213,363 213,456 210,457 162,415 162,352 128,323 128,431 247,534 247,342 165,271 183,232 212,232 213,279 247,308 247,198ZM2390,481 2390,559 2406,559 2407,531 2411,531 2432,559 2452,559 2433,532 2443,524 2448,514 2448,501 2445,494 2437,486 2428,482ZM2406,497 2408,495 2418,495 2427,498 2432,506 2430,513 2422,519 2407,519ZM2241,481 2240,558 2292,559 2291,545 2257,544 2258,527 2283,527 2283,513 2257,512 2257,496 2292,495 2292,482ZM2084,481 2083,495 2103,495 2105,497 2105,559 2121,559 2121,497 2123,495 2143,495 2142,481ZM1767,481 1767,559 1818,559 1818,545 1783,544 1783,529 1785,527 1809,527 1809,513 1783,512 1783,497 1785,495 1818,495 1818,481ZM1319,481 1319,495 1340,496 1340,559 1357,559 1357,496 1378,495 1378,481ZM1162,481 1161,558 1178,558 1177,535 1179,531 1183,531 1203,559 1223,559 1205,533 1219,516 1220,503 1216,493 1205,484 1199,482ZM1178,496 1189,495 1197,497 1203,504 1201,514 1193,519 1179,519 1177,514ZM861,482 821,482 821,559 837,559 838,536 862,534 871,529 879,520 881,514 879,497 873,489ZM837,497 839,495 858,497 865,506 863,515 854,521 839,521 837,519ZM1916,480 1916,559 1933,558 1934,516 1985,560 1985,481 1969,481 1969,523 1967,524ZM1621,483 1609,490 1602,497 1596,508 1594,523 1599,539 1614,554 1626,559 1643,560 1662,554 1668,548 1658,539 1644,545 1632,545 1621,540 1613,531 1611,515 1614,508 1627,497 1642,495 1657,502 1668,491 1657,484 1635,480ZM1016,480 1000,484 988,492 982,499 976,514 976,527 984,544 994,553 1008,559 1025,560 1042,555 1056,543 1063,529 1063,512 1055,496 1046,488 1034,482ZM1008,497 1015,495 1031,497 1045,510 1047,516 1046,528 1035,541 1025,545 1014,545 1006,542 996,533 992,522 993,513 997,506ZM693,480 685,482 675,489 670,499 670,509 678,520 703,530 707,537 698,545 690,544 685,537 669,540 674,551 680,556 687,559 700,560 713,555 719,549 723,541 723,532 714,520 692,512 688,509 686,503 694,495 702,497 706,503 719,501 721,497 712,485 703,481Z"/><path fill="#cbcbcb" fill-rule="evenodd" d="M516,138 333,138 333,539 320,554 307,539 307,138 124,138 160,172 273,173 273,557 320,598 367,557 367,173 479,172ZM1261,139 1115,407 1172,407 1192,369 1331,369 1352,407 1408,407ZM1262,239 1307,325 1217,326 1216,323ZM2173,138 2173,407 2225,407 2226,271 2312,368 2400,271 2401,407 2453,407 2453,138 2313,293ZM1873,138 1873,308 1881,343 1896,368 1914,385 1931,395 1953,403 1976,407 2009,407 2027,404 2049,397 2073,383 2090,366 2100,350 2110,317 2111,139 2059,139 2059,308 2056,322 2046,340 2031,354 2012,362 1982,364 1965,360 1949,351 1935,336 1928,322 1925,308 1925,138ZM1751,138 1751,407 1803,407 1803,138ZM1440,138 1440,407 1492,407 1493,248 1681,407 1681,138 1629,184 1628,300ZM939,138 940,181 1020,182 1020,407 1072,407 1072,182 1151,181 1151,138ZM846,138 846,407 898,407 898,138ZM625,138 580,181 669,182 669,407 721,407 721,182 800,181 800,138Z"/></svg>';
 V.hoy = () => {
   const t = today(); const nombre = S.perfil?.apodo || String(S.a.nombre || '').split(' ')[0]; const nombreC = nombre.charAt(0).toUpperCase() + nombre.slice(1);
-  const p = planActual(); const usadas = p ? presentes(p.inicio, p.fin) : 0; const tot = p?.clases || S.a.clases || 0;
+  const p = planActual(); const usadas = p ? presentes(p.inicio, p.fin ? addDays(p.fin, -1) : null) : 0; const tot = p?.clases || S.a.clases || 0;
   const saldo = p ? Math.max(0, (p.monto || 0) - abonado(p)) : 0;
   const rd0 = rutinaDeHoy(); const prox = proximas(1)[0];
   // la tarjeta muestra la rutina de la clase de la que habla (hoy o la próxima) y el botón abre esa misma clase
@@ -805,17 +805,21 @@ function colectarEj() { const rd = rutinaDeHoy(); const by = {};
   const put = (n, i, f, v) => { const o = (by[n] = by[n] || []); o[i] = o[i] || {}; v = String(v ?? '').trim().replace(',', '.'); if (v === '') delete o[i][f]; else if (!isNaN(v)) o[i][f] = Number(v); };
   const d = getDraft(); Object.entries(d.sets || {}).forEach(([n, arr]) => Object.entries(arr || {}).forEach(([i, z]) => { if (z) ['kg', 'r'].forEach(f => { if (z[f] != null) put(n, Number(i), f, z[f]); }); }));
   document.querySelectorAll('.set input').forEach(i => put(i.dataset.n, Number(i.dataset.i), i.dataset.f, i.value));
-  return Object.entries(by).map(([n, sets]) => { const ss = [...sets].map(z => z || {}).filter(z => z.kg != null || z.r != null); if (!ss.length) return null;
-    const top = ss.reduce((b, z) => (z.kg || 0) > (b.kg || 0) ? z : b, ss[0]); return { n, kg: top.kg, r: top.r, s: ss.length, sets: ss }; }).filter(Boolean); }
+  return Object.entries(by).map(([n, sets]) => { const pos = Array.from(sets, z => z && (z.kg != null || z.r != null) ? { kg: z.kg ?? null, r: z.r ?? null } : {});
+    while (pos.length && pos[pos.length - 1].kg == null && pos[pos.length - 1].r == null) pos.pop();
+    const ss = pos.filter(z => z.kg != null || z.r != null); if (!ss.length) return null;
+    const top = ss.reduce((b, z) => (z.kg || 0) > (b.kg || 0) ? z : b, ss[0]); return { n, kg: top.kg, r: top.r, s: ss.length, sets: pos }; }).filter(Boolean); }
 let AS = null, ASpend = false;
 function asEstado(t, cls) { document.querySelectorAll('.as-st').forEach(el => { el.textContent = t; el.className = 'as-st small ' + (cls || 'muted'); }); }
 function autoGuardar(ms) { clearTimeout(AS); ASpend = true; AS = setTimeout(guardarYa, ms ?? 1500); }
-async function guardarYa() { clearTimeout(AS); if (!ASpend) return; ASpend = false; if (S.v !== 'rutina' || S.evSel) return;
-  const rd = rutinaDeHoy(); if (!rd.r || rd.futuro) return; const ej = colectarEj(); const carga = $('#carga') ? ($('#carga').value.trim() || null) : ((getDraft().carga || '').trim() || rd.rec?.carga || null);
-  if (!ej.length && !carga && S.rpe == null) return;
-  asEstado('Guardando…'); S.miEscritura = Date.now();
+let ASvuelo = false;
+async function guardarYa() { clearTimeout(AS); if (!ASpend) return; if (ASvuelo) { AS = setTimeout(guardarYa, 600); return; } ASpend = false; if (S.v !== 'rutina' || S.evSel) return;
+  const rd = rutinaDeHoy(); if (!rd.r || rd.futuro || rd.hora === 'libre') return; const ej = colectarEj(); const carga = $('#carga') ? ($('#carga').value.trim() || null) : ((getDraft().carga || '').trim() || rd.rec?.carga || null);
+  if (!ej.length && !carga && S.rpe == null && !(rd.rec?.ej || []).length) return;
+  asEstado('Guardando…'); S.miEscritura = Date.now(); ASvuelo = true;
   const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: rd.fecha || today(), p_hora: rd.hora, p_ej: ej, p_carga: carga, p_rpe: S.rpe ?? rd.rec?.rpe ?? null, p_rutina: rd.id || null });
-  if (error) { ASpend = true; asEstado('Sin conexión · se guarda al volver', 'warn'); return; }
+  ASvuelo = false;
+  if (error) { if (/agenda/i.test(error.message || '')) { asEstado('Esta sesión no está en tu agenda', 'warn'); return; } ASpend = true; asEstado('Sin conexión · se guarda al volver', 'warn'); return; }
   const h = new Date(); asEstado('✓ Guardado ' + pad(h.getHours()) + ':' + pad(h.getMinutes()), 'ok'); }
 let WL = null;
 async function wakeOn() { try { if (!WL && navigator.wakeLock && document.visibilityState === 'visible') { WL = await navigator.wakeLock.request('screen'); WL.addEventListener('release', () => { WL = null; }); } } catch (_) {} }
@@ -830,17 +834,19 @@ V.rutina = () => {
   if (!S.ses && !S.rutSel && !claseHoy) {
     if (evsHoy.length) return evDetalleHTML(evsHoy[0], true);
     return `<h1>Entreno</h1><section class="card"><b style="font-size:18px">😌 Hoy es día de descanso</b><div class="small muted">No tienes clase ni actividad agendada para hoy. Descansa: también es parte del entrenamiento. Mira lo que viene en tu Agenda.</div><button class="btn" data-go="agenda">Ver mi agenda</button></section>`; }
+  // la sesión queda fija mientras entrena: no cambia de hora ni de día aunque pase el tiempo
+  if (!S.ses && !S.rutSel) { const r0 = rutinaDeHoy(); if (r0.hora && r0.hora !== 'libre') S.ses = { f: r0.fecha, h: r0.hora, id: r0.id, auto: true }; }
   const rd = rutinaDeHoy(); const r = rd.r;
-  if (!r) return `<h1>Rutina</h1><div class="card"><div class="muted">Aún no tienes una rutina asignada. Franco te la asigna en la clase.</div></div>`;
+  if (!r) return `<h1>Entreno</h1><div class="card"><div class="muted">Aún no tienes una rutina asignada. Franco te la asigna en la clase.</div></div>`;
   const cur = {}; (rd.rec?.ej || []).forEach(e => cur[e.n] = e);
   const bloques = r.bloques || [];
   const cuandoTxt = rd.fecha === today() ? 'Sesión de hoy' : 'Sesión del ' + longD(rd.fecha).toLowerCase();
-  const otro = S.ses ? `<section class="card" style="border-color:var(--ev);background:rgba(77,163,255,.08)"><div class="row" style="align-items:center"><b>📅 ${esc(cuandoTxt)}${rd.hora && rd.hora !== 'libre' ? ' · ' + esc(rd.hora) : ''}</b><button class="chip" data-sesx="1">‹ Agenda</button></div>${rd.futuro ? '<div class="small muted">Vista previa: podrás anotarla ese día.</div>' : rd.otroDia ? '<div class="small muted">Lo que anotes se guarda en ese día.</div>' : ''}</section>` : '';
+  const otro = S.ses && !S.ses.auto ? `<section class="card" style="border-color:var(--ev);background:rgba(77,163,255,.08)"><div class="row" style="align-items:center"><b>📅 ${esc(cuandoTxt)}${rd.hora && rd.hora !== 'libre' ? ' · ' + esc(rd.hora) : ''}</b><button class="chip" data-sesx="1">‹ Agenda</button></div>${rd.futuro ? '<div class="small muted">Vista previa: podrás anotarla ese día.</div>' : rd.otroDia ? '<div class="small muted">Lo que anotes se guarda en ese día.</div>' : ''}</section>` : '';
   const cIdx = (() => { let k = -1; bloques.forEach((b, bi) => { if (!/bloque b/i.test(b.titulo || '') && (/bloque c/i.test(b.titulo || '') || bi >= 2)) k = bi; }); return k; })();
   const cNom = cIdx >= 0 ? (String(bloques[cIdx].titulo || '').replace(/^bloque\s+[a-z]\s*[·:-]?\s*/i, '').split('·')[0].trim() || 'bloque final') : '';
   const guardada = rd.rec && rd.rec.rpe != null; // terminada: el RPE se marca al final
   const okCard = guardada ? `<section class="card" style="border-color:var(--ok);background:rgba(111,211,154,.08)"><b class="ok" style="font-size:18px">✅ Sesión guardada</b><div class="small muted">${[(rd.rec.ej || []).length ? rd.rec.ej.length + ' ejercicio' + (rd.rec.ej.length === 1 ? '' : 's') + ' anotados' : '', rd.rec.carga ? 'Resultado: ' + rd.rec.carga : '', rd.rec.rpe != null ? 'RPE ' + rd.rec.rpe : ''].filter(Boolean).map(esc).join(' · ')}</div><div class="small muted">Si cambias algo, toca «Actualizar mi entrenamiento».</div></section>` : '';
-  const tambien = !S.ses && claseHoy && evsHoy.length ? `<div class="chips">${evsHoy.map(x => `<button class="chip" data-evid="${esc(x.id)}">También hoy: ${EVI[x.tipo] || '📌'} ${esc(x.titulo)} ›</button>`).join('')}</div>` : '';
+  const tambien = (!S.ses || S.ses.auto) && claseHoy && evsHoy.length ? `<div class="chips">${evsHoy.map(x => `<button class="chip" data-evid="${esc(x.id)}">También hoy: ${EVI[x.tipo] || '📌'} ${esc(x.titulo)} ›</button>`).join('')}</div>` : '';
   const info = b => { const m = String(b.titulo || '').match(/^bloque\s+([a-z])\s*[·:-]?\s*(.*)$/i); const bi = bloques.indexOf(b); const letra = m ? m[1].toUpperCase() : String.fromCharCode(65 + bi);
     const isB = /bloque b/i.test(b.titulo || ''); return { letra, nomB: (m ? m[2] : b.titulo) || 'Bloque ' + letra, isB, isC: !isB && (/bloque c/i.test(b.titulo || '') || bi >= 2) }; };
   const items = []; bloques.forEach((b, bi) => (b.ejercicios || []).forEach((e, ei) => items.push({ b, bi, e, ei })));
@@ -971,7 +977,7 @@ V.progreso = () => {
 };
 V.plan = () => {
   const p = planActual(); if (!p) return `<h1>Mi perfil</h1>${perfilCard()}${fichaCard()}${avisosCard()}<div class="card"><div class="muted">Todavía no tienes un plan registrado. Habla con Franco.</div></div><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
-  const usadas = presentes(p.inicio, p.fin); const tot = p.clases || S.a.clases || 0; const ab = abonado(p); const saldo = Math.max(0, (p.monto || 0) - ab);
+  const usadas = presentes(p.inicio, p.fin ? addDays(p.fin, -1) : null); const tot = p.clases || S.a.clases || 0; const ab = abonado(p); const saldo = Math.max(0, (p.monto || 0) - ab);
   // días fijos; si entrena fuera del horario normal, se toman de sus clases agendadas de las próximas 2 semanas
   const fijos = (S.a.bloques || []).length ? S.a.bloques : [...new Set((S.clases || []).filter(r => r.extra && !r.quitado && !(r.reag_de && r.reag_de.recup) && r.fecha >= today() && r.fecha <= addDays(today(), 13) && /^\d\d:\d\d$/.test(r.hora)).map(r => dayKey(r.fecha) + '-' + r.hora))]
     .sort((a, b) => ['lun','mar','mie','jue','vie','sab','dom'].indexOf(a.split('-')[0]) - ['lun','mar','mie','jue','vie','sab','dom'].indexOf(b.split('-')[0]));
@@ -987,7 +993,8 @@ const lunesDe = f => addDays(f, -((parseISO(f).getDay() + 6) % 7));
 function prediccion() { const m = new Map(); const pe = progEstado(); const t = today(); let i = 0;
   for (let d = 0; d < 70; d++) { const f = addDays(t, d);
     for (const h of bloquesDe(f)) { if (f === t && hm(h) + 60 < nowM()) continue; const rec = recOf(f, h);
-      if (rec?.rutina) m.set(f + '|' + h, rec.rutina); else if (pe) m.set(f + '|' + h, pe.ses[(pe.idx + i) % pe.ses.length][0]); i++; } }
+      const hecha = rec && rec.asis !== 'ausente' && (rec.asis === 'presente' || rec.aprobada || rec.rpe != null);
+      if (rec?.rutina) m.set(f + '|' + h, rec.rutina); else if (pe) m.set(f + '|' + h, pe.ses[(pe.idx + i) % pe.ses.length][0]); if (!hecha) i++; } }
   return m; }
 function clasesDia(f) { const t = today();
   if (f < t) return S.clases.filter(r => r.fecha === f && !r.quitado).map(r => ({ h: r.hora, rec: r }));
@@ -1394,12 +1401,16 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('mess
 let RF = null, RFcorriendo = false;
 async function refrescar() { if (RFcorriendo) { clearTimeout(RF); RF = setTimeout(refrescar, 1500); return; } RFcorriendo = true;
   try { await load(); } catch (_) { RFcorriendo = false; return; } RFcorriendo = false;
+  if (diaRender && today() !== diaRender) { if (S.ses?.auto) S.ses = null; S.foco = null; render(); return; }
   const entrenando = S.v === 'rutina' && document.querySelector('.ej,#guardar') && !appBloqueada();
   const escribiendo = document.activeElement && document.activeElement.matches('input,textarea,select');
   if (document.getElementById('sheet') || document.getElementById('tmr')) return;
   if (!entrenando && !escribiendo) render(true); }
 const rel = p => { const t = p && p.table;
-  if (t === 'clases' && S.miEscritura && Date.now() - S.miEscritura < 6000) return; // eco de mi propio guardado
+  if (t === 'clases') { const n = p.new || {}, o = p.old || {};
+    const soloMio = p.eventType === 'UPDATE' && Object.keys(o).length > 3 && Object.keys(n).every(k => ['ej', 'carga', 'rpe', 'updated_at'].includes(k) || JSON.stringify(n[k]) === JSON.stringify(o[k]));
+    const primeroMio = p.eventType === 'INSERT' && S.miEscritura && Date.now() - S.miEscritura < 6000 && n.asis == null && !n.extra;
+    if (soloMio || primeroMio) return; } // eco de lo que anota el alumno
   if (t === 'alumnos' && S.usoAt && Date.now() - S.usoAt < 6000) return; // eco de "última vez que usó la app"
   clearTimeout(RF); RF = setTimeout(refrescar, 800); };
 sb.channel('al-' + codigo)
