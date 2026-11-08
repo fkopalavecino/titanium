@@ -52,6 +52,8 @@ h2{font-size:22px}
 .tec-d summary{cursor:pointer;color:var(--red-t);font-weight:600;font-size:14px;list-style:none}.tec-d summary::-webkit-details-marker{display:none}
 .tec-d ol,.tec-ol{margin:8px 0 4px;padding-left:20px;display:grid;gap:6px;line-height:1.4}.tec-d .btn{margin-top:6px}
 .red-t{color:var(--red-t);font-weight:600}
+.fx-no{justify-self:start;border-style:dashed}.fx-no[aria-pressed="true"]{background:rgba(111,211,154,.14)!important;border-color:var(--ok)!important;border-style:solid;color:var(--ok)!important}
+.field .fx-no{margin:2px 0}
 .circ{display:grid;gap:8px}.circ-it{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--sunk)}
 .circ-it.ok{border-color:var(--ok);background:rgba(111,211,154,.08)}.circ-it.ok .circ-tx b{color:var(--muted);text-decoration:line-through}
 .circ-ck{flex:none;width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:18px;cursor:pointer}.circ-it.ok .circ-ck{background:var(--ok);border-color:var(--ok);color:#0e0c0f}
@@ -423,6 +425,7 @@ function applyDraft() { if (S.v !== 'rutina') return; const d = getDraft();
   if (d.carga != null && $('#carga')) $('#carga').value = d.carga;
   document.querySelectorAll('.com-i').forEach(i => { const v = d.com?.[i.dataset.comn]; if (v != null) { i.value = v; if (v.trim()) { i.closest('.com-w').hidden = false; const b = document.querySelector(`[data-com="${CSS.escape(i.dataset.comn)}"]`); if (b) b.hidden = true; } } });
   if (d.rpe != null) { S.rpe = d.rpe; document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.rpe) === String(d.rpe))); } }
+document.addEventListener('input', ev => { const g = ev.target?.dataset?.fxtx; if (g && ev.target.value.trim()) document.querySelector(`[data-fxno="${g}"]`)?.setAttribute('aria-pressed', 'false'); });
 document.addEventListener('focusout', ev => { const i = ev.target; if (!i.matches || !i.matches('.com-i') || i.value.trim()) return;
   const w = i.closest('.com-w'), b = document.querySelector(`[data-com="${CSS.escape(i.dataset.comn)}"]`); if (w && b) { w.hidden = true; b.hidden = false; } });
 document.addEventListener('input', ev => { const i = ev.target; const d = getDraft();
@@ -524,6 +527,8 @@ const F_PREV = ['Fonasa', 'Isapre', 'Otra', 'Ninguna'];
 const F_PARQ = ['¿Algún médico te ha dicho que tienes un problema al corazón o presión alta?', '¿Sientes dolor en el pecho en reposo, en tu día a día o al hacer actividad física?', '¿Has perdido el equilibrio por mareos o perdido la conciencia en el último año?', '¿Tienes diagnosticada otra enfermedad crónica (diabetes, cáncer, etc.)?', '¿Tomas medicamentos recetados para una enfermedad crónica?', '¿Tienes un problema óseo, articular o de tejido blando que empeore con la actividad física?', '¿Algún médico te ha dicho que solo debes hacer actividad física supervisada?'];
 const fOpt = (lst, v) => '<option value="">Elegir…</option>' + lst.map(o => `<option ${v === o ? 'selected' : ''}>${esc(o)}</option>`).join('');
 const fChips = (grupo, lst, sel) => `<div class="chips" style="flex-wrap:wrap">${lst.map(([k, l]) => `<button type="button" class="chip" data-fx="${grupo}" data-k="${esc(k)}" aria-pressed="${(sel || []).includes(k)}">${esc(l)}</button>`).join('')}</div>`;
+// "No tengo…": respuesta explícita para que la ficha no quede en blanco; se excluye con marcar algo o escribir
+const fNo = (grupo, txt, on) => `<button type="button" class="chip fx-no" data-fxno="${grupo}" aria-pressed="${!!on}">✓ ${esc(txt)}</button>`;
 /* ---------- primera vez: ficha obligatoria y luego activar avisos ---------- */
 const REGLAS_V = 1; // súbelo si cambian las reglas y todos deben volver a leerlas
 /* ---------- app en pausa por deuda: solo la pantalla de pago y hablar con el profe ---------- */
@@ -609,14 +614,16 @@ function fichaCard() { const f = S.perfil?.ficha || {}; const e = f.emerg || {};
     </div></details>
     <details class="fx-sec" data-fx-sec="les" ><summary>🦴 Lesiones o molestias<span class="chev" aria-hidden="true">›</span></summary><div class="fx-b">
     <div class="small muted">Marca las actuales o de los últimos 12 meses.</div>
+    ${fNo('les', 'No tengo lesiones ni molestias', f.sinLes)}
     ${fChips('les', F_LES, f.lesiones)}
-    <label class="field">Detalle u otras lesiones<textarea id="fx-lesd" rows="3" maxlength="600" placeholder="Ej: operado de rodilla derecha 2022, dolor al correr">${esc(f.lesDetalle || '')}</textarea></label>
+    <label class="field">Detalle u otras lesiones<textarea id="fx-lesd" data-fxtx="les" rows="3" maxlength="600" placeholder="Ej: operado de rodilla derecha 2022, dolor al correr">${esc(f.lesDetalle || '')}</textarea></label>
     </div></details>
     <details class="fx-sec" data-fx-sec="enf" ><summary>❤️ Enfermedades y salud<span class="chev" aria-hidden="true">›</span></summary><div class="fx-b">
+    ${fNo('enf', 'No tengo enfermedades', f.sinEnf)}
     ${fChips('enf', F_ENF, f.enfermedades)}
-    <label class="field">Otras enfermedades<input id="fx-enfo" maxlength="200" value="${esc(f.enfOtra || '')}"></label>
-    <label class="field">Medicamentos que tomas<input id="fx-med" maxlength="200" placeholder="Nombre y para qué" value="${esc(f.medicamentos || '')}"></label>
-    <label class="field">Alergias<input id="fx-ale" maxlength="200" value="${esc(f.alergias || '')}"></label>
+    <label class="field">Otras enfermedades<input id="fx-enfo" data-fxtx="enf" maxlength="200" value="${esc(f.enfOtra || '')}"></label>
+    <div class="field">Medicamentos que tomas${fNo('med', 'No tomo medicamentos', f.sinMed)}<input id="fx-med" data-fxtx="med" maxlength="200" placeholder="Nombre y para qué" value="${esc(f.medicamentos || '')}"></div>
+    <div class="field">Alergias${fNo('ale', 'No tengo alergias', f.sinAle)}<input id="fx-ale" data-fxtx="ale" maxlength="200" value="${esc(f.alergias || '')}"></div>
     </div></details>
     <details class="fx-sec" data-fx-sec="parq" ><summary>📋 Cuestionario PAR-Q<span class="chev" aria-hidden="true">›</span></summary><div class="fx-b">
     <div class="small muted">Responde las 7 preguntas.</div>
@@ -629,6 +636,11 @@ async function guardarFicha(btn) {
   const sel = g => [...document.querySelectorAll(`[data-fx="${g}"][aria-pressed=true]`)].map(b => b.dataset.k);
   const resp = {}; document.querySelectorAll('[data-pq][aria-pressed=true]').forEach(b => { resp[b.dataset.pq] = b.dataset.val; });
   const abrir = k => { const d = document.querySelector(`[data-fx-sec="${k}"]`); if (d) { d.open = true; d.scrollIntoView({ block: 'start', behavior: 'smooth' }); } };
+  const no = g => document.querySelector(`[data-fxno="${g}"]`)?.getAttribute('aria-pressed') === 'true';
+  if (!sel('les').length && !v('fx-lesd') && !no('les')) { toast('Marca tus lesiones o «No tengo lesiones ni molestias».'); abrir('les'); return; }
+  if (!sel('enf').length && !v('fx-enfo') && !no('enf')) { toast('Marca tus enfermedades o «No tengo enfermedades».'); abrir('enf'); return; }
+  if (!v('fx-med') && !no('med')) { toast('Escribe tus medicamentos o marca «No tomo medicamentos».'); abrir('enf'); return; }
+  if (!v('fx-ale') && !no('ale')) { toast('Escribe tus alergias o marca «No tengo alergias».'); abrir('enf'); return; }
   if (Object.keys(resp).length < F_PARQ.length) { toast('Responde las 7 preguntas del PAR-Q.'); abrir('parq'); return; }
   if (!$('#fx-ok').checked) { toast('Marca la declaración para guardar.'); return; }
   if (!v('fx-mail')) { toast('Agrega tu correo.'); abrir('datos'); $('#fx-mail').focus(); return; }
@@ -642,6 +654,7 @@ async function guardarFicha(btn) {
     objetivo: v('fx-obj') || null, experiencia: v('fx-exp') || null,
     lesiones: sel('les'), lesDetalle: v('fx-lesd') || null, enfermedades: sel('enf'), enfOtra: v('fx-enfo') || null,
     medicamentos: v('fx-med') || null, alergias: v('fx-ale') || null,
+    sinLes: no('les') || undefined, sinEnf: no('enf') || undefined, sinMed: no('med') || undefined, sinAle: no('ale') || undefined,
     parqResp: resp, parq: Object.keys(resp).filter(k => resp[k] === 'si').map(Number).sort((a, b) => a - b), fecha: today() };
   btn.disabled = true;
   const primera = !S.perfil?.ficha?.fecha;
@@ -1322,7 +1335,9 @@ document.addEventListener('click', async ev => {
   const msx = ev.target.closest('[data-msx]'); if (msx) { try { const x = JSON.parse(localStorage.getItem('tl-msx') || '[]'); x.push(Number(msx.dataset.msx)); localStorage.setItem('tl-msx', JSON.stringify(x.slice(-30))); } catch (_) {} render(); return; }
   if (ev.target.closest('[data-pushx]')) { try { localStorage.setItem('tl-pushx', '1'); } catch (_) {} render(); return; }
   if (ev.target.closest('[data-ficha]')) secAbiertos.add('ficha');
-  const fx = ev.target.closest('[data-fx]'); if (fx) { fx.setAttribute('aria-pressed', String(fx.getAttribute('aria-pressed') !== 'true')); return; }
+  const fxn = ev.target.closest('[data-fxno]'); if (fxn) { const g = fxn.dataset.fxno; const on = fxn.getAttribute('aria-pressed') !== 'true'; fxn.setAttribute('aria-pressed', String(on));
+    if (on) { document.querySelectorAll(`[data-fx="${g}"]`).forEach(b => b.setAttribute('aria-pressed', 'false')); document.querySelectorAll(`[data-fxtx="${g}"]`).forEach(i => { i.value = ''; }); } return; }
+  const fx = ev.target.closest('[data-fx]'); if (fx) { const on = fx.getAttribute('aria-pressed') !== 'true'; fx.setAttribute('aria-pressed', String(on)); if (on) document.querySelector(`[data-fxno="${fx.dataset.fx}"]`)?.setAttribute('aria-pressed', 'false'); return; }
   const pqb = ev.target.closest('[data-pq]'); if (pqb) { document.querySelectorAll(`[data-pq="${pqb.dataset.pq}"]`).forEach(b => b.setAttribute('aria-pressed', String(b === pqb))); return; }
   if (ev.target.id === 'fx-save') { guardarFicha(ev.target); return; }
   const abr = ev.target.closest('[data-abrses]'); if (abr) { const [f, h, id] = abr.dataset.abrses.split('|'); S.ses = { f, h, id }; S.rutSel = null; S.evSel = null; S.foco = null; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }

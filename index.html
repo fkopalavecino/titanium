@@ -660,11 +660,11 @@ function fichaAlumnoHTML(a) { const f = a.perfil?.ficha; if (!f) return '';
       ${fila('Ocupación', esc(f.ocupacion || ''))}
       ${fila('Objetivo', esc(f.objetivo || ''))}
       ${fila('Experiencia', esc(f.experiencia || ''))}
-      ${fila('Lesiones', les.length ? `<b style="color:var(--warn)">${esc(les.join(', '))}</b>` : '<span class="muted">Ninguna marcada</span>')}
+      ${fila('Lesiones', les.length ? `<b style="color:var(--warn)">${esc(les.join(', '))}</b>` : f.sinLes ? '<span style="color:var(--ok)">✓ No tiene lesiones ni molestias</span>' : '<span class="muted">Ninguna marcada</span>')}
       ${fila('Detalle lesiones', esc(f.lesDetalle || ''))}
-      ${fila('Enfermedades', enf.length ? `<b style="color:var(--warn)">${esc(enf.join(', '))}</b>` : '<span class="muted">Ninguna marcada</span>')}
-      ${fila('Medicamentos', esc(f.medicamentos || ''))}
-      ${fila('Alergias', esc(f.alergias || ''))}
+      ${fila('Enfermedades', enf.length ? `<b style="color:var(--warn)">${esc(enf.join(', '))}</b>` : f.sinEnf ? '<span style="color:var(--ok)">✓ No tiene enfermedades</span>' : '<span class="muted">Ninguna marcada</span>')}
+      ${fila('Medicamentos', f.medicamentos ? esc(f.medicamentos) : f.sinMed ? '<span style="color:var(--ok)">✓ No toma medicamentos</span>' : '')}
+      ${fila('Alergias', f.alergias ? esc(f.alergias) : f.sinAle ? '<span style="color:var(--ok)">✓ No tiene alergias</span>' : '')}
       ${fila('PAR-Q «sí»', (f.parq || []).length ? f.parq.map(i => esc(PARQ[i] || '')).join('<br>') : '<span class="muted">Todas «no»</span>')}
     </div></details>`; }
 const lesionCorta = a => (ingDe(a).lesiones || []).map(k => (LESIONES.find(l => l[0] === k) || [])[1]).filter(Boolean).map(x => x.split(' (')[0].split(' / ')[0]);
