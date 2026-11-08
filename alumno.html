@@ -319,7 +319,7 @@ async function load() {
   ]);
   S.mensajes = msj?.data || []; S.hechas = new Map((ah?.data || []).map(r => [String(r.evento), r]));
   S.tec = (tq?.data || []).map(t => { try { return Object.assign({}, t, { re: new RegExp(t.patron, 'i') }); } catch (_) { return null; } }).filter(Boolean);
-  sb.rpc('marcar_uso').then(() => {}, () => {});
+  if (!S.usoAt || Date.now() - S.usoAt > 600000) { S.usoAt = Date.now(); sb.rpc('marcar_uso').then(() => {}, () => {}); }
   try { const { data: rc } = await sb.rpc('mis_recuperaciones'); S.recup = rc || null; } catch (_) { S.recup = null; }
   try { const [ep, sp] = await Promise.all([sb.rpc('mi_estado_pago'), sb.from('solicitudes').select('id,data,created_at').eq('alumno', codigo).eq('tipo', 'pago').eq('estado', 'pendiente').order('created_at', { ascending: false }).limit(1)]);
     S.pago = ep.data || null; S.pagoPend = (sp.data || [])[0] || null;
@@ -813,7 +813,7 @@ function autoGuardar(ms) { clearTimeout(AS); ASpend = true; AS = setTimeout(guar
 async function guardarYa() { clearTimeout(AS); if (!ASpend) return; ASpend = false; if (S.v !== 'rutina' || S.evSel) return;
   const rd = rutinaDeHoy(); if (!rd.r || rd.futuro) return; const ej = colectarEj(); const carga = $('#carga') ? ($('#carga').value.trim() || null) : ((getDraft().carga || '').trim() || rd.rec?.carga || null);
   if (!ej.length && !carga && S.rpe == null) return;
-  asEstado('Guardando…');
+  asEstado('Guardando…'); S.miEscritura = Date.now();
   const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: rd.fecha || today(), p_hora: rd.hora, p_ej: ej, p_carga: carga, p_rpe: S.rpe ?? rd.rec?.rpe ?? null, p_rutina: rd.id || null });
   if (error) { ASpend = true; asEstado('Sin conexión · se guarda al volver', 'warn'); return; }
   const h = new Date(); asEstado('✓ Guardado ' + pad(h.getHours()) + ':' + pad(h.getMinutes()), 'ok'); }
@@ -1194,15 +1194,16 @@ V.clases = () => {
 };
 
 let diaRender = '';
-function render() {
-  diaRender = today();
-  window.scrollTo(0, 0);
+function render(mantener) {
+  diaRender = today(); const y = window.scrollY;
+  if (!mantener) window.scrollTo(0, 0);
   const lock = appBloqueada(); const onb = lock ? '' : onboardingHTML();
   $('#app').innerHTML = lock ? bloqueoHTML() : onb || V[S.v]();
   $('#tabs').hidden = !!(onb || lock);
   if (!lock && !onb && S.v === 'rutina' && document.querySelector('.ej,#guardar')) wakeOn(); else wakeOff();
   document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.v === S.v || (S.v === 'clases' && b.dataset.v === 'agenda') ? 'page' : 'false'));
   applyDraft();
+  if (mantener) { window.scrollTo(0, y); return; }
   window.scrollTo(0, 0); requestAnimationFrame(() => window.scrollTo(0, 0));
 }
 
@@ -1353,7 +1354,7 @@ document.addEventListener('click', async ev => {
     clearTimeout(AS); ASpend = false; const ej = colectarEj();
     const btn = ev.target; btn.disabled = true;
     const rpe = S.rpe ?? rd.rec?.rpe ?? null; if (rpe == null) { btn.disabled = false; toast('Marca qué tan duro fue (RPE) para terminar.'); document.querySelector('[data-rpe]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
-    const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: rd.fecha || today(), p_hora: rd.hora, p_ej: ej, p_carga: $('#carga') ? ($('#carga').value.trim() || null) : ((getDraft().carga || '').trim() || rd.rec?.carga || null), p_rpe: rpe, p_rutina: rd.id || null });
+    S.miEscritura = Date.now(); const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: rd.fecha || today(), p_hora: rd.hora, p_ej: ej, p_carga: $('#carga') ? ($('#carga').value.trim() || null) : ((getDraft().carga || '').trim() || rd.rec?.carga || null), p_rpe: rpe, p_rutina: rd.id || null });
     btn.disabled = false;
     if (error) { toast('No se pudo guardar: ' + error.message); return; }
     clearDraft(); S.foco = null; S.rpe = null; await load(); toast('Entrenamiento guardado 💪'); render();
@@ -1384,11 +1385,31 @@ else revisarAviso();
 let ocultaDesde = 0;
 document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') { ocultaDesde = Date.now(); return; } revisarAviso();
   const quieto = !(document.activeElement && document.activeElement.matches('input,textarea'));
-  if (ocultaDesde && Date.now() - ocultaDesde > 120000) { nuevaFrase(); if (S.v === 'hoy' && quieto && !(diaRender && today() !== diaRender)) render(); }
-  if (diaRender && today() !== diaRender && quieto) load().then(render).catch(() => render()); });
+  const fuera = ocultaDesde ? Date.now() - ocultaDesde : 0;
+  if (fuera > 120000) nuevaFrase();
+  if ((diaRender && today() !== diaRender) || fuera > 60000) refrescar(); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', m => { if (m.data && m.data.ev) revisarAviso(); });
-const rel = async () => { await load(); if (!document.activeElement || !document.activeElement.matches('input')) render(); };
-sb.channel('al-' + codigo).on('postgres_changes', { event: '*', schema: 'public', table: 'clases', filter: 'alumno=eq.' + codigo }, rel).on('postgres_changes', { event: '*', schema: 'public', table: 'eventos' }, rel).on('postgres_changes', { event: '*', schema: 'public', table: 'mensajes' }, rel).subscribe();
+// sincronía: los cambios que hace Franco (asistencia, rutina, pagos, horario, actividades) llegan solos.
+// No reacciona al eco de lo que este teléfono acaba de guardar, y mientras entrena actualiza los datos sin redibujar.
+let RF = null, RFcorriendo = false;
+async function refrescar() { if (RFcorriendo) { clearTimeout(RF); RF = setTimeout(refrescar, 1500); return; } RFcorriendo = true;
+  try { await load(); } catch (_) { RFcorriendo = false; return; } RFcorriendo = false;
+  const entrenando = S.v === 'rutina' && document.querySelector('.ej,#guardar') && !appBloqueada();
+  const escribiendo = document.activeElement && document.activeElement.matches('input,textarea,select');
+  if (document.getElementById('sheet') || document.getElementById('tmr')) return;
+  if (!entrenando && !escribiendo) render(true); }
+const rel = p => { const t = p && p.table;
+  if (t === 'clases' && S.miEscritura && Date.now() - S.miEscritura < 6000) return; // eco de mi propio guardado
+  if (t === 'alumnos' && S.usoAt && Date.now() - S.usoAt < 6000) return; // eco de "última vez que usó la app"
+  clearTimeout(RF); RF = setTimeout(refrescar, 800); };
+sb.channel('al-' + codigo)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'clases', filter: 'alumno=eq.' + codigo }, rel)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'planes', filter: 'alumno=eq.' + codigo }, rel)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'alumnos', filter: 'codigo=eq.' + codigo }, rel)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'eventos' }, rel)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'mensajes' }, rel)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'config' }, rel)
+  .subscribe();
 })();
 </script>
 </body>

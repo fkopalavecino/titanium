@@ -1458,10 +1458,11 @@ function fichaAlumno(code) {
       ${(() => { const pg = progEstado(a); return pg ? `<div class="small muted num">Semana ${Math.min(pg.semana, pg.total)} de ${pg.total} · ${pg.hechas} sesiones hechas · próxima: <b style="color:var(--fg)">${esc(pg.next[1].tipo || '')}</b>${pg.terminado ? ' · <b style="color:var(--warn)">terminado: elige el siguiente programa o sube de nivel</b>' : ''}</div>` : `<div class="small muted">La sesión que le toca aparecerá sola en "Clase de hoy" y rota según su asistencia.</div>`; })()}
     </div>
     </details>
+    ${isNew ? '' : '<details class="sec" id="fa-acts-sec" hidden><summary>Actividades hechas en su app <span class="small muted" id="fa-acts-n" style="font-weight:500"></span></summary><div class="list small" id="fa-acts" style="margin-top:8px"></div></details>'}
     <details class="sec"><summary>Últimas clases y cargas <span class="small muted" style="font-weight:500">· ${as.pres} presentes, ${as.aus} ausencias en total</span></summary>
     <div style="display:grid;gap:12px;margin-top:8px">
     <div><b>Asistencia</b> <span class="muted small num">· ${as.pres} presentes, ${as.aus} ausencias en total</span>
-      <div class="list small" style="margin-top:4px">${hist.slice(0,8).map(([f,h,r]) => `<div class="li"><span class="grow num">${fmtDY(f)} · ${esc(h)}${r.carga ? ' · ' + esc(r.carga) : ''}${r.rpe ? ' · RPE ' + esc(r.rpe) : ''}</span><span class="pill ${r.asis === 'presente' ? 'ok' : 'crit'}">${r.asis === 'presente' ? 'Presente' : 'Ausente'}</span></div>`).join('') || '<div class="muted">Sin registros todavía.</div>'}</div></div>
+      <div class="list small" style="margin-top:4px">${hist.slice(0,8).map(([f,h,r]) => `<div class="li"><span class="grow num">${fmtDY(f)} · ${esc(h)}${r.carga ? ' · ' + esc(r.carga) : ''}${r.rpe ? ' · RPE ' + esc(r.rpe) : ''}</span><span class="pill ${r.asis === 'presente' ? 'ok' : r.asis === 'aviso' ? 'warn' : 'crit'}">${r.asis === 'presente' ? 'Presente' : r.asis === 'aviso' ? 'Avisó' : 'Ausente'}</span></div>`).join('') || '<div class="muted">Sin registros todavía.</div>'}</div></div>
     ${(() => { const cs = cargasDe(a.codigo); if (!cs.length) return ''; const by = {}; cs.forEach(x => (by[x.n] = by[x.n] || []).push(x));
       return `<div><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><span><b>Cargas registradas</b> <span class="muted small">· última vez y mejor marca</span></span><button type="button" class="btn sm" data-act="progreso" data-id="${esc(a.codigo)}">Ver progreso completo</button></div><div class="list small" style="margin-top:4px">${Object.entries(by).slice(0, 6).map(([n, xs]) => { const best = xs.filter(x => x.kg != null).sort((p, q) => q.kg - p.kg || (q.r || 0) - (p.r || 0))[0]; return `<div class="li"><span class="grow"><b>${esc(n)}</b><span class="muted num"> · ${fmtDY(xs[0].f)}: ${esc(fmtSet(xs[0]))}${xs.length > 1 ? ` · antes: ${esc(fmtSet(xs[1]))}` : ''}</span></span>${best ? `<span class="pill info num">Mejor ${esc(fmtSet(best))}</span>` : ''}</div>`; }).join('')}</div></div>`; })()}
     </div>
@@ -1500,6 +1501,11 @@ function fichaAlumno(code) {
     </details>
     <div id="del-zone"></div>
   `;
+  if (!isNew && window.__sb) setTimeout(async () => { try {
+    const { data } = await window.__sb.from('actividades_hechas').select('fecha,minutos,rpe,nota,eventos(titulo,tipo)').eq('alumno', a.codigo).order('fecha', { ascending: false }).limit(20);
+    const box = document.getElementById('fa-acts'); if (!box || !data || !data.length) return;
+    box.innerHTML = data.map(x => `<div class="li"><span class="grow"><b>${esc(x.eventos?.titulo || 'Actividad')}</b> <span class="muted num">· ${fmtDY(x.fecha)}${x.minutos ? ' · ' + x.minutos + ' min' : ''}${x.rpe != null ? ' · RPE ' + esc(x.rpe) : ''}</span>${x.nota ? `<br><span class="muted">${esc(x.nota)}</span>` : ''}</span><span class="pill ok">Hecha</span></div>`).join('');
+    document.getElementById('fa-acts-n').textContent = '· ' + data.length + ' registrada' + (data.length === 1 ? '' : 's'); document.getElementById('fa-acts-sec').hidden = false; } catch (_) {} }, 0);
   openModal(isNew ? 'Nuevo alumno' : a.nombre, `
 ${isNew ? fichaNueva() : fichaExistente()}
   `, {
