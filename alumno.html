@@ -938,6 +938,7 @@ function confirmarAsis(k, estado) { return new Promise(res => { const [f, h] = k
     <div class="small muted" style="font-weight:700">${esc(cuando)}</div>
     <div class="note small" style="display:grid;gap:6px;border-color:var(--warn)">
       <div>⚠️ ${cambio ? '<b>Este es tu único cambio.</b> Después tu respuesta queda fija.' : 'Tienes <b>solo 1 oportunidad</b> para cambiar tu respuesta después de esto.'}</div>
+      ${estado === 'voy' ? '<div>❌ Si confirmas y después faltas sin avisar, <b>la clase se descuenta de tu plan</b>.</div>' : ''}
       ${estado === 'no_voy' ? (aTiempo ? '<div>🔁 Como avisas con más de 2 horas, ganas <b>1 clase para recuperar</b> (esta semana o la próxima, dentro del mes).</div>' : '<div>⏰ Faltan menos de 2 horas: esta clase <b>no se puede recuperar</b>.</div>') : ''}
       <div>Si después necesitas otro cambio, <b>contáctate con ${prof}</b>.</div>
     </div>
@@ -1140,7 +1141,7 @@ document.addEventListener('click', async ev => {
   if (ev.target.closest('[data-hoy]')) { S.dia = today(); S.wk = lunesDe(S.dia); render(); return; }
   const rp = ev.target.closest('[data-rpe]'); if (rp) { S.rpe = Number(rp.dataset.rpe); { const d = getDraft(); d.rpe = S.rpe; putDraft(d); } document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', b === rp)); return; }
   const vy = ev.target.closest('[data-voy]'); if (vy) { const k = vy.dataset.voy;
-    if (S.conf?.get(k) && !(await confirmarAsis(k, 'voy'))) return;
+    if (!(await confirmarAsis(k, 'voy'))) return;
     vy.disabled = true; if (!(await confirmar(k, 'voy'))) vy.disabled = false; return; }
   const nvy = ev.target.closest('[data-nov]') || ev.target.closest('[data-novoy]');
   if (nvy) { ev.preventDefault(); const x = nvy.dataset.novoy != null ? proximas(4)[Number(nvy.dataset.novoy)] : null; const k = x ? x.f + '_' + x.h : nvy.dataset.nov; if (!k) return;
