@@ -39,13 +39,13 @@ h2{font-size:22px}
 .ej{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line)}
 .ej-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.ej-n{min-width:0}
 .ej-acc{display:flex;gap:6px;flex:none;align-items:center}
-.com-b{flex:none;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer;display:grid;place-items:center;transition:color .2s,border-color .2s,background .2s,transform .2s}
-.com-b.on{color:var(--red-t);border-color:color-mix(in srgb,var(--red) 55%,transparent);background:rgba(215,31,48,.1)}.com-b.pop{animation:comPop .35s ease}
-@keyframes comPop{40%{transform:scale(1.22)}100%{transform:scale(1)}}
+.com-add{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;padding:0 14px;border:1px dashed color-mix(in srgb,var(--red) 45%,var(--line));border-radius:20px;background:rgba(215,31,48,.06);color:var(--red-t);font:600 14px Barlow,sans-serif;text-align:left;cursor:pointer;transition:background .2s,transform .15s;animation:comIn .3s ease both}
+.com-add span{color:var(--muted);font-weight:500}.com-add:active{transform:scale(.98);background:rgba(215,31,48,.14)}.com-add[hidden]{display:none}.com-add svg{flex:none}
+.com-w{position:relative}.com-ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none}.com-w .com-i{padding-left:36px}
 .com-w{animation:comIn .25s ease both}.com-w[hidden]{display:none}@keyframes comIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
-.com-i{width:100%;height:38px;border:1px solid var(--line);border-radius:19px;background:var(--bg);color:var(--fg);font:500 14px Barlow,sans-serif;padding:0 14px}
+.com-i{width:100%;height:40px;border:1px solid color-mix(in srgb,var(--red) 45%,var(--line));border-radius:20px;background:var(--bg);color:var(--fg);font:500 14px Barlow,sans-serif;padding:0 14px}
 .com-i:focus{outline:none;border-color:color-mix(in srgb,var(--red) 60%,transparent)}.com-i::placeholder{color:#6d6469}
-@media (prefers-reduced-motion:reduce){.com-w,.com-b.pop{animation:none}}
+@media (prefers-reduced-motion:reduce){.com-w,.com-add{animation:none}}
 .tec-b{flex:none;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--muted);font:700 14px Barlow,sans-serif;cursor:pointer;display:grid;place-items:center}
 .sug{font-size:13px;color:var(--muted)}.sug.up{color:var(--red-t);font-weight:700}
 .ej-f{border-top:0;padding:0;gap:8px}.ej-f .ej-n{font:700 30px/1.05 'Barlow Condensed',sans-serif;letter-spacing:.01em}.ej-f .set input,.ej-f .set .chk{height:52px}.ej-f .set input{font-size:22px}
@@ -421,11 +421,13 @@ function applyDraft() { if (S.v !== 'rutina') return; const d = getDraft();
   document.querySelectorAll('.set input').forEach(i => { const v = d.sets?.[i.dataset.n]?.[i.dataset.i]?.[i.dataset.f]; if (v != null && v !== '') i.value = v; });
   document.querySelectorAll('.set').forEach(box => box.classList.toggle('done', [...box.querySelectorAll('input')].some(i => i.value.trim() !== '')));
   if (d.carga != null && $('#carga')) $('#carga').value = d.carga;
-  document.querySelectorAll('.com-i').forEach(i => { const v = d.com?.[i.dataset.comn]; if (v != null) { i.value = v; if (v.trim()) { i.closest('.com-w').hidden = false; document.querySelector(`[data-com="${CSS.escape(i.dataset.comn)}"]`)?.classList.add('on'); } } });
+  document.querySelectorAll('.com-i').forEach(i => { const v = d.com?.[i.dataset.comn]; if (v != null) { i.value = v; if (v.trim()) { i.closest('.com-w').hidden = false; const b = document.querySelector(`[data-com="${CSS.escape(i.dataset.comn)}"]`); if (b) b.hidden = true; } } });
   if (d.rpe != null) { S.rpe = d.rpe; document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.rpe) === String(d.rpe))); } }
+document.addEventListener('focusout', ev => { const i = ev.target; if (!i.matches || !i.matches('.com-i') || i.value.trim()) return;
+  const w = i.closest('.com-w'), b = document.querySelector(`[data-com="${CSS.escape(i.dataset.comn)}"]`); if (w && b) { w.hidden = true; b.hidden = false; } });
 document.addEventListener('input', ev => { const i = ev.target; const d = getDraft();
   if (i.matches('.set input')) { const n = i.dataset.n; ((d.sets[n] = d.sets[n] || {})[i.dataset.i] = d.sets[n][i.dataset.i] || {})[i.dataset.f] = i.value; i.closest('.set')?.classList.toggle('done', [...i.closest('.set').querySelectorAll('input')].some(x => x.value.trim() !== '')); putDraft(d); autoGuardar(2500); }
-  else if (i.matches('.com-i')) { (d.com = d.com || {})[i.dataset.comn] = i.value; putDraft(d); document.querySelector(`[data-com="${CSS.escape(i.dataset.comn)}"]`)?.classList.toggle('on', !!i.value.trim()); autoGuardar(2500); }
+  else if (i.matches('.com-i')) { (d.com = d.com || {})[i.dataset.comn] = i.value; putDraft(d); autoGuardar(2500); }
   else if (i.id === 'carga') { d.carga = i.value; putDraft(d); autoGuardar(2500); } });
 
 /* ---------- subir InBody ---------- */
@@ -798,15 +800,15 @@ function sugerencia(e) { const m = String(e.dosis || '').match(/×\s*(\d+)(?:\s*
 function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nSer(e.dosis) : 0; const sets = c?.sets || [];
   const tc = tecDe(e.nombre); const sg = isB ? sugerencia(e) : null; const pv = isB ? prevSets(e.nombre) : [];
   const com = c?.c || ''; const pcom = isB ? prevCom(e.nombre) : '';
-  const comB = isB ? `<button class="com-b${com ? ' on' : ''}" data-com="${esc(e.nombre)}" aria-label="Comentario de ${esc(e.nombre)}" aria-expanded="${com ? 'true' : 'false'}"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 5h16v10H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>` : '';
-  return `<div class="ej${foco ? ' ej-f' : ''}"><div class="ej-h"><b class="ej-n">${esc(e.nombre)}</b><span class="ej-acc">${comB}${tc && !foco ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</span></div>
+  return `<div class="ej${foco ? ' ej-f' : ''}"><div class="ej-h"><b class="ej-n">${esc(e.nombre)}</b><span class="ej-acc">${tc && !foco ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</span></div>
     <div class="small muted">${esc(e.dosis)}${isB ? ` · ⏱ ${mmss(descansoDe(e))}` : ''}</div>
     ${sg ? `<div class="sug${sg.sube ? ' up' : ''}">${sg.sube ? '↗' : '→'} ${esc(sg.txt)}</div>` : ''}
     ${tc && foco ? `<details class="tec-d"><summary>¿Cómo se hace?</summary><ol>${(tc.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol>${tc.video ? `<a class="btn" href="${esc(tc.video)}" target="_blank" rel="noopener">▶ Ver video</a>` : `<a class="small red-t" href="${esc(ytBuscar(tc.nombre))}" target="_blank" rel="noopener">🔎 Ver ejemplos en YouTube</a>`}</details>` : ''}
     ${isB ? `<div class="sets"><div class="set-h"><span>Serie</span><span>Anterior</span><span>Kg</span><span>Reps</span><span></span></div>${Array.from({ length: n }, (_, i) => { const s0 = sets[i] || {}; const done = s0.kg != null || s0.r != null; const p = pv[i] || pv[pv.length - 1];
       const phKg = sg ? fmtKg(sg.kg) : p && p.kg != null ? String(p.kg).replace('.', ',') : 'kg';
       return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span><span class="prev">${p && (p.kg != null || p.r != null) ? esc(fmtSet(p)) : '—'}</span><input inputmode="decimal" placeholder="${esc(phKg)}" aria-label="kg serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s0.kg != null ? esc(String(s0.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${p && p.r != null ? esc(p.r) : 'reps'}" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s0.r != null ? esc(s0.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }).join('')}</div>
-    <div class="com-w" data-comw="${esc(e.nombre)}" ${com ? '' : 'hidden'}><input class="com-i" data-comn="${esc(e.nombre)}" maxlength="80" enterkeyhint="done" placeholder="${esc(pcom ? 'La vez anterior: ' + pcom : 'Ej: 20 kg por mano · agarre neutro')}" value="${esc(com)}"></div>` : ''}</div>`; }
+    <button class="com-add" data-com="${esc(e.nombre)}" ${com ? 'hidden' : ''}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 5h16v10H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>${pcom ? 'Comentario · la vez anterior: ' + esc(pcom) : 'Agregar comentario <span>(ej: kg por mano)</span>'}</button>
+    <div class="com-w" data-comw="${esc(e.nombre)}" ${com ? '' : 'hidden'}><span class="com-ic" aria-hidden="true">💬</span><input class="com-i" data-comn="${esc(e.nombre)}" maxlength="80" enterkeyhint="done" placeholder="${esc(pcom ? 'La vez anterior: ' + pcom : 'Ej: 20 kg por mano · agarre neutro')}" value="${esc(com)}"></div>` : ''}</div>`; }
 function abrirTec(id) { const t = (S.tec || []).find(x => x.id === id); if (!t) return; document.getElementById('sheet')?.remove();
   const sh = document.createElement('div'); sh.id = 'sheet';
   sh.innerHTML = `<div class="in" role="dialog" aria-modal="true" aria-label="${esc(t.nombre)}"><div class="row"><span class="eyebrow red">Técnica</span><button class="btn" data-close="1" style="width:auto;min-height:36px" aria-label="Cerrar">✕</button></div>
@@ -1294,9 +1296,8 @@ document.addEventListener('click', async ev => {
   // antes de cambiar de pantalla o de sesión, sube lo pendiente
   if (ASpend && ev.target.closest('[data-go],[data-v],[data-abrses],[data-sesx],[data-evid],[data-entrenar],[data-focox],[data-fnav]')) guardarYa();
   const tcb = ev.target.closest('[data-tec]'); if (tcb) { abrirTec(tcb.dataset.tec); return; }
-  const cmb = ev.target.closest('[data-com]'); if (cmb) { const w = document.querySelector(`[data-comw="${CSS.escape(cmb.dataset.com)}"]`); if (!w) return; const inp = w.querySelector('input');
-    if (w.hidden) { w.hidden = false; cmb.setAttribute('aria-expanded', 'true'); cmb.classList.remove('pop'); void cmb.offsetWidth; cmb.classList.add('pop'); inp.focus(); }
-    else if (!inp.value.trim()) { w.hidden = true; cmb.setAttribute('aria-expanded', 'false'); } else inp.focus(); return; }
+  const cmb = ev.target.closest('[data-com]'); if (cmb) { const w = document.querySelector(`[data-comw="${CSS.escape(cmb.dataset.com)}"]`); if (!w) return;
+    cmb.hidden = true; w.hidden = false; w.querySelector('input').focus(); return; }
   if (ev.target.closest('[data-foco]')) { S.foco = 0; S.cck = new Set(); S.vta = {}; render(); window.scrollTo(0, 0); return; }
   const cck = ev.target.closest('[data-cck]'); if (cck) { S.cck = S.cck || new Set(); const k = cck.dataset.cck; const on = !S.cck.has(k); on ? S.cck.add(k) : S.cck.delete(k);
     cck.setAttribute('aria-pressed', on); cck.closest('.circ-it')?.classList.toggle('ok', on); if (on && navigator.vibrate) try { navigator.vibrate(15); } catch (_) {} return; }
