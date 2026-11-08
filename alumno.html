@@ -1038,10 +1038,11 @@ function prediccion() { const m = new Map(); const pe = progEstado(); const t = 
       if (rec?.rutina) m.set(f + '|' + h, rec.rutina); else if (pe) m.set(f + '|' + h, pe.ses[(pe.idx + i) % pe.ses.length][0]); if (!hecha) i++; } }
   return m; }
 // días pasados: lo registrado + sus bloques fijos de ese día (desde que empezó su primer plan), aunque nadie haya marcado nada
-const inicioAlumno = () => S.planes.map(p => p.inicio).filter(Boolean).sort()[0] || null;
+const AGENDA_DESDE = '2026-11-02'; // el historial de la agenda parte esta semana
+const inicioAlumno = () => { const p = S.planes.map(x => x.inicio).filter(Boolean).sort()[0]; return p && p > AGENDA_DESDE ? p : AGENDA_DESDE; };
 function clasesDia(f) { const t = today();
   if (f < t) { const regs = S.clases.filter(r => r.fecha === f && !r.quitado && /^\d\d:\d\d$/.test(r.hora));
-    const ini = inicioAlumno(); const fijos = ini && f >= ini && f >= addDays(t, -120) ? bloquesDe(f).filter(h => !regs.some(r => r.hora === h) && !S.clases.some(r => r.fecha === f && r.hora === h && (r.quitado || r.reag_a))) : [];
+    const ini = inicioAlumno(); const fijos = f >= ini ? bloquesDe(f).filter(h => !regs.some(r => r.hora === h) && !S.clases.some(r => r.fecha === f && r.hora === h && (r.quitado || r.reag_a))) : [];
     return [...regs.map(r => ({ h: r.hora, rec: r })), ...fijos.map(h => ({ h, rec: null }))].sort((a, b) => a.h.localeCompare(b.h)); }
   const hs = bloquesDe(f); const recs = S.clases.filter(r => r.fecha === f && !r.quitado && !hs.includes(r.hora) && (r.asis || r.ej));
   return [...hs.map(h => ({ h, rec: recOf(f, h) })), ...recs.map(r => ({ h: r.hora, rec: r }))].sort((a, b) => a.h.localeCompare(b.h)); }
@@ -1235,7 +1236,7 @@ V.agenda = () => {
       ${r && past && S.dia >= addDays(t, -30) && rec?.asis !== 'ausente' ? `<button class="btn ${(rec?.ej || []).length ? '' : 'pri'}" data-abrses="${esc(S.dia + '|' + x.h + '|' + id)}">${(rec?.ej || []).length ? 'Ver / editar lo que anotaste' : 'Abrir y anotar esta sesión'}</button>` : ''}
       ${nv >= 0 ? asisBtns(S.dia, x.h) : ''}</section>`; };
   return `<div class="row" style="align-items:center"><h1>Agenda</h1>${S.dia !== t ? '<button class="chip" data-hoy="1">Hoy</button>' : ''}</div>
-  <div class="wknav"><button data-wk="-7" aria-label="Semana anterior">‹</button><b class="small">${esc(titulo)}</b><button data-wk="7" aria-label="Semana siguiente">›</button></div>
+  <div class="wknav"><button data-wk="-7" aria-label="Semana anterior" ${S.wk <= AGENDA_DESDE ? 'disabled style="opacity:.25;cursor:default"' : ''}>‹</button><b class="small">${esc(titulo)}</b><button data-wk="7" aria-label="Semana siguiente">›</button></div>
   ${weekStrip(S.wk, S.dia, 'data-dia')}
 
   <div class="eyebrow">${esc(longD(S.dia))}</div>
@@ -1396,7 +1397,7 @@ document.addEventListener('click', async ev => {
   const zf = ev.target.closest('[data-zoom]'); if (zf) { const lb = document.createElement('div'); lb.id = 'lightbox'; lb.innerHTML = `<img src="${zf.getAttribute('src')}" alt="Foto ampliada">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); return; }
   const fa = ev.target.closest('[data-fang]'); if (fa) { S.fang = fa.dataset.fang; render(); return; }
   const wd = ev.target.closest('[data-dia]'); if (wd) { S.dia = wd.dataset.dia; render(); return; }
-  const wn = ev.target.closest('[data-wk]'); if (wn) { S.wk = addDays(S.wk, Number(wn.dataset.wk)); const t = today(); S.dia = (t >= S.wk && t <= addDays(S.wk, 6)) ? t : S.wk; render(); return; }
+  const wn = ev.target.closest('[data-wk]'); if (wn) { if (Number(wn.dataset.wk) < 0 && S.wk <= AGENDA_DESDE) return; S.wk = addDays(S.wk, Number(wn.dataset.wk)); const t = today(); S.dia = (t >= S.wk && t <= addDays(S.wk, 6)) ? t : S.wk; render(); return; }
   if (ev.target.closest('[data-hoy]')) { S.dia = today(); S.wk = lunesDe(S.dia); render(); return; }
   const rp = ev.target.closest('[data-rpe]'); if (rp) { S.rpe = Number(rp.dataset.rpe); { const d = getDraft(); d.rpe = S.rpe; putDraft(d); } document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', b === rp)); autoGuardar(300); return; }
   const vy = ev.target.closest('[data-voy]'); if (vy) { const k = vy.dataset.voy;
