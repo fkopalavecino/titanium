@@ -346,7 +346,7 @@ details.sec[open] summary{margin-bottom:10px}
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supa-shim.js"></script><script src="inbody-ocr.js"></script>
+<script src="supa-shim.js"></script><script src="inbody-ocr.js"></script><script src="sonidos.js"></script>
 <script>
 (() => {
 'use strict';
@@ -1025,18 +1025,15 @@ function timerHTML() {
       <div class="tools">
         <button class="btn pri" data-act="t-start" id="t-start">${T.running ? 'Pausar' : 'Iniciar'}</button>
         <button class="btn" data-act="t-reset">Reiniciar</button>
+        <button class="btn" data-act="snd-panel" title="Volumen y sonidos">🔊 Sonidos</button>
       </div>
     </div>
     <div class="small" style="color:var(--ink-muted)">EMOM: cada ${T.intervalo} s empieza una estación; trabajo máximo ${T.activo} s y el resto es recuperación. E90S: pon 90 en “Cada”.</div>
   </section>`;
 }
 function tElapsed() { return T.acc + (T.running ? (Date.now() - T.start) / 1000 : 0); }
-let actx = null;
-function beep(freq=880, dur=.18) {
-  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); const o = actx.createOscillator(), g = actx.createGain();
-    o.frequency.value = freq; o.connect(g); g.connect(actx.destination); g.gain.setValueAtTime(.25, actx.currentTime); g.gain.exponentialRampToValueAtTime(.001, actx.currentTime + dur);
-    o.start(); o.stop(actx.currentTime + dur); } catch(e) {}
-}
+function beep(freq=880, dur=.18) { try { window.SND && SND.tone(freq, dur * 1000); } catch(e) {} }
+function snd(ev, n) { try { window.SND && SND.play(ev, n); } catch(e) {} }
 function paintTimer() {
   const el = $('#t-clock'); if (!el) return;
   const total = T.intervalo * T.rondas, e = Math.min(tElapsed(), total);
@@ -1053,7 +1050,8 @@ function paintTimer() {
   ph.className = 'phase ' + (phase === 'work' ? 'work' : 'rest');
   $('#t-round').textContent = `Ronda ${ronda} / ${T.rondas}`;
   $('#t-bar').style.width = (100 * e / total) + '%';
-  if (T.running && phase !== T.lastPhase) { if (phase === 'work') beep(1046,.25); else if (phase === 'rest') beep(660,.2); else if (phase === 'done') { beep(523,.5); } }
+  if (T.running && phase !== T.lastPhase) { T.lb = null; if (phase === 'work') snd('inicio'); else if (phase === 'rest') snd('fin'); else if (phase === 'done') snd('final'); }
+  else if (T.running && (phase === 'work' || phase === 'rest') && left <= 3.05 && left > 0 && s !== T.lb) { T.lb = s; snd('cuenta', s); }
   T.lastPhase = phase;
   if (done && T.running) { T.acc = total; T.running = false; const b = $('#t-start'); if (b) b.textContent = 'Iniciar'; releaseLock(); }
 }
@@ -1977,8 +1975,9 @@ document.addEventListener('click', e => {
     case 't-start': {
       T.intervalo = Math.max(10, Number(val('t-int')) || 60); T.activo = Math.min(T.intervalo, Math.max(5, Number(val('t-act')) || 25)); T.rondas = Math.max(1, Number(val('t-ron')) || 8);
       if (T.running) { T.acc = tElapsed(); T.running = false; el.textContent = 'Iniciar'; releaseLock(); }
-      else { if (T.acc >= T.intervalo * T.rondas) T.acc = 0; T.start = Date.now(); T.running = true; T.lastPhase = null; el.textContent = 'Pausar'; beep(880,.05); getLock(); }
+      else { if (T.acc >= T.intervalo * T.rondas) T.acc = 0; T.start = Date.now(); T.running = true; T.lastPhase = null; el.textContent = 'Pausar'; try { window.SND && SND.unlock(); } catch(e) {} getLock(); }
       paintTimer(); break; }
+    case 'snd-panel': try { window.SND && (SND.unlock(), SND.abrirPanel()); } catch(e) {} break;
     case 't-reset': T.running = false; T.acc = 0; T.lastPhase = null; releaseLock(); render(); break;
     case 'h-dia': S.ui.horarioDia = el.dataset.d; render(); break;
     case 'h-asignar': asignarModal(el.dataset.key); break;

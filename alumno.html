@@ -136,6 +136,7 @@ details.ses summary::-webkit-details-marker{display:none}
 #tmr .tcfg button{height:44px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--fg);font-size:22px;cursor:pointer}
 #tmr .tcfg b{text-align:center;font:800 26px 'Barlow Condensed',Barlow,sans-serif}
 #tmr .tgo{min-height:56px;font-size:18px}
+#tmr .tsnd{min-height:48px;font-size:16px}
 .nx{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;text-align:left;background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:8px 12px 8px 8px;color:var(--fg);font:inherit;cursor:pointer}
 .nx.c{border-left:4px solid var(--red)}.nx.e{border-left:4px solid var(--ev)}
 .nx .dt{display:grid;place-items:center;gap:2px;line-height:1;border-radius:9px;background:var(--surface);padding:7px 0}
@@ -159,6 +160,7 @@ details.ses summary::-webkit-details-marker{display:none}
 <script>window.TL_MODE = 'alumno';</script>
 <script src="supa-shim.js"></script>
 <script src="inbody-ocr.js"></script>
+<script src="sonidos.js"></script>
 <script>
 (async () => {
 const sb = window.__sb;
@@ -648,12 +650,13 @@ function descansoDe(e) { const d = String(e.dosis || ''); const ex = d.match(/de
   const reps = Number((d.match(/×\s*(\d+)/) || [])[1]) || 10; const base = COMPUESTO.test(e.nombre || '') ? 120 : 75;
   return reps <= 5 ? 180 : reps <= 8 ? Math.max(base, 120) : reps <= 12 ? base : 60; }
 const mmss = s => Math.floor(Math.max(0, s) / 60) + ':' + String(Math.max(0, Math.round(s)) % 60).padStart(2, '0');
-let AC = null; const beep = (f = 880, ms = 140) => { try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); const o = AC.createOscillator(), g = AC.createGain(); o.frequency.value = f; o.connect(g); g.connect(AC.destination); g.gain.setValueAtTime(.25, AC.currentTime); g.gain.exponentialRampToValueAtTime(.001, AC.currentTime + ms / 1000); o.start(); o.stop(AC.currentTime + ms / 1000); } catch (_) {} try { navigator.vibrate && navigator.vibrate(ms); } catch (_) {} };
+const beep = (f = 880, ms = 140) => { try { window.SND && SND.tone(f, ms); } catch (_) {} try { (!window.SND || SND.cfg.vib) && navigator.vibrate && navigator.vibrate(ms); } catch (_) {} };
+const snd = (ev, n) => { try { window.SND && SND.play(ev, n); } catch (_) {} };
 let REST = null;
 function iniciarDescanso(seg) { finDescanso(); const el = document.createElement('div'); el.id = 'rest'; let fin = Date.now() + seg * 1000; beep(660, 60);
   const pintar = () => { const q = (fin - Date.now()) / 1000;
-    if (q <= 0) { el.classList.add('go'); el.innerHTML = '<span>💪 ¡Siguiente serie!</span><button data-rx="1" aria-label="Cerrar">✕</button>'; if (!el.dataset.b) { el.dataset.b = 1; beep(988, 250); setTimeout(() => beep(988, 250), 320); setTimeout(finDescanso, 4000); } return; }
-    if (q <= 3.05 && q > 0 && Math.ceil(q) !== Number(el.dataset.l)) { el.dataset.l = Math.ceil(q); beep(740, 80); }
+    if (q <= 0) { el.classList.add('go'); el.innerHTML = '<span>💪 ¡Siguiente serie!</span><button data-rx="1" aria-label="Cerrar">✕</button>'; if (!el.dataset.b) { el.dataset.b = 1; snd('inicio'); setTimeout(finDescanso, 4000); } return; }
+    if (q <= 3.05 && q > 0 && Math.ceil(q) !== Number(el.dataset.l)) { el.dataset.l = Math.ceil(q); snd('cuenta', el.dataset.l); }
     el.innerHTML = `<span>⏱ Descanso <b>${mmss(Math.ceil(q))}</b></span><button data-rm="-15" aria-label="Quitar 15 segundos">−15</button><button data-rm="15" aria-label="Sumar 15 segundos">+15</button><button data-rx="1" aria-label="Saltar descanso">✕</button>`; };
   el.addEventListener('click', ev => { const b = ev.target.closest('button'); if (!b) return; ev.stopPropagation(); if (b.dataset.rx) return finDescanso(); fin += Number(b.dataset.rm) * 1000; pintar(); });
   document.body.appendChild(el); pintar(); REST = setInterval(pintar, 250); }
@@ -690,22 +693,23 @@ function abrirTimer(b) { cerrarTimer(); const c = detectarTimer(b); const el = d
       <div class="small muted">Revisa los tiempos y toca Comenzar.</div>
       ${campos().map(([k, l, step]) => `<div class="tcfg"><span>${l}</span><button data-tc="${k}" data-d="-${step}" aria-label="Menos">−</button><b>${val(k)}</b><button data-tc="${k}" data-d="${step}" aria-label="Más">+</button></div>`).join('')}
       ${c.ejs.length ? `<div class="small muted">${c.ejs.map(esc).join(' · ')}</div>` : ''}
+      <button class="btn tsnd" data-tsnd="1">🔊 Sonidos y volumen</button>
       <button class="btn pri tgo" data-ts="1">▶ Comenzar</button></div>`; return; }
     const e = transcurrido(); let big = '', fase = '', sub = '', cls = ''; const T = total();
     if (c.modo === 'emom') { const r = Math.floor(e / c.w); const q = c.w - (e % c.w); if (r >= c.n) return terminar();
       big = mmss(Math.ceil(q)); fase = `Ronda ${r + 1} de ${c.n}`; sub = c.ejs.length ? c.ejs[r % c.ejs.length] : ''; cls = 'w';
-      if (r !== st.last) { st.last = r; beep(988, 260); } else if (q <= 3.05 && Math.ceil(q) !== st.lb) { st.lb = Math.ceil(q); beep(740, 80); } }
+      if (r !== st.last) { st.last = r; snd('inicio'); } else if (q <= 3.05 && Math.ceil(q) !== st.lb) { st.lb = Math.ceil(q); snd('cuenta', st.lb); } }
     else if (c.modo === 'int') { const cyc = c.w + c.r; const r = Math.floor(e / cyc); const p = e % cyc; if (e >= T) return terminar();
       const trab = p < c.w; const q = trab ? c.w - p : cyc - p; big = mmss(Math.ceil(q)); fase = (trab ? 'TRABAJO' : 'DESCANSO') + ` · ${r + 1}/${c.n}`; cls = trab ? 'w' : 'r';
       sub = trab && c.ejs.length ? c.ejs[r % c.ejs.length] : trab ? '' : (c.ejs.length ? 'Sigue: ' + c.ejs[(r + 1) % c.ejs.length] : '');
-      const key = r * 2 + (trab ? 0 : 1); if (key !== st.last) { st.last = key; beep(trab ? 988 : 523, 260); } else if (q <= 3.05 && Math.ceil(q) !== st.lb) { st.lb = Math.ceil(q); beep(740, 80); } }
-    else if (c.modo === 'amrap') { const q = T - e; if (q <= 0) return terminar(); big = mmss(Math.ceil(q)); fase = 'Tiempo restante'; cls = 'w'; if (q <= 3.05 && Math.ceil(q) !== st.lb) { st.lb = Math.ceil(q); beep(740, 80); } }
-    else { if (T && e >= T) return terminar(); big = mmss(Math.floor(e)); fase = T ? `Tope ${mmss(T)}` : 'Cronómetro'; cls = 'w'; sub = c.vueltas || st.vuelta ? `Vuelta ${st.vuelta}${c.vueltas ? ' de ' + c.vueltas : ''}` : ''; }
-    el.innerHTML = `<div class="tin ${cls}"><div class="trow"><b class="tname">${esc(c.nombre)}</b><button data-tx="1" aria-label="Cerrar">✕</button></div>
+      const key = r * 2 + (trab ? 0 : 1); if (key !== st.last) { st.last = key; snd(trab ? 'inicio' : 'fin'); } else if (q <= 3.05 && Math.ceil(q) !== st.lb) { st.lb = Math.ceil(q); snd('cuenta', st.lb); } }
+    else if (c.modo === 'amrap') { const q = T - e; if (q <= 0) return terminar(); big = mmss(Math.ceil(q)); fase = 'Tiempo restante'; cls = 'w'; if (st.last === -1) { st.last = 0; snd('inicio'); } else if (q <= 3.05 && Math.ceil(q) !== st.lb) { st.lb = Math.ceil(q); snd('cuenta', st.lb); } }
+    else { if (T && e >= T) return terminar(); if (st.last === -1) { st.last = 0; snd('inicio'); } else if (T && T - e <= 3.05 && Math.ceil(T - e) !== st.lb) { st.lb = Math.ceil(T - e); snd('cuenta', st.lb); } big = mmss(Math.floor(e)); fase = T ? `Tope ${mmss(T)}` : 'Cronómetro'; cls = 'w'; sub = c.vueltas || st.vuelta ? `Vuelta ${st.vuelta}${c.vueltas ? ' de ' + c.vueltas : ''}` : ''; }
+    el.innerHTML = `<div class="tin ${cls}"><div class="trow"><button data-tsnd="1" aria-label="Sonidos y volumen">🔊</button><b class="tname">${esc(c.nombre)}</b><button data-tx="1" aria-label="Cerrar">✕</button></div>
       <div class="tfase">${esc(fase)}</div><div class="tbig" aria-live="off">${big}</div><div class="tsub">${esc(sub)}</div>
       <div class="tbar"><i style="width:${T ? Math.min(100, e / T * 100) : 0}%"></i></div>
       <div class="tbtns">${c.modo === 'crono' ? '<button class="btn" data-tv="1">+1 vuelta</button>' : ''}<button class="btn" data-tp="1">${st.fase === 'pausa' ? '▶ Seguir' : '⏸ Pausa'}</button><button class="btn pri" data-tf="1">${c.modo === 'crono' ? '■ Terminé' : '■ Terminar'}</button></div></div>`; };
-  const terminar = () => { const e = transcurrido(); clearInterval(TM); TM = null; st.fase = 'fin'; beep(988, 300); setTimeout(() => beep(1175, 400), 350);
+  const terminar = () => { const e = transcurrido(); clearInterval(TM); TM = null; st.fase = 'fin'; snd('final');
     const res = c.modo === 'crono' ? mmss(Math.floor(e)) + (st.vuelta ? ' · ' + st.vuelta + ' vueltas' : '') : c.modo === 'amrap' ? '' : '';
     const inp = document.getElementById('carga'); if (res && inp && !inp.value.trim()) { inp.value = res; inp.dispatchEvent(new Event('input', { bubbles: true })); }
     el.innerHTML = `<div class="tin"><div class="trow"><b class="tname">${esc(c.nombre)}</b><button data-tx="1" aria-label="Cerrar">✕</button></div><div class="tbig">✓</div>
@@ -713,15 +717,16 @@ function abrirTimer(b) { cerrarTimer(); const c = detectarTimer(b); const el = d
     try { wake && wake.release(); } catch (_) {} };
   el.addEventListener('click', async ev => { const b = ev.target.closest('button'); if (!b) return; ev.stopPropagation();
     if (b.dataset.tx) return cerrarTimer();
+    if (b.dataset.tsnd) { try { window.SND && (SND.unlock(), SND.abrirPanel()); } catch (_) {} return; }
     if (b.dataset.tc) { const k = b.dataset.tc, d = Number(b.dataset.d); if (k === 'total' || k === 'tope') c[k] = Math.max(k === 'tope' ? 0 : 60, c[k] + d * 60); else c[k] = Math.max(k === 'n' ? 1 : 5, c[k] + d); return pintar(); }
-    if (b.dataset.ts) { beep(660, 60); st.fase = 'run'; st.t0 = Date.now() + 3000; st.pausa = 0; st.last = -1; let k = 3;
-      const cd = () => { if (k > 0) { el.innerHTML = `<div class="tin w"><div class="tfase">Prepárate</div><div class="tbig">${k}</div></div>`; beep(740, 90); k--; setTimeout(cd, 1000); } else { pintar(); TM = setInterval(pintar, 200); } }; st.fase = 'pre'; cd(); setTimeout(() => { st.fase = 'run'; }, 3000);
+    if (b.dataset.ts) { try { window.SND && SND.unlock(); } catch (_) {} st.fase = 'run'; st.t0 = Date.now() + 3000; st.pausa = 0; st.last = -1; let k = 3;
+      const cd = () => { if (k > 0) { el.innerHTML = `<div class="tin w"><div class="tfase">Prepárate</div><div class="tbig">${k}</div></div>`; snd('prep', k); k--; setTimeout(cd, 1000); } else { pintar(); TM = setInterval(pintar, 200); } }; st.fase = 'pre'; cd(); setTimeout(() => { st.fase = 'run'; }, 3000);
       try { wake = await navigator.wakeLock?.request('screen'); } catch (_) {} return; }
     if (b.dataset.tp) { if (st.fase === 'run') { st.fase = 'pausa'; st.pausedAt = Date.now(); } else if (st.fase === 'pausa') { st.pausa += Date.now() - st.pausedAt; st.fase = 'run'; } return pintar(); }
     if (b.dataset.tv) { st.vuelta++; beep(880, 80); return pintar(); }
     if (b.dataset.tf) return terminar(); });
   document.body.appendChild(el); pintar(); }
-function cerrarTimer() { clearInterval(TM); TM = null; document.getElementById('tmr')?.remove(); }
+function cerrarTimer() { clearInterval(TM); TM = null; document.getElementById('tmr')?.remove(); try { window.SND && SND.cerrarPanel(); } catch (_) {} }
 V.rutina = () => {
   const rd = rutinaDeHoy(); const r = rd.r;
   if (!r) return `<h1>Rutina</h1><div class="card"><div class="muted">Aún no tienes una rutina asignada. Franco te la asigna en la clase.</div></div>`;
