@@ -374,7 +374,7 @@ function progEstado() {
   const ids = new Set(ses.map(([id]) => id)); const pos = new Map(ses.map(([id], i) => [id, i])); const t = today();
   let last = -1, hechas = 0;
   for (const r of S.clases) { if (r.fecha >= t || (pr.inicio && r.fecha < pr.inicio)) continue;
-    if (r.asis === 'ausente' || !(r.asis === 'presente' || r.aprobada)) continue; if (r.rutina && !ids.has(r.rutina)) continue;
+    if (r.hora === 'libre' || r.asis === 'ausente' || !(r.asis === 'presente' || r.aprobada || r.rpe != null)) continue; if (r.rutina && !ids.has(r.rutina)) continue;
     hechas++; last = r.rutina ? pos.get(r.rutina) : (last + 1) % ses.length; }
   const semana = pr.inicio ? Math.max(1, Math.floor(diffDays(pr.inicio, t) / 7) + 1) : 1; const total = Number(pr.semanas) || 6;
   const idx = (last + 1) % ses.length;
@@ -831,7 +831,7 @@ V.rutina = () => {
   const evsHoy = evDia(tHoy).slice().sort((a, b) => String(a.hora || '').localeCompare(String(b.hora || '')));
   if (!S.ses && !S.rutSel && !claseHoy) {
     if (evsHoy.length) return evDetalleHTML(evsHoy[0], true);
-    return `<h1>Entreno</h1><section class="card"><b style="font-size:18px">😌 Hoy es día de descanso</b><div class="small muted">No tienes clase ni actividad agendada para hoy. Si igual quieres entrenar, abre la sesión que te toca.</div>${progEstado() ? '<button class="btn pri" data-entrenar="1">💪 Entrenar igual</button>' : ''}<button class="btn" data-go="agenda">Ver mi agenda</button></section>`; }
+    return `<h1>Entreno</h1><section class="card"><b style="font-size:18px">😌 Hoy es día de descanso</b><div class="small muted">No tienes clase ni actividad agendada para hoy. Descansa: también es parte del entrenamiento. Mira lo que viene en tu Agenda.</div><button class="btn" data-go="agenda">Ver mi agenda</button></section>`; }
   const rd = rutinaDeHoy(); const r = rd.r;
   if (!r) return `<h1>Rutina</h1><div class="card"><div class="muted">Aún no tienes una rutina asignada. Franco te la asigna en la clase.</div></div>`;
   const cur = {}; (rd.rec?.ej || []).forEach(e => cur[e.n] = e);
@@ -1056,7 +1056,7 @@ function evDetalleHTML(e, deHoy) { const { acts, doc, esPdf } = evActs(e); const
   ${doc && !esPdf ? `<img src="${esc(doc)}" alt="${esc(e.titulo)}" data-zoom="1" style="width:100%;max-height:360px;object-fit:contain;border-radius:12px;background:var(--sunk)">` : ''}
   ${hechaCard(e)}
   ${acts.length ? `<div style="display:grid;gap:10px">${acts.join('')}</div>` : ''}
-  ${deHoy && !S.ses && !S.rutSel && progEstado() ? '<button class="btn" data-entrenar="1">💪 Hacer también una sesión de fuerza</button>' : ''}`; }
+`; }
 function abrirEvento(id) { const e = S.eventos.find(x => String(x.id) === String(id)); if (!e) return;
   const { acts, doc, esPdf } = evActs(e);
   const sh = document.createElement('div'); sh.id = 'sheet';
