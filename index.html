@@ -126,6 +126,7 @@ label.f input,label.f select,label.f textarea{color:var(--fg);font-weight:400}
 @keyframes livepulse{50%{opacity:.25}}@media (prefers-reduced-motion:reduce){.live .dot{animation:none}}
 .tec-it{border-bottom:1px solid var(--line);padding:10px 2px}.tec-it>summary{cursor:pointer;list-style:none;display:flex;gap:8px;align-items:center}.tec-it>summary::-webkit-details-marker{display:none}
 .tec-sin>summary{cursor:pointer;color:var(--warn)}
+.tec-ck{flex:none;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-size:12px;font-weight:800}.tec-ck.ok{background:var(--ok);border-color:var(--ok);color:#fff}
 .ej-link{border:0;background:none;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer;text-decoration:underline dotted color-mix(in srgb,currentColor 45%,transparent);text-underline-offset:3px}.ej-link:hover{color:var(--red)}
 .pill.ok{background:var(--ok-soft);color:var(--ok)}
 .pill.warn{background:var(--warn-soft);color:var(--warn)}
@@ -1582,9 +1583,15 @@ async function tecnicaModal() {
   TEC = data || [];
   const nombres = [...new Set([...S.rutinas.values()].flatMap(r => (r.bloques || []).flatMap(b => (b.ejercicios || []).map(e => e.nombre))).filter(Boolean))];
   const sin = [...new Set(nombres.filter(n => !tecMatch(n)).map(n => limpiarEj(n)))].filter(n => !/pausa|gesto|pases o tiros|aproximaciones/i.test(n)).sort();
-  const conVideo = TEC.filter(t => t.video).length;
+  // prioridad de grabación: cuántas veces aparece cada movimiento en tus workouts
+  const usos = {}; [...S.rutinas.values()].forEach(r => (r.bloques || []).forEach(b => (b.ejercicios || []).forEach(e => { const t = tecMatch(e.nombre); if (t) usos[t.id] = (usos[t.id] || 0) + 1; })));
+  TEC.forEach(t => t.usos = usos[t.id] || 0);
+  TEC.sort((a, b) => (!!a.video - !!b.video) || (b.usos - a.usos) || (a.orden - b.orden));
+  const conVideo = TEC.filter(t => t.video).length, pct = TEC.length ? Math.round(conVideo / TEC.length * 100) : 0;
   openModal('Técnica y videos', `
-    <p class="small muted" style="margin:0">Tus alumnos ven estas 3 claves y el video al tocar <b>?</b> o «¿Cómo se hace?» en su app. Cada movimiento cubre todas sus variantes (con barra, mancuernas, pausa, etc.). ${TEC.length} movimientos · ${conVideo} con video.</p>
+    <div style="display:grid;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>🎬 Grabados ${conVideo} de ${TEC.length}</b><span class="small muted num">${pct}%</span></div>
+      <div style="height:6px;border-radius:4px;background:var(--line)"><i style="display:block;height:6px;width:${pct}%;border-radius:4px;background:var(--red)"></i></div>
+      <p class="small muted" style="margin:0">Ordenados por prioridad: arriba los que más se repiten en tus workouts y aún no tienen video. Pega el link y queda marcado solo. Tus alumnos lo ven al tocar <b>?</b> o «¿Cómo se hace?».</p></div>
     <input type="search" class="search" id="tec-q" placeholder="Buscar movimiento" aria-label="Buscar movimiento">
     ${sin.length ? `<details class="tec-sin"><summary class="small"><b>${sin.length} ejercicio${sin.length === 1 ? '' : 's'} sin técnica</b></summary><div class="list small">${sin.map(n => `<div class="li"><span class="grow">${esc(n)}</span><button type="button" class="btn sm" data-act="tec-add" data-n="${esc(n)}">+ Agregar</button></div>`).join('')}</div></details>` : ''}
     <div class="list" id="tec-list" style="max-height:52vh;overflow:auto">${TEC.map(tecFila).join('')}</div>`, { wide: true, submit: 'Listo', cancel: 'Cerrar', onSubmit: () => { const o = document.querySelector('#tec-list details.tec-it[open] [data-act="tec-save"]'); if (o) { o.click(); return false; } return true; } });
@@ -1598,19 +1605,20 @@ async function verTec(nombre) {
     <div style="display:grid;gap:8px">${t?.video ? `<a class="btn pri" href="${esc(t.video)}" target="_blank" rel="noopener">▶ Ver tu video</a>` : ''}<a class="btn ${t?.video ? '' : 'pri'}" href="${esc(ytBuscar(t ? t.nombre : limpio))}" target="_blank" rel="noopener">🔎 Ver ejemplos en YouTube</a></div>
     ${t && !t.video ? '<p class="small muted" style="margin:0">Cuando encuentres o grabes un buen video, pégalo en Workouts › Técnica y videos y tus alumnos lo verán en su app.</p>' : ''}`, { submit: 'Listo', cancel: 'Cerrar', onSubmit: () => true });
 }
-const tecFila = t => `<details class="tec-it" data-q="${esc(norm(t.nombre + ' ' + t.patron))}"><summary><b>${esc(t.nombre)}</b>${t.video ? ' <span class="pill ok">▶ video</span>' : ''}</summary>
+const tecSum = t => `${t.video ? '<span class="tec-ck ok" aria-label="Grabado">✓</span>' : '<span class="tec-ck" aria-hidden="true"></span>'}<b class="grow">${esc(t.nombre)}</b>${t.usos ? `<span class="small muted num">${t.usos}×</span>` : ''}`;
+const tecFila = t => `<details class="tec-it" data-q="${esc(norm(t.nombre + ' ' + t.patron))}"><summary>${tecSum(t)}</summary>
   <div style="display:grid;gap:8px;padding:8px 0 4px">
     ${[0, 1, 2].map(i => `<label class="f">Clave ${i + 1}<input type="text" id="tec-${esc(t.id)}-${i}" maxlength="90" value="${esc((t.claves || [])[i] || '')}"></label>`).join('')}
     <label class="f">Video (link de YouTube, Instagram o Drive)<input type="url" id="tec-${esc(t.id)}-v" placeholder="https://…" value="${esc(t.video || '')}"></label>
     <details class="small"><summary class="muted">Avanzado · a qué ejercicios se aplica</summary><label class="f">Palabras que lo identifican (separa con |)<input type="text" id="tec-${esc(t.id)}-p" value="${esc(t.patron)}"></label></details>
-    <div><button type="button" class="btn sm pri" data-act="tec-save" data-id="${esc(t.id)}">Guardar</button></div></div></details>`;
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm pri" data-act="tec-save" data-id="${esc(t.id)}">Guardar</button><a class="btn sm ghost" href="${esc(ytBuscar(t.nombre))}" target="_blank" rel="noopener">🔎 Referencias en YouTube</a></div></div></details>`;
 async function tecGuardar(id, btn) {
   const claves = [0, 1, 2].map(i => val(`tec-${id}-${i}`)).filter(Boolean); const video = val(`tec-${id}-v`) || null; const patron = val(`tec-${id}-p`);
   if (video && !/^https?:\/\//i.test(video)) { toast('El video debe ser un link que empiece con https://', true); return; }
   try { new RegExp(patron, 'i'); } catch (_) { toast('Las palabras que lo identifican no son válidas.', true); return; }
   btn.disabled = true; const { error } = await window.__sb.from('tecnica').update({ claves, video, patron, updated_at: new Date().toISOString() }).eq('id', id); btn.disabled = false;
   if (error) { toast('No se pudo guardar: ' + error.message, true); return; }
-  const t = TEC.find(x => x.id === id); if (t) Object.assign(t, { claves, video, patron }); const d = btn.closest('details.tec-it'); if (d) { d.querySelector('summary').innerHTML = `<b>${esc(t.nombre)}</b>${video ? ' <span class="pill ok">▶ video</span>' : ''}`; d.open = false; }
+  const t = TEC.find(x => x.id === id); if (t) Object.assign(t, { claves, video, patron }); const d = btn.closest('details.tec-it'); if (d) { d.querySelector('summary').innerHTML = tecSum(t); d.open = false; }
   toast('Técnica guardada ✓ Tus alumnos ya la ven.'); }
 async function tecAgregar(nombre) {
   const id = 'x-' + norm(nombre).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) + '-' + Date.now().toString(36).slice(-4);
