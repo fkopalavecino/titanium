@@ -179,9 +179,27 @@ tr.click:hover td{background:var(--sunk)}
 }
 
 /* clase de hoy */
-.student{padding:14px 16px;display:grid;gap:10px}
-.student.present{border-color:var(--ok)}
-.student.absent{opacity:.7}
+.student{padding:12px 14px;display:grid;gap:10px}
+.student.present{box-shadow:inset 3px 0 0 var(--ok)}
+.student.absent{opacity:.6}
+.sc-top{display:flex;gap:10px;align-items:center;width:100%;border:0;background:none;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.sc-top .grow{flex:1;min-width:0;display:grid;gap:2px}
+.sc-l1{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sc-l1 .st-name{font-size:16px}
+.sc-l2{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-l3{font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-l3 .dot{display:inline-block;vertical-align:middle;margin-right:6px;width:7px;height:7px;border-radius:50%;background:var(--red);animation:livepulse 1.6s ease-in-out infinite}
+.sc-al{font-size:12px;color:var(--crit);font-weight:600}
+.sc-ic{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}.sc-ic.crit{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 40%,transparent)}
+.ok-t{color:var(--ok);font-weight:600}.crit-t{color:var(--crit)}
+.sc .chev{color:var(--muted);font-size:20px;transition:transform .2s}.sc.open .chev{transform:rotate(90deg)}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg-b{border:0;background:none;color:var(--muted);font:600 13px/1 inherit;padding:10px 4px;cursor:pointer;font-family:inherit}.seg-b+.seg-b{border-left:1px solid var(--line)}
+.seg-b.on.presente{background:var(--ok-soft);color:var(--ok)}.seg-b.on.ausente{background:var(--crit-soft);color:var(--crit)}.seg-b.on.aviso{background:var(--warn-soft);color:var(--warn)}
+.student{grid-template-columns:minmax(0,1fr)}.sc.open{grid-column:1/-1}
+.sc-det{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:14px;border-top:1px solid var(--line);padding-top:12px;align-items:start}.sc-c{display:grid;gap:10px;min-width:0}
+.res{display:grid;gap:2px;background:var(--sunk);border-radius:8px;padding:8px 12px}
+.res-r{display:grid;gap:1px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}.res-r:last-of-type{border-bottom:0}
+.res-n{font-weight:600}.res-s{color:var(--fg)}.res-r.vac .res-s{color:var(--muted)}.res-c{color:var(--muted);font-style:italic;font-size:12px}
 .btn.on-warn{background:var(--warn);border-color:var(--warn);color:#111}
 .student.reag{border-left:4px solid var(--info)}
 .st-top{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
@@ -268,7 +286,7 @@ details.sec[open] summary{margin-bottom:10px}
 .rut h4{margin:0;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
 .rut ol{margin:0;padding-left:20px;display:grid;gap:3px}
 .rut .d{color:var(--muted);font-size:13px}
-.students{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,430px),1fr));gap:14px;align-items:start}
+.students{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:10px;align-items:start}
 .students>*{min-width:0}
 
 /* timer */
@@ -891,26 +909,36 @@ function studentCard(f, hora, code, ruts) {
   const rut = rutBase && r.sesion ? Object.assign({}, rutBase, {bloques: r.sesion}) : rutBase;
   const key = f+'|'+hora+'|'+code;
   const open = S.ui.openRut[key];
+  const det = !!(S.ui.stOpen || {})[key];
   const pe = pagoEstado(p), ve = vigencia(a, p);
+  const vino = r.asis === 'presente' || (r.ej || []).length || r.rpe != null;
+  const cf = S.conf?.get(f + '|' + hora + '|' + code);
+  // íconos discretos: solo lo que el profe necesita ver de un vistazo
+  const debe = ['vencido','hoy'].includes(ve.k) || ['pendiente','parcial'].includes(pe.k);
+  const les = lesionCorta(a); const cu = cumple(a, f);
+  const marcas = [r.reagDe && r.reagDe.recup ? '<span title="Recupera una clase">🔁</span>' : r.extra ? '<span title="Agendado solo para esta fecha">↻</span>' : '',
+    les.length ? `<span class="sc-ic" title="Lesiones: ${esc(les.join(', '))}">⚠ ${esc(les[0])}${les.length > 1 ? ' +' + (les.length - 1) : ''}</span>` : '',
+    a.ingreso?.parq?.length ? '<span class="sc-ic crit" title="Respondió sí en el PAR-Q">PAR-Q</span>' : '',
+    debe ? '<span class="sc-ic crit" title="Tiene un pago pendiente">$ debe</span>' : '',
+    cu && cu.dias === 0 ? '<span title="Cumpleaños">🎂</span>' : ''].filter(Boolean).join('');
+  const rutNom = rid ? String(S.rutinas.get(rid)?.tipo || 'Rutina').split(' · ')[0] : 'Sin rutina';
+  const v = vivoInfo(f, hora, code, rut, r);
+  const estado = v ? v.txt : (cf === 'no_voy' && !vino ? '<span class="crit-t">Avisó que no viene</span>' : cf === 'voy' ? 'Confirmó que viene' : '');
+  const seg = (val, txt, ttl) => `<button class="seg-b ${r.asis === val ? 'on ' + val : ''}" data-act="asis" data-v="${val}" data-k="${esc(key)}" ${val === 'presente' && sug ? `data-r="${esc(sug)}"` : ''} ${ttl ? `title="${ttl}"` : ''}>${txt}</button>`;
   return `
-  <article class="card student ${r.asis === 'presente' ? 'present' : r.asis === 'ausente' || r.asis === 'aviso' ? 'absent' : ''} ${r.extra ? 'reag' : ''}">
-    <div class="st-top">
-      <div class="grow">
-        <button class="st-name" data-act="ficha" data-id="${esc(code)}" style="border:0;background:none;padding:0;cursor:pointer;text-align:left">${esc(a.nombre)}</button>${r.reagDe && r.reagDe.recup ? ' <span class="pill" title="Agendó esta recuperación desde su app">🔁 Recupera</span>' : ''}
-        <div class="small muted num">${tot ? `${usadas} de ${tot} clases usadas · ${Math.max(0,tot-usadas)} disponibles` : 'Plan sin clases definidas'}</div>
-      </div>
-      <div class="chips">${(() => { const cf = S.conf?.get(f + '|' + hora + '|' + code); return cf === 'voy' ? '<span class="pill ok" title="Confirmó desde su app">✅ Confirmó</span>' : cf === 'no_voy' ? '<span class="pill crit" title="Avisó desde su app">❌ No viene</span>' : ''; })()}${r.extra ? '<span class="pill info" title="Agendado solo para esta fecha">↻ Clase reagendada</span>' : ''}${(() => { const cu = cumple(a, f); return cu && cu.dias === 0 ? '<span class="pill warn">🎂 Cumpleaños</span>' : ''; })()}${a.ingreso?.parq?.length ? '<span class="pill crit">PAR-Q</span>' : ''}${lesionCorta(a).length ? `<span class="pill warn" title="Lesiones informadas">⚠ ${esc(lesionCorta(a).join(', '))}</span>` : ''}${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}<button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button></div>
-    </div>
-    ${enVivo(f, hora, code, rut, r)}
-    ${pg ? `<div class="small" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="pill ${pg.terminado ? 'warn' : 'info'}">${esc(progTexto(pg))}</span><span class="muted num">Semana ${Math.min(pg.semana, pg.total)} de ${pg.total} · sesión ${pg.idx + 1} de ${pg.ses.length}${pg.terminado ? ' · programa terminado' : ''}</span>${sug ? `<span style="color:var(--red);font-weight:600">Le toca: ${esc(S.rutinas.get(sug)?.tipo || '')}</span>` : ''}</div>` : ''}
-    ${pg && rut && !pg.terminado && progLinea(rut, pg.semana) ? `<div class="small" style="border-left:3px solid var(--red);padding:4px 8px;background:var(--bg-2, rgba(255,255,255,.04));border-radius:4px">📈 ${esc(progLinea(rut, pg.semana))}</div>` : ''}
-    <div class="st-row">
-      <button class="btn sm ${r.asis === 'presente' ? 'on-ok' : ''}" data-act="asis" data-v="presente" data-k="${esc(key)}" ${sug ? `data-r="${esc(sug)}"` : ''}>Presente</button>
-      <button class="btn sm ${r.asis === 'ausente' ? 'on-crit' : ''}" data-act="asis" data-v="ausente" data-k="${esc(key)}">Ausente</button>
-      <button class="btn sm ${r.asis === 'aviso' ? 'on-warn' : ''}" data-act="asis" data-v="aviso" data-k="${esc(key)}" title="No vino pero te avisó: decides si le das la recuperación (si no, queda Ausente)">📩 Avisó</button>
-      <button class="btn sm ghost" data-act="reag" data-k="${esc(key)}" title="Mover esta clase a otro día u hora">↻ Reagendar</button>
-      ${r.extra ? `<button class="btn sm ghost" data-act="quitar-extra" data-k="${esc(key)}">Quitar del bloque</button>` : ''}
-    </div>
+  <article class="card student sc ${r.asis === 'presente' ? 'present' : r.asis === 'ausente' || r.asis === 'aviso' ? 'absent' : ''} ${det ? 'open' : ''}">
+    <button class="sc-top" data-act="st-open" data-k="${esc(key)}" aria-expanded="${det}">
+      <span class="grow"><span class="sc-l1"><b class="st-name">${esc(a.nombre)}</b>${marcas}</span>
+        <span class="sc-l2">${esc(rutNom)}${r.aprobada ? ' ✓' : ''}${tot ? ` · ${usadas}/${tot} clases` : ''}</span>
+        ${estado ? `<span class="sc-l3">${estado}</span>` : ''}
+        ${v && v.al.length ? `<span class="sc-al">⚠ ${v.al.map(esc).join(' · ')}</span>` : ''}</span>
+      <span class="chev" aria-hidden="true">›</span>
+    </button>
+    <div class="seg" role="group" aria-label="Asistencia">${seg('presente', 'Presente')}${seg('ausente', 'Ausente')}${seg('aviso', 'Avisó', 'No vino pero te avisó: decides si le das la recuperación')}</div>
+    ${det ? `<div class="sc-det"><div class="sc-c">
+    <div class="st-row small"><button class="btn sm ghost" data-act="ficha" data-id="${esc(code)}">Ficha</button><button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button><button class="btn sm ghost" data-act="reag" data-k="${esc(key)}">↻ Reagendar</button>${r.extra ? `<button class="btn sm ghost" data-act="quitar-extra" data-k="${esc(key)}">Quitar del bloque</button>` : ''}${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}</div>
+    ${pg ? `<div class="small muted num">${esc(progTexto(pg))} · semana ${Math.min(pg.semana, pg.total)} de ${pg.total} · sesión ${pg.idx + 1} de ${pg.ses.length}${pg.terminado ? ' · programa terminado' : ''}${sug ? ` · <b style="color:var(--fg)">le toca ${esc(S.rutinas.get(sug)?.tipo || '')}</b>` : ''}</div>` : ''}
+    ${pg && rut && !pg.terminado && progLinea(rut, pg.semana) ? `<div class="small muted">📈 ${esc(progLinea(rut, pg.semana))}</div>` : ''}
     <div class="st-row">
       <select id="rut-${esc(key)}" data-act="rutina" data-k="${esc(key)}" aria-label="Rutina">
         <option value="">Sin rutina asignada</option>
@@ -919,32 +947,36 @@ function studentCard(f, hora, code, ruts) {
       </select>
       ${rid ? `<button class="btn sm ${r.aprobada ? 'on-ok' : ''}" data-act="aprobar" data-k="${esc(key)}" ${sug ? `data-r="${esc(sug)}"` : ''}>${r.aprobada ? 'Aprobada ✓' : 'Aprobar'}</button>
       <button class="btn sm ghost" data-act="ver-rut" data-k="${esc(key)}">${open ? 'Ocultar' : 'Ver rutina'}</button>
-      <button class="btn sm ${r.sesion ? 'on-ok' : ''}" data-act="editar-ses" data-k="${esc(key)}" data-r="${esc(rid)}">${r.sesion ? 'Ajustada ✎' : 'Editar sesión'}</button>` : ''}
+      <button class="btn sm ghost" data-act="editar-ses" data-k="${esc(key)}" data-r="${esc(rid)}">${r.sesion ? 'Ajustada ✎' : 'Editar sesión'}</button>` : ''}
     </div>
     ${rut && open ? rutinaBody(rut) : ''}
-    ${rut ? cargasHTML(f, hora, code, key, rut, r) : ''}
     <div class="frow">
       <label class="f">Resultado del bloque C<input type="text" id="carga-${esc(key)}" data-act="campo" data-field="carga" data-k="${esc(key)}" value="${esc(r.carga||'')}" placeholder="Ej: 5 rondas + 8 · 14:32"></label>
       <label class="f">RPE<input type="number" min="1" max="10" id="rpe-${esc(key)}" data-act="campo" data-field="rpe" data-k="${esc(key)}" value="${esc(r.rpe||'')}"></label>
     </div>
     <label class="f">Notas · molestias, ajustes y sensaciones<textarea rows="2" id="nota-${esc(key)}" data-act="campo" data-field="notas" data-k="${esc(key)}">${esc(r.notas||'')}</textarea></label>
+    </div><div class="sc-c">${rut ? cargasHTML(f, hora, code, key, rut, r) : '<div class="small muted">Sin rutina asignada.</div>'}</div></div>` : ''}
   </article>`;
 }
 // lo que el alumno va anotando desde su app durante la clase (se actualiza solo)
 const limpiarEj = n => String(n || '').replace(/^(min(uto)?\s*\d+|\d+[ab]?)\s*·\s*/i, '').replace(/\s*\(.*?\)/g, '');
+const ejCorto = n => limpiarEj(n).split(/,|\s+—\s+/)[0].trim();
 const nSerieD = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? Math.min(6, Number(m[1])) : 1; };
-function enVivo(f, hora, code, rut, r) {
-  if (f !== today() || !rut) return '';
-  const llenos = x => setsOf(x).filter(z => z.kg != null || z.r != null); const cur = r.ej || []; const hechas = cur.reduce((n, x) => n + llenos(x).length, 0);
-  if (!hechas && r.rpe == null) return '';
+function vivoInfo(f, hora, code, rut, r) {
+  if (!rut) return null;
+  const llenos = x => setsOf(x).filter(z => z.kg != null || z.r != null || z.t != null); const cur = r.ej || []; const hechas = cur.reduce((n, x) => n + llenos(x).length, 0);
+  if (!hechas && r.rpe == null) return null;
   const ejs = ejsDe(rut); const plan = ejs.reduce((n, x) => n + nSerieD(x.d), 0); const orden = ejs.map(x => x.n);
-  const ult = [...cur].sort((a, b) => orden.indexOf(b.n) - orden.indexOf(a.n))[0]; const ls = ult ? llenos(ult).slice(-1)[0] : null;
+  const ult = [...cur].filter(x => llenos(x).length).sort((a, b) => orden.indexOf(b.n) - orden.indexOf(a.n))[0]; const ls = ult ? llenos(ult).slice(-1)[0] : null;
   const prev = cargasDe(code).filter(c => c.f < f); const al = [];
   if (r.rpe != null && Number(r.rpe) >= 9) al.push('RPE ' + r.rpe);
-  cur.forEach(x => { const pv = prev.find(c => c.n === x.n); if (pv && pv.kg > 0 && x.kg > pv.kg * 1.15) al.push(`${limpiarEj(x.n)} +${Math.round((x.kg / pv.kg - 1) * 100)}%`); });
-  const terminado = r.rpe != null;
-  return `<div class="live ${terminado ? 'fin' : ''}">${terminado ? '✅' : '<span class="dot" aria-hidden="true"></span>'}<b>${terminado ? 'Terminó' : 'En vivo'}</b><span class="muted num">${hechas}${plan ? '/' + plan : ''} series${!terminado && ult ? ' · ' + esc(limpiarEj(ult.n)) + (ls ? ' · ' + esc(fmtSet(ls)) : '') : ''}${terminado ? ' · RPE ' + esc(r.rpe) : ''}</span>${al.map(a => `<span class="pill crit">⚠ ${esc(a)}</span>`).join('')}</div>`;
+  cur.forEach(x => { const pv = prev.find(c => c.n === x.n); if (pv && pv.kg > 0 && x.kg > pv.kg * 1.15) al.push(`${ejCorto(x.n)} +${Math.round((x.kg / pv.kg - 1) * 100)}%`); });
+  const terminado = r.rpe != null; const vivo = f === today() && !terminado;
+  const txt = terminado ? `<span class="ok-t">✓ Terminó</span> · ${hechas}${plan ? '/' + plan : ''} series · RPE ${esc(r.rpe)}`
+    : `${vivo ? '<span class="dot" aria-hidden="true"></span><b>En vivo</b> · ' : ''}${hechas}${plan ? '/' + plan : ''} series${ult ? ' · ' + esc(ejCorto(ult.n)) + (ls ? ' ' + esc(fmtSetC(ls)) : '') : ''}`;
+  return {txt, al};
 }
+const fmtSetC = x => x.t != null ? x.t + ' s' : (x.kg != null ? String(x.kg).replace('.', ',') : '') + (x.r != null ? (x.kg != null ? '×' : '') + x.r + (x.kg != null ? '' : ' reps') : '');
 function ejsDe(rut) {
   const bs = rut?.bloques || [];
   let src = bs.filter(b => /bloque b/i.test(b.titulo || ''));
@@ -976,7 +1008,7 @@ function setSerie(k, n, i, patch) {
     x.sets = sets; x.s = ok.length;
     if (top.kg != null) x.kg = top.kg; if (top.r != null) x.r = top.r;
   }
-  const ej2 = ej.filter(o => o.kg != null || o.r != null);
+  const ej2 = ej.filter(o => o.kg != null || o.r != null || o.t != null || o.c || (o.ap || []).length);
   patchDia(f, h, code, {ej: ej2.length ? ej2 : null});
 }
 function cargasHTML(f, hora, code, key, rut, r) {
@@ -984,8 +1016,10 @@ function cargasHTML(f, hora, code, key, rut, r) {
   const cur = r.ej || [];
   const hechos = ejs.filter(e => cur.some(x => x.n === e.n)).length;
   const open = !!S.ui.openCar[key];
-  const btn = `<button class="btn sm ${hechos ? 'on-ok' : ''}" data-act="ver-car" data-k="${esc(key)}">${open ? 'Ocultar cargas' : 'Anotar kg y reps'} · ${hechos}/${ejs.length}</button>`;
-  if (!open) return `<div class="st-row">${btn}</div>`;
+  const btn = `<button class="btn sm ghost" data-act="ver-car" data-k="${esc(key)}">${open ? 'Listo' : hechos ? '✎ Corregir series' : '✎ Anotar kg y reps'}</button>`;
+  if (!open) return `<div class="res">${ejs.map(e => { const c = cur.find(x => x.n === e.n); const ss = c ? setsOf(c).filter(z => z.kg != null || z.r != null || z.t != null) : []; const ap = (c?.ap || []).filter(z => z && (z.kg != null || z.r != null));
+      return `<div class="res-r${ss.length ? '' : ' vac'}"><span class="res-n">${esc(limpiarEj(e.n))}</span><span class="res-s num">${ap.length ? `<span class="muted">aprox ${ap.map(fmtSetC).map(esc).join(' · ')} →</span> ` : ''}${ss.length ? ss.map(fmtSetC).map(esc).join(' · ') : '—'}</span>${c?.c ? `<span class="res-c">💬 ${esc(c.c)}</span>` : ''}</div>`; }).join('')}
+    <div class="st-row"><span class="small muted grow">${hechos}/${ejs.length} ejercicios anotados</span>${btn}</div></div>`;
   const last = {}, best = {}; cargasDe(code).forEach(x => { if (x.f + '|' + x.h < f + '|' + hora) { if (!last[x.n]) last[x.n] = x; if (x.kg != null && (!best[x.n] || x.kg > best[x.n].kg || (x.kg === best[x.n].kg && (x.r || 0) > (best[x.n].r || 0)))) best[x.n] = x; } });
   const nSer = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? m[1] : ''; };
   const kid = key.replace(/[^A-Za-z0-9]/g, '_');
@@ -1028,7 +1062,7 @@ function setEj(k, n, patch) {
   const ej = clone(rec(f, h, code).ej || []);
   let x = ej.find(o => o.n === n); if (!x) { x = {n}; ej.push(x); }
   for (const fld in patch) { if (patch[fld] == null || patch[fld] === '' || isNaN(patch[fld])) delete x[fld]; else x[fld] = Number(patch[fld]); }
-  const ej2 = ej.filter(o => o.kg != null || o.r != null);
+  const ej2 = ej.filter(o => o.kg != null || o.r != null || o.c);
   patchDia(f, h, code, {ej: ej2.length ? ej2 : null});
 }
 function rutinaBody(r) {
@@ -2074,6 +2108,7 @@ document.addEventListener('click', e => {
     case 'ses-del': el.closest('.ses-row').remove(); break;
     case 'ses-up': { const row = el.closest('.ses-row'); if (row.previousElementSibling) row.parentNode.insertBefore(row, row.previousElementSibling); break; }
     case 'ses-reset': { const {f,h,code} = toggleOne(el.dataset.k); patchDia(f, h, code, {sesion: null}); closeModal(); toast('Sesión devuelta a la plantilla.'); break; }
+    case 'st-open': S.ui.stOpen = S.ui.stOpen || {}; S.ui.stOpen[el.dataset.k] = !S.ui.stOpen[el.dataset.k]; render(); break;
     case 'ver-car': S.ui.openCar[el.dataset.k] = !S.ui.openCar[el.dataset.k]; render(); break;
     case 'ser-igual': setSerie(el.dataset.k, el.dataset.n, +el.dataset.i, {kg: el.dataset.kg === '' ? null : Number(el.dataset.kg), r: el.dataset.r === '' ? null : Number(el.dataset.r)}); break;
     case 'ser-add': S.ui.extraSer = S.ui.extraSer || {}; S.ui.extraSer[el.dataset.k + '|' + el.dataset.n] = +el.dataset.c + 1; render(); break;
