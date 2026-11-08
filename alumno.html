@@ -332,7 +332,8 @@ await load();
 
 /* ---------- lógica ---------- */
 const planActual = () => { const t = today(); return S.planes.find(p => p.inicio && p.fin && p.inicio <= t && t <= p.fin) || S.planes[S.planes.length - 1] || null; };
-const presentes = (desde, hasta) => S.clases.filter(r => r.asis === 'presente' && (!desde || r.fecha >= desde) && (!hasta || r.fecha <= hasta)).length;
+// clases usadas del plan: las que asistió + las que faltó sin avisar (esas se pierden)
+const presentes = (desde, hasta) => S.clases.filter(r => (r.asis === 'presente' || r.asis === 'ausente') && (!desde || r.fecha >= desde) && (!hasta || r.fecha <= hasta)).length;
 const abonado = p => (p?.pagos || []).reduce((s, x) => s + (Number(x.monto) || 0), 0);
 const recOf = (f, h) => S.clases.find(r => r.fecha === f && r.hora === h);
 function bloquesDe(f) {
@@ -512,7 +513,7 @@ function onboardingHTML() {
         <h2 style="margin:0">🔁 Si no puedes ir a una clase</h2>
         <div style="display:grid;gap:6px" class="small">
           <div>• Avisa en la app con <b>al menos 2 horas de anticipación</b> (botón «No puedo ir»). Así ganas <b>1 clase para recuperar</b>.</div>
-          <div>• Si avisas más tarde o no avisas, esa clase <b>no se puede recuperar</b>.</div>
+          <div>• Si avisas más tarde o no avisas, esa clase <b>no se puede recuperar y se descuenta de tu plan</b>.</div>
           <div>• Recuperas tú mismo en los bloques habilitados <b>de esta semana y la próxima</b>, según los cupos disponibles.</div>
           <div>• Las clases por recuperar <b>vencen al final del mes</b>: no pasan al mes siguiente.</div>
           <div>• Elige bien el bloque: una vez agendada la recuperación, <b>no se puede cambiar</b>. Si no asistes, la pierdes.</div>
