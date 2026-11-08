@@ -52,6 +52,14 @@ h2{font-size:22px}
 .tec-d summary{cursor:pointer;color:var(--red-t);font-weight:600;font-size:14px;list-style:none}.tec-d summary::-webkit-details-marker{display:none}
 .tec-d ol,.tec-ol{margin:8px 0 4px;padding-left:20px;display:grid;gap:6px;line-height:1.4}.tec-d .btn{margin-top:6px}
 .red-t{color:var(--red-t);font-weight:600}
+#tour{position:fixed;inset:0;z-index:70}
+.tour-hole{position:fixed;border-radius:14px;box-shadow:0 0 0 9999px rgba(8,6,9,.8),0 0 0 2px var(--red),0 0 24px 4px rgba(215,31,48,.45);transition:left .38s cubic-bezier(.2,.8,.2,1),top .38s cubic-bezier(.2,.8,.2,1),width .38s cubic-bezier(.2,.8,.2,1),height .38s cubic-bezier(.2,.8,.2,1);pointer-events:none}
+.tour-card{position:fixed;left:16px;right:16px;max-width:440px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--red);border-radius:16px;padding:16px;display:grid;gap:10px;box-shadow:0 14px 44px rgba(0,0,0,.55)}
+.tour-card.mid{transform:translateY(-50%)}.tour-card.in{animation:tourIn .32s ease both}.tour-card.mid.in{animation:tourInMid .32s ease both}
+@keyframes tourIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes tourInMid{from{opacity:0;transform:translateY(-46%)}to{opacity:1;transform:translateY(-50%)}}
+.tour-dots{display:flex;gap:5px}.tour-dots i{height:4px;flex:1;border-radius:3px;background:var(--line);transition:background .3s}.tour-dots i.ok{background:rgba(215,31,48,.5)}.tour-dots i.on{background:var(--red)}
+.tour-nav{display:flex;align-items:center;gap:8px}.tour-skip{background:none;border:0;color:var(--muted);font:600 14px Barlow,sans-serif;cursor:pointer;padding:8px 4px}
+@media (prefers-reduced-motion:reduce){.tour-hole{transition:none}.tour-card.in,.tour-card.mid.in{animation:none}}
 .tg{display:inline-block;align-self:flex-start;font-size:12px;font-weight:700;letter-spacing:.02em;padding:2px 8px;border-radius:999px;margin-bottom:3px;white-space:nowrap}
 .tg.ev{color:#7fb9ff;background:rgba(77,163,255,.14);border:1px solid rgba(77,163,255,.45)}.tg.warn{color:var(--warn);background:rgba(243,180,91,.12);border:1px solid rgba(243,180,91,.4)}
 .nx.c.tg-ev{border-left-color:var(--ev)}.nx .tg{justify-self:start;margin-bottom:1px}
@@ -867,6 +875,57 @@ async function wakeOn() { try { if (!WL && navigator.wakeLock && document.visibi
 function wakeOff() { try { WL && WL.release(); } catch (_) {} WL = null; }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { if (ASpend) guardarYa(); } else if (S.v === 'rutina' && document.querySelector('.ej,#guardar')) wakeOn(); });
 window.addEventListener('pagehide', () => { if (ASpend) guardarYa(); });
+
+/* ---------- tour de la app: se ilumina una parte a la vez con una tarjeta que explica ---------- */
+const TOUR_K = 'tl-tour-v1';
+const tourHecho = () => { try { return localStorage.getItem(TOUR_K) === '1'; } catch (_) { return true; } };
+function tourMuestra() { // si hoy no hay sesión para mostrar, abre la próxima clase como vista previa
+  if (document.querySelector('#app .ej')) return; const px = proximas(1)[0]; if (!px) return;
+  const id = recOf(px.f, px.h)?.rutina || prediccion().get(px.f + '|' + px.h); if (!id) return;
+  S.ses = { f: px.f, h: px.h, id }; S.tourSes = true; render(); }
+function tourAbrirB() { const d = [...document.querySelectorAll('#app details.blk')].find(x => x.querySelector('.set')); if (d) d.open = true; }
+const TOUR = [
+  { t: 'Bienvenido a tu app 💪', x: 'Te muestro cómo funciona en menos de un minuto.' },
+  { v: 'hoy', sel: '#tabs [data-v="hoy"]', t: 'Hoy', x: 'Tu resumen del día: próxima clase, recuperaciones, actividades y lo que viene.' },
+  { v: 'hoy', sel: '#app .ag-rut', t: 'Tu próxima clase', x: 'Toca la sesión para ver la rutina. Debajo confirmas si vienes o avisas que no puedes: si avisas con 2 horas o más, ganas una clase para recuperar.' },
+  { v: 'hoy', sel: '#recup-card', t: 'Recuperar clases', x: 'Cuando tienes clases por recuperar aparece esta tarjeta: tócala y elige día y hora. Es una sola oportunidad y vence cuando termina tu plan.' },
+  { v: 'agenda', sel: '#app .wk', t: 'Agenda', x: 'Tu semana completa. Toca un día para ver sus clases y actividades; con ‹ › cambias de semana.' },
+  { v: 'rutina', sel: '#tabs [data-v="rutina"]', t: 'Entreno', x: 'Aquí entrenas: tu sesión con sus 3 bloques. Ábrela también desde Hoy o Agenda.', pre: tourMuestra },
+  { v: 'rutina', sel: '#app .foco-go', t: 'Modo clase', x: 'En el gimnasio toca aquí: un ejercicio a la vez, en grande, con temporizador y descanso automático.' },
+  { v: 'rutina', sel: '#app .set', t: 'Anota tus series', x: 'Escribe kg y reps y toca ✓. Se guarda solo y parte el descanso. A la izquierda ves lo que hiciste la vez anterior.', pre: tourAbrirB },
+  { v: 'rutina', sel: '#app .com-add', t: 'Comentarios', x: '¿Fueron 20 kg por mano? Déjalo anotado aquí: la próxima vez te lo recuerda.' },
+  { v: 'rutina', sel: '#app .tec-b', t: '¿Cómo se hace?', x: 'Toca ? para ver las 3 claves técnicas del ejercicio y un video.' },
+  { v: 'progreso', sel: '#tabs [data-v="progreso"]', t: 'Progreso', x: 'Tus récords, fotos de antes y después y tus medidas.' },
+  { v: 'plan', sel: '#tabs [data-v="plan"]', t: 'Perfil', x: 'Tu ficha de salud, avisos, plan y pagos. Aquí también puedes volver a ver este tour.' },
+  { t: '¡Listo! 🎉', x: 'Ya sabes usar tu app. Nos vemos en Titanium.', fin: true },
+];
+let TR = null;
+function iniciarTour() { if (document.getElementById('tour')) return; finDescanso(); cerrarTimer(); document.getElementById('sheet')?.remove();
+  const el = document.createElement('div'); el.id = 'tour'; el.innerHTML = '<div class="tour-hole"></div><div class="tour-card" role="dialog" aria-modal="true" aria-live="polite"></div>';
+  document.body.appendChild(el); TR = { i: 0, el, dir: 1 };
+  el.addEventListener('click', ev => { ev.stopPropagation(); const b = ev.target.closest('[data-tr]'); if (!b) return; const a = b.dataset.tr;
+    if (a === 'sig') tourIr(TR.i + 1, 1); else if (a === 'ant') tourIr(TR.i - 1, -1); else tourFin(); });
+  tourIr(0, 1); }
+function tourIr(i, dir) { if (!TR) return; if (i < 0) i = 0; if (i >= TOUR.length) return tourFin(); const st = TOUR[i]; TR.i = i; TR.dir = dir;
+  if (st.v && S.v !== st.v) { S.v = st.v; S.evSel = null; S.foco = null; render(); }
+  if (st.pre) st.pre();
+  setTimeout(() => { if (!TR || TR.i !== i) return; const tgt = st.sel ? document.querySelector(st.sel) : null;
+    if (st.sel && (!tgt || !tgt.getClientRects().length)) return tourIr(i + dir, dir); // si no existe en esta pantalla, sigue
+    if (tgt && !tgt.closest('#tabs')) tgt.scrollIntoView({ block: 'center' });
+    setTimeout(() => tourPintar(st, tgt), tgt ? 260 : 0); }, 60); }
+function tourPintar(st, tgt) { if (!TR) return; const hole = TR.el.querySelector('.tour-hole'), card = TR.el.querySelector('.tour-card');
+  const n = TOUR.length, i = TR.i, H = window.innerHeight;
+  if (tgt) { const r = tgt.getBoundingClientRect(), p = 6;
+    Object.assign(hole.style, { left: (r.left - p) + 'px', top: (r.top - p) + 'px', width: (r.width + p * 2) + 'px', height: (r.height + p * 2) + 'px', opacity: 1 });
+    const abajo = r.bottom + 230 < H; Object.assign(card.style, abajo ? { top: (r.bottom + 16) + 'px', bottom: 'auto' } : { top: 'auto', bottom: (H - r.top + 16) + 'px' }); }
+  else { Object.assign(hole.style, { left: '50%', top: '50%', width: '0px', height: '0px', opacity: 1 }); Object.assign(card.style, { top: '50%', bottom: 'auto' }); }
+  card.classList.toggle('mid', !tgt);
+  card.innerHTML = `<div class="tour-dots">${TOUR.map((_, k) => `<i class="${k === i ? 'on' : k < i ? 'ok' : ''}"></i>`).join('')}</div>
+    <h2 style="font-size:24px;margin:0">${esc(st.t)}</h2><div style="line-height:1.45">${esc(st.x)}</div>
+    <div class="tour-nav">${st.fin ? '' : '<button class="tour-skip" data-tr="fin">Saltar</button>'}<span style="flex:1"></span>${i > 0 && !st.fin ? '<button class="btn" data-tr="ant" style="width:auto;min-height:44px;padding:0 16px">‹</button>' : ''}<button class="btn pri" data-tr="${st.fin ? 'fin' : 'sig'}" style="width:auto;min-height:44px;padding:0 20px">${st.fin ? 'Empezar' : i === 0 ? 'Vamos' : 'Siguiente'}</button></div>`;
+  card.classList.remove('in'); void card.offsetWidth; card.classList.add('in'); card.querySelector('[data-tr="sig"],[data-tr="fin"].btn')?.focus({ preventScroll: true }); }
+function tourFin() { try { localStorage.setItem(TOUR_K, '1'); } catch (_) {} TR?.el.remove(); TR = null;
+  if (S.tourSes) { S.ses = null; S.tourSes = false; } S.v = 'hoy'; render(); }
 V.rutina = () => {
   if (S.evSel) { const e = S.eventos.find(x => String(x.id) === String(S.evSel)); if (e) return evDetalleHTML(e); S.evSel = null; }
   // pestaña Rutina directa: muestra lo que corresponde hoy (clase, si no la actividad del día, si no descanso)
@@ -925,7 +984,7 @@ V.rutina = () => {
   return `${otro}${tambien}${okCard}
   <div style="display:grid;gap:6px"><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total : ''}</div><h1 style="font-size:30px;line-height:1.05">${esc(r.tipo || 'Rutina')}</h1>${(() => { const l = rd.pe ? progLinea(r, rd.pe.semana) : ''; return l ? `<div class="small muted">💡 ${esc(l.replace(/^Semana \d+ · /, ''))}</div>` : ''; })()}
     <div class="chips" style="margin-top:2px">${r.minutos ? `<span class="chip">⏱ ~${esc(r.minutos)} min</span>` : ''}<span class="chip">${items.length} ejercicios</span>${rd.hora && rd.hora !== 'libre' ? `<span class="chip">🕒 ${esc(rd.hora)}</span>` : ''}</div>
-    ${!rd.futuro && items.length ? `<div class="row" style="align-items:center"><button class="btn pri foco-go" data-foco="1">▶ Modo clase</button></div><span class="as-st small muted"></span>` : ''}</div>
+    ${(!rd.futuro || S.tourSes) && items.length ? `<div class="row" style="align-items:center"><button class="btn pri foco-go" data-foco="1">▶ Modo clase</button></div><span class="as-st small muted"></span>` : ''}</div>
   ${bloques.map((b, bi) => { const { letra, nomB, isB, isC } = info(b);
     const nEj = (b.ejercicios || []).length; const cerrado = !blkAbiertos.has(bi); const det = isB ? 'anota tus series' : isC ? '⏱ con temporizador' : '';
     return `<details class="card blk" data-blk="${bi}" ${cerrado ? '' : 'open'}><summary><span class="blk-l ${isB ? 'b' : ''}">${esc(letra)}</span><div style="flex:1;min-width:0"><div class="blk-t">${esc(nomB)}</div><div class="small muted">${nEj} ejercicio${nEj === 1 ? '' : 's'}${det ? ' · ' + esc(det) : ''}</div>${cerrado ? `<div class="blk-p">${esc((b.ejercicios || []).map(e => String(e.nombre || '').replace(/^(min(uto)?\s*\d+|\d+[ab]?)\s*·\s*/i, '')).join(' · '))}</div>` : ''}</div><span class="chev" aria-hidden="true">›</span></summary>${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}${isC ? `<button class="btn tbtn" data-timer="${bi}">⏱ Abrir temporizador · ${esc(timerTxt(detectarTimer(b)))}</button>` : ''}
@@ -1017,13 +1076,13 @@ V.progreso = () => {
   ${tab === 'entreno' ? entreno : tab === 'cuerpo' ? inbCard + medCard : fotosCard}`;
 };
 V.plan = () => {
-  const p = planActual(); if (!p) return `<h1>Mi perfil</h1>${perfilCard()}${fichaCard()}${avisosCard()}<div class="card"><div class="muted">Todavía no tienes un plan registrado. Habla con Franco.</div></div><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
+  const p = planActual(); if (!p) return `<h1>Mi perfil</h1>${perfilCard()}${fichaCard()}${avisosCard()}<div class="card"><div class="muted">Todavía no tienes un plan registrado. Habla con Franco.</div></div><button class="btn" data-tour="1">▶ Ver el tour de la app</button><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
   const usadas = presentes(p.inicio, p.fin ? addDays(p.fin, -1) : null); const tot = p.clases || S.a.clases || 0; const ab = abonado(p); const saldo = Math.max(0, (p.monto || 0) - ab);
   // días fijos; si entrena fuera del horario normal, se toman de sus clases agendadas de las próximas 2 semanas
   const fijos = (S.a.bloques || []).length ? S.a.bloques : [...new Set((S.clases || []).filter(r => r.extra && !r.quitado && !(r.reag_de && r.reag_de.recup) && r.fecha >= today() && r.fecha <= addDays(today(), 13) && /^\d\d:\d\d$/.test(r.hora)).map(r => dayKey(r.fecha) + '-' + r.hora))]
     .sort((a, b) => ['lun','mar','mie','jue','vie','sab','dom'].indexOf(a.split('-')[0]) - ['lun','mar','mie','jue','vie','sab','dom'].indexOf(b.split('-')[0]));
   const dias = fijos.map(k => DL[k.split('-')[0]] + ' ' + k.split('-')[1]).join(' · ');
-  return `<h1>Mi perfil</h1>${perfilCard()}${fichaCard()}${avisosCard()}${pagosCard(p, usadas, tot, ab, saldo, dias)}`;
+  return `<h1>Mi perfil</h1>${perfilCard()}${fichaCard()}${avisosCard()}${pagosCard(p, usadas, tot, ab, saldo, dias)}<button class="btn" data-tour="1">▶ Ver el tour de la app</button>`;
 };
 function weekStrip(wk, sel, attr) { const t = today();
   return `<div class="wk">${Array.from({ length: 7 }, (_, i) => addDays(wk, i)).map(f => { const its = clasesDia(f); const done = its.some(x => x.rec?.asis === 'presente'); const ne = evDia(f).length;
@@ -1260,6 +1319,7 @@ function render(mantener) {
   if (!lock && !onb && S.v === 'rutina' && document.querySelector('.ej,#guardar')) wakeOn(); else wakeOff();
   document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.v === S.v || (S.v === 'clases' && b.dataset.v === 'agenda') ? 'page' : 'false'));
   applyDraft();
+  if (!lock && !onb && S.v === 'hoy' && !tourHecho() && !TR && !S.tourAuto) { S.tourAuto = true; setTimeout(() => { if (S.v === 'hoy' && !TR) iniciarTour(); }, 700); }
   if (mantener) { window.scrollTo(0, y); return; }
   window.scrollTo(0, 0); requestAnimationFrame(() => window.scrollTo(0, 0));
 }
@@ -1327,6 +1387,7 @@ async function solicitar(tipo, data) {
 document.addEventListener('click', async ev => {
   // antes de cambiar de pantalla o de sesión, sube lo pendiente
   if (ASpend && ev.target.closest('[data-go],[data-v],[data-abrses],[data-sesx],[data-evid],[data-entrenar],[data-focox],[data-fnav]')) guardarYa();
+  if (ev.target.closest('[data-tour]')) { iniciarTour(); return; }
   const tcb = ev.target.closest('[data-tec]'); if (tcb) { abrirTec(tcb.dataset.tec); return; }
   const cmb = ev.target.closest('[data-com]'); if (cmb) { const w = document.querySelector(`[data-comw="${CSS.escape(cmb.dataset.com)}"]`); if (!w) return;
     cmb.hidden = true; w.hidden = false; w.querySelector('input').focus(); return; }
