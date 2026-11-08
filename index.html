@@ -997,7 +997,7 @@ function cargasHTML(f, hora, code, key, rut, r) {
       const nS = Math.max(Number(nSer(e.d)) || 3, sets.length, extra[key + '|' + e.n] || 0);
       const pr = b && c.kg != null && (c.kg > b.kg || (c.kg === b.kg && (c.r || 0) > (b.r || 0)));
       return `<div class="ej-blk">
-      <div class="ej-n">${esc(e.n)}${pr ? '<span class="pr">🏆 Récord</span>' : ''}<span class="d">${esc(e.d)}${l ? ` · última: <b>${esc(fmtSets(l))}</b>` : ''}</span></div>
+      <div class="ej-n">${esc(e.n)}${pr ? '<span class="pr">🏆 Récord</span>' : ''}<span class="d">${esc(e.d)}${l ? ` · última: <b>${esc(fmtSets(l))}</b>` : ''}</span></div>${c.c ? `<div class="small" style="color:var(--muted);font-style:italic">💬 ${esc(c.c)}</div>` : ''}
       <div class="ser-row h"><span>Serie</span><span>kg</span><span>reps</span><span></span></div>
       ${Array.from({length: nS}, (_, j) => { const s = sets[j] || {}, ls = lsets[j], prev = j ? sets[j - 1] : null;
         const src = ls || (prev && (prev.kg != null || prev.r != null) ? prev : null); return `
