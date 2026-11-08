@@ -667,10 +667,8 @@ V.hoy = () => {
   ${(() => { const nac = S.perfil?.nac || S.a.nacimiento; return nac && nac.slice(5) === t.slice(5) ? `<section class="card" style="background:linear-gradient(135deg,#d71f30,#7a0f1a);border-color:#d71f30;text-align:center"><div style="font-size:40px">🎂</div><div class="disp" style="font-size:28px;color:#fff">¡Feliz cumpleaños, ${esc(nombreC)}!</div><div style="color:#ffe3e6">Todo el equipo Titanium te desea un gran día. Hoy celebra… y entrena con todo 💪</div></section>` : ''; })()}
   <section class="card">
     <div class="row"><span class="eyebrow red">${rd.hoy ? 'Tu clase de hoy' : 'Tu próxima clase'}</span><span class="small muted">${prox ? esc((prox.f === t ? 'Hoy' : DL[dayKey(prox.f)] + ' ' + fmtD(prox.f)) + ' · ' + prox.h) : 'Sin clases agendadas'}</span></div>
-    ${rd.r ? `<div><div class="disp" style="font-size:28px;line-height:1.05">${esc(rd.r.tipo || 'Rutina')}</div><div class="small muted">${esc(rd.r.familia || '')} · ${esc(rd.r.nivel || '')}</div></div>` : `<div class="muted">Franco te asigna la rutina en la clase.</div>`}
-    ${linea ? `<div class="note"><b class="red">Semana ${Math.min(rd.pe.semana, rd.pe.total)} de ${rd.pe.total}</b> · ${esc(linea.replace(/^Semana \d+ · /, ''))}</div>` : ''}
-    ${rd.r ? (prox ? `<button class="btn pri" data-abrses="${esc(prox.f + '|' + prox.h + '|' + (rd.id || ''))}">${prox.f === t ? 'Entrenar ahora' : 'Ver mi rutina'}</button>` : `<button class="btn pri" data-go="rutina">Ver mi rutina</button>`) : ''}
-    ${prox ? `<div class="small muted" style="margin-top:4px">¿Vienes ${esc(prox.f === t ? 'hoy' : DL[dayKey(prox.f)].toLowerCase() + ' ' + fmtD(prox.f))} a las ${esc(prox.h)}?</div>${asisBtns(prox.f, prox.h)}` : ''}
+    ${rd.r ? `<button class="ag-rut" ${prox ? `data-abrses="${esc(prox.f + '|' + prox.h + '|' + (rd.id || ''))}"` : 'data-go="rutina"'}><div style="flex:1;min-width:0"><div class="blk-t" style="font-size:22px">${esc(rd.r.tipo || 'Rutina')}</div><div class="small muted">${linea ? 'Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total + ' · ' : ''}${prox && prox.f === t ? 'Toca para entrenar' : 'Toca para ver la rutina'}</div></div><span class="chev" aria-hidden="true">›</span></button>` : `<div class="small muted">Franco te asigna la rutina en la clase.</div>`}
+    ${prox ? asisCorto(prox.f, prox.h) : ''}
   </section>
   ${recupHTML()}
   ${evDia(t).map(evHTML).join('')}
@@ -1073,6 +1071,13 @@ const waNum = () => String(S.cfg.whatsapp || '').replace(/\D/g, '');
 /* ---------- confirmar asistencia: ✅ Voy / ❌ No puedo ir ---------- */
 const waNoVoy = (f, h) => { const n = waNum(); if (!n) return ''; const nom = String(S.perfil?.apodo || S.a.nombre || '').split(' ')[0];
   return `https://wa.me/${n}?text=${encodeURIComponent(`Hola Franco, soy ${nom}. No puedo ir a mi clase del ${longD(f).toLowerCase()} a las ${h}.`)}`; };
+// versión compacta para Hoy: una línea si ya respondió; los dos botones solo si falta responder
+function asisCorto(f, h) { const k = f + '_' + h, e = S.conf?.get(k); if (!e) return `<div class="small muted">¿Vienes ${esc(f === today() ? 'hoy' : DL[dayKey(f)].toLowerCase() + ' ' + fmtD(f))} a las ${esc(h)}?</div>${asisBtns(f, h)}`;
+  const wa = waNoVoy(f, h); const limite = new Date(f + 'T' + h + ':00'); limite.setHours(limite.getHours() - 2);
+  const fija = (S.confCambios?.get(k) || 0) >= 1 || new Date() >= limite; const prof = esc(S.cfg?.coach?.split(' ')[0] || 'tu profe');
+  const accion = e === 'voy' ? (fija ? (wa ? `<a class="chip" href="${wa}" target="_blank" rel="noopener">Escribir</a>` : '') : `<button class="chip" data-nov="${k}">No puedo ir</button>`)
+    : (fija ? (wa ? `<a class="chip" href="${wa}" target="_blank" rel="noopener">Escribir a ${prof}</a>` : '') : `<button class="chip" data-voy="${k}">Al final sí voy</button>`);
+  return `<div class="row small" style="align-items:center">${e === 'voy' ? '<b class="ok">✅ Confirmaste que vienes</b>' : '<b class="warn">❌ Avisaste que no vienes</b>'}${accion}</div>`; }
 function asisBtns(f, h) { const k = f + '_' + h, e = S.conf?.get(k), wa = waNoVoy(f, h);
   const waBtn = (txt, extra) => wa ? `<a class="btn" ${extra || ''} href="${wa}" target="_blank" rel="noopener" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">${txt}</a>` : `<button class="btn" ${extra || ''}>${txt}</button>`;
   // reglas: responden una vez, pueden cambiar 1 vez y solo hasta 2 horas antes
