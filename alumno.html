@@ -813,7 +813,7 @@ let AS = null, ASpend = false;
 function asEstado(t, cls) { document.querySelectorAll('.as-st').forEach(el => { el.textContent = t; el.className = 'as-st small ' + (cls || 'muted'); }); }
 function autoGuardar(ms) { clearTimeout(AS); ASpend = true; AS = setTimeout(guardarYa, ms ?? 1500); }
 async function guardarYa() { clearTimeout(AS); if (!ASpend) return; ASpend = false; if (S.v !== 'rutina' || S.evSel) return;
-  const rd = rutinaDeHoy(); if (!rd.r || rd.futuro) return; const ej = colectarEj(); const carga = $('#carga') ? ($('#carga').value.trim() || null) : (rd.rec?.carga || getDraft().carga || null);
+  const rd = rutinaDeHoy(); if (!rd.r || rd.futuro) return; const ej = colectarEj(); const carga = $('#carga') ? ($('#carga').value.trim() || null) : ((getDraft().carga || '').trim() || rd.rec?.carga || null);
   if (!ej.length && !carga && S.rpe == null) return;
   asEstado('Guardando…');
   const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: rd.fecha || today(), p_hora: rd.hora, p_ej: ej, p_carga: carga, p_rpe: S.rpe ?? rd.rec?.rpe ?? null, p_rutina: rd.id || null });
@@ -846,12 +846,13 @@ V.rutina = () => {
   const info = b => { const m = String(b.titulo || '').match(/^bloque\s+([a-z])\s*[·:-]?\s*(.*)$/i); const bi = bloques.indexOf(b); const letra = m ? m[1].toUpperCase() : String.fromCharCode(65 + bi);
     const isB = /bloque b/i.test(b.titulo || ''); return { letra, nomB: (m ? m[2] : b.titulo) || 'Bloque ' + letra, isB, isC: !isB && (/bloque c/i.test(b.titulo || '') || bi >= 2) }; };
   const items = []; bloques.forEach((b, bi) => (b.ejercicios || []).forEach((e, ei) => items.push({ b, bi, e, ei })));
-  const finalHTML = rd.futuro ? '<section class="card"><div class="small muted">Esta sesión es de un día que aún no llega. Ábrela desde la Agenda ese día para anotar tus series.</div></section>' : `<section class="card">
-    ${cIdx >= 0 ? `<label class="field">Resultado · ${esc(cNom)}<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>` : ''}
+  const finalDe = foco => rd.futuro ? '<section class="card"><div class="small muted">Esta sesión es de un día que aún no llega. Ábrela desde la Agenda ese día para anotar tus series.</div></section>' : `<section class="card">
+    ${cIdx >= 0 && !foco ? `<label class="field">Resultado · ${esc(cNom)}<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>` : ''}
     <div class="field">¿Qué tan duro fue? (RPE)<div class="chips">${[5,6,7,8,9,10].map(v => `<button class="chip" data-rpe="${v}" aria-pressed="${String(S.rpe ?? rd.rec?.rpe) === String(v)}">${v}</button>`).join('')}</div></div>
     <button class="btn pri" id="guardar">${guardada ? 'Actualizar mi entrenamiento' : 'Terminar y guardar'}</button>
-    <div class="small muted">${rd.otroDia ? `Se guarda en tu sesión del ${esc(fmtD(rd.fecha))}. ` : rd.hoy ? '' : 'Hoy no tienes clase agendada: queda como entrenamiento libre. '}Tus series se guardan solas mientras entrenas.</div>
+    ${foco ? (rd.otroDia ? `<div class="small muted">Se guarda en tu sesión del ${esc(fmtD(rd.fecha))}.</div>` : '') : `<div class="small muted">${rd.otroDia ? `Se guarda en tu sesión del ${esc(fmtD(rd.fecha))}. ` : ''}Tus series se guardan solas mientras entrenas.</div>`}
   </section>`;
+  const finalHTML = finalDe(false);
   // modo paso a paso: el bloque B ejercicio por ejercicio (series y kilos); los bloques A y C como un circuito en una sola pantalla
   const pasos = []; bloques.forEach((b, bi) => { const inf = info(b); if (inf.isB) (b.ejercicios || []).forEach((e, ei) => pasos.push({ t: 'ej', b, bi, e, ei, inf })); else if ((b.ejercicios || []).length) pasos.push({ t: 'circ', b, bi, inf }); });
   if (S.foco != null && !rd.futuro && pasos.length) {
@@ -859,7 +860,8 @@ V.rutina = () => {
     const head = `<div class="foco-top"><button class="chip" data-focox="1">‹ Ver todo</button><span class="as-st small muted"></span><b class="small">${fin ? 'Final' : (k + 1) + ' / ' + pasos.length}</b></div>
     <div class="bar foco-bar"><i style="width:${Math.round(k / pasos.length * 100)}%"></i></div>`;
     const nav = `<div class="grid2"><button class="btn" data-fnav="-1" ${k === 0 ? 'disabled' : ''}>‹ Anterior</button><button class="btn pri" data-fnav="1">${k === pasos.length - 1 ? 'Terminar ›' : 'Siguiente ›'}</button></div>`;
-    if (fin) return `${head}<h1 style="font-size:30px;line-height:1.05">¡Terminaste! 💪</h1>${finalHTML}<button class="btn" data-fnav="-1">‹ Anterior</button>`;
+    if (fin) { const res = rd.rec?.carga || getDraft().carga;
+      return `${head}<h1 style="font-size:30px;line-height:1.05">¡Terminaste! 💪</h1>${res ? `<div class="small muted">Resultado · <b style="color:var(--fg)">${esc(res)}</b></div>` : ''}${finalDe(true)}<button class="btn" data-fnav="-1">‹ Anterior</button>`; }
     if (st.t === 'ej') return `${head}<div class="eyebrow">Bloque ${esc(st.inf.letra)} · ${esc(st.inf.nomB)}</div>
     <section class="card foco">${st.ei === 0 && st.b.nota ? `<div class="small muted">${esc(st.b.nota)}</div>` : ''}${ejHTML(st.e, true, cur, true)}</section>${nav}`;
     // circuito: todos los ejercicios a la vista, se marcan al pasar; vueltas en el A, temporizador y resultado en el C
@@ -878,7 +880,7 @@ V.rutina = () => {
   return `${otro}${tambien}${okCard}
   <div style="display:grid;gap:6px"><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total : ''}</div><h1 style="font-size:30px;line-height:1.05">${esc(r.tipo || 'Rutina')}</h1>${(() => { const l = rd.pe ? progLinea(r, rd.pe.semana) : ''; return l ? `<div class="small muted">💡 ${esc(l.replace(/^Semana \d+ · /, ''))}</div>` : ''; })()}
     <div class="chips" style="margin-top:2px">${r.minutos ? `<span class="chip">⏱ ~${esc(r.minutos)} min</span>` : ''}<span class="chip">${items.length} ejercicios</span>${rd.hora && rd.hora !== 'libre' ? `<span class="chip">🕒 ${esc(rd.hora)}</span>` : ''}</div>
-    ${!rd.futuro && items.length ? `<div class="row" style="align-items:center"><button class="btn pri foco-go" data-foco="1">▶ Comenzar entrenamiento</button></div><span class="as-st small muted"></span>` : ''}</div>
+    ${!rd.futuro && items.length ? `<div class="row" style="align-items:center"><button class="btn pri foco-go" data-foco="1">▶ Modo clase</button></div><span class="as-st small muted"></span>` : ''}</div>
   ${bloques.map((b, bi) => { const { letra, nomB, isB, isC } = info(b);
     const nEj = (b.ejercicios || []).length; const cerrado = !blkAbiertos.has(bi); const det = isB ? 'anota tus series' : isC ? '⏱ con temporizador' : '';
     return `<details class="card blk" data-blk="${bi}" ${cerrado ? '' : 'open'}><summary><span class="blk-l ${isB ? 'b' : ''}">${esc(letra)}</span><div style="flex:1;min-width:0"><div class="blk-t">${esc(nomB)}</div><div class="small muted">${nEj} ejercicio${nEj === 1 ? '' : 's'}${det ? ' · ' + esc(det) : ''}</div>${cerrado ? `<div class="blk-p">${esc((b.ejercicios || []).map(e => String(e.nombre || '').replace(/^(min(uto)?\s*\d+|\d+[ab]?)\s*·\s*/i, '')).join(' · '))}</div>` : ''}</div><span class="chev" aria-hidden="true">›</span></summary>${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}${isC ? `<button class="btn tbtn" data-timer="${bi}">⏱ Abrir temporizador · ${esc(timerTxt(detectarTimer(b)))}</button>` : ''}
@@ -1128,16 +1130,16 @@ function recupHTML() { const R = S.recup; if (!R || !R.activo) return '';
   if (R.bloqueado && !prox.length) return `<section class="card" style="border-color:#4da3ff"><div class="row"><span class="eyebrow" style="color:#7fb9ff">🔁 Recuperar clases</span></div><div><b>Tienes ${R.disponibles} clase${R.disponibles === 1 ? '' : 's'} por recuperar</b><div class="small muted">Para agendarlas, primero regulariza tu pago.</div></div><button class="btn" data-gopago="1">💳 Ver mi pago</button></section>`;
   const dia = f => (f === t ? 'Hoy' : f === addDays(t, 1) ? 'Mañana' : DL[dayKey(f)] + ' ' + fmtD(f));
   const ops = (R.opciones || []).filter(o => !o.ya);
-  return `<section class="card" id="recup-card" style="border-color:#4da3ff;background:rgba(77,163,255,.07)">
-    <div class="row"><span class="eyebrow" style="color:#7fb9ff">🔁 Recuperar clases</span><span class="small muted">vencen el ${esc(fmtD(R.vence))}</span></div>
-    ${R.disponibles ? `<div><b style="font-size:18px">Tienes ${R.disponibles} clase${R.disponibles === 1 ? '' : 's'} por recuperar</b><div class="small muted">Elige un bloque de esta semana o la próxima. Lo que no recuperes antes de que termine tu plan se pierde.</div></div>
+  const tit = R.disponibles ? `${R.disponibles} clase${R.disponibles === 1 ? '' : 's'} por recuperar` : `Recuperación agendada · ${dia(prox[0].f)} ${prox[0].h}`;
+  return `<details class="card blk" data-sec="recup" id="recup-card" style="border-color:#4da3ff;background:rgba(77,163,255,.07)" ${secAbiertos.has('recup') ? 'open' : ''}><summary><span class="blk-l" style="border-color:#4da3ff;color:#7fb9ff">🔁</span><div style="flex:1;min-width:0"><div class="blk-t">${esc(tit)}</div><div class="small muted">${R.disponibles ? 'Toca para elegir día y hora · ' : ''}vencen el ${esc(fmtD(R.vence))}</div></div><span class="chev" aria-hidden="true">›</span></summary>
+    ${R.disponibles ? `<div class="small muted">Elige un bloque de esta semana o la próxima. Lo que no recuperes antes de que termine tu plan se pierde.</div>
       ${ops.length ? (() => { const dias = [...new Set(ops.filter(o => o.libres).map(o => o.f))]; if (!dias.length) return '<div class="note small">Los bloques disponibles están llenos. Revisa más tarde.</div>';
         const sel = dias.includes(S.rDia) ? S.rDia : dias[0];
         return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;min-width:0">${dias.map(f => `<button class="chip" data-rdia="${esc(f)}" aria-pressed="${f === sel}" style="justify-content:center;min-width:0;padding:0 6px;font-size:13px">${esc(f === t ? 'Hoy' : f === addDays(t, 1) ? 'Mañana' : DL[dayKey(f)] + ' ' + fmtD(f))}</button>`).join('')}</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px">${ops.filter(o => o.f === sel && o.libres).map(o => `<button class="btn" data-rec="${esc(o.f + '_' + o.h)}" style="flex-direction:column;min-height:54px"><b>${esc(o.h)}</b><span class="small ok">${o.libres} cupo${o.libres === 1 ? '' : 's'}</span></button>`).join('')}</div>`; })()
         : '<div class="note small">No quedan bloques para recuperar esta semana ni la próxima. Revisa de nuevo el lunes, cuando se abre una semana más.</div>'}` : ''}
     ${prox.length ? `<div style="display:grid;gap:6px"><div class="small muted">Tus recuperaciones agendadas</div>${prox.map(u => `<div class="row" style="align-items:center"><span>✅ <b>${esc(dia(u.f))} · ${esc(u.h)}</b></span><span class="small muted">agendada</span></div>`).join('')}</div>` : ''}
-  </section>`; }
+  </details>`; }
 async function recupAccion(k, cancelar) { const [f, h] = k.split('_');
   const txt = (f === today() ? 'hoy' : DL[dayKey(f)].toLowerCase() + ' ' + fmtD(f)) + ' a las ' + h;
   const prof = esc((S.cfg?.coach || 'tu profe').split(' ')[0]);
@@ -1346,7 +1348,7 @@ document.addEventListener('click', async ev => {
     clearTimeout(AS); ASpend = false; const ej = colectarEj();
     const btn = ev.target; btn.disabled = true;
     const rpe = S.rpe ?? rd.rec?.rpe ?? null; if (rpe == null) { btn.disabled = false; toast('Marca qué tan duro fue (RPE) para terminar.'); document.querySelector('[data-rpe]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
-    const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: rd.fecha || today(), p_hora: rd.hora, p_ej: ej, p_carga: $('#carga') ? ($('#carga').value.trim() || null) : (rd.rec?.carga || null), p_rpe: rpe, p_rutina: rd.id || null });
+    const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: rd.fecha || today(), p_hora: rd.hora, p_ej: ej, p_carga: $('#carga') ? ($('#carga').value.trim() || null) : ((getDraft().carga || '').trim() || rd.rec?.carga || null), p_rpe: rpe, p_rutina: rd.id || null });
     btn.disabled = false;
     if (error) { toast('No se pudo guardar: ' + error.message); return; }
     clearDraft(); S.foco = null; S.rpe = null; await load(); toast('Entrenamiento guardado 💪'); render();
