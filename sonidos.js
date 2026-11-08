@@ -21,12 +21,12 @@
   const VOZ = { inicio: '¡Vamos!', fin: 'Descanso', final: '¡Terminado!', prep: 'Prepárate' };
 
   /* ---------- motor de audio ---------- */
-  let AC = null, OUT = null;
+  let AC = null, OUT = null, GRABANDO = false;
+  // iPhone: 'playback' hace que suene aunque el teléfono esté en silencio, pero bloquea el micrófono;
+  // mientras se graba se cambia a 'play-and-record' y al terminar se vuelve a 'playback'
+  function modoAudio(t) { try { if (navigator.audioSession && navigator.audioSession.type !== t) navigator.audioSession.type = t; } catch (_) {} }
   function ctx() {
-    try {
-      // iPhone: que suene aunque el teléfono esté en silencio y con el volumen de multimedia
-      if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback';
-    } catch (_) {}
+    if (!GRABANDO) modoAudio('playback');
     if (!AC) {
       const C = window.AudioContext || window.webkitAudioContext; if (!C) return null;
       AC = new C();
@@ -111,10 +111,13 @@
   let REC = null;
   async function grabar(ev, alTerminar) {
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error('Este navegador no permite grabar. Sube un archivo de audio.');
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
+    GRABANDO = true; modoAudio('play-and-record');
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } }); }
+    catch (e) { GRABANDO = false; modoAudio('playback'); throw e; }
     const mr = new MediaRecorder(stream), partes = [];
     mr.ondataavailable = e => e.data.size && partes.push(e.data);
-    mr.onstop = async () => { stream.getTracks().forEach(t => t.stop()); clearTimeout(REC?.t); REC = null; let err = null;
+    mr.onstop = async () => { stream.getTracks().forEach(t => t.stop()); clearTimeout(REC?.t); REC = null; GRABANDO = false; modoAudio('playback'); let err = null;
       try { await guardarMio(ev, new Blob(partes, { type: mr.mimeType || 'audio/mp4' })); } catch (e) { err = e; } alTerminar(err); };
     mr.start(); REC = { mr, ev, t: setTimeout(() => mr.state === 'recording' && mr.stop(), MAX_SEG * 1000) };
   }
@@ -198,7 +201,7 @@
         if (REC) { detener(); return; }
         delete aviso[e]; unlock();
         try { await grabar(e, err => { aviso[e] = err ? '⚠️ ' + err.message : ''; if (!err) delete aviso[e]; refrescar(); if (!err) play(e); }); }
-        catch (err) { aviso[e] = '⚠️ ' + (err.name === 'NotAllowedError' ? 'Permite el uso del micrófono para grabar, o sube un archivo.' : err.message); }
+        catch (err) { aviso[e] = '⚠️ ' + (err.name === 'NotAllowedError' ? 'Permite el uso del micrófono para grabar (Ajustes del iPhone → Safari → Micrófono), o sube un archivo.' : 'No se pudo grabar: ' + err.message + '. Prueba de nuevo o sube un archivo.'); }
         refrescar(); }
       if (b.dataset.sb) { await borrarMio(b.dataset.sb); refrescar(); }
     });
