@@ -1304,7 +1304,7 @@ VIEWS.registro = () => {
           <label class="chip" style="min-height:44px"><input type="checkbox" id="aj-pbloq" ${c.pago?.bloquearRecup === false ? '' : 'checked'} style="accent-color:var(--red)"> Si debe, no puede recuperar clases</label></div>
       </fieldset>
       <fieldset style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:0;display:grid;gap:10px"><legend class="small" style="font-weight:700;padding:0 6px">🔁 Recuperaciones automáticas</legend>
-        <div class="small muted">Elige cuántos cupos de recuperación das en cada bloque (— = no se recupera ahí). Esos cupos salen de los ${c.cupos} del bloque: si el bloque ya está lleno con alumnos regulares, no se ofrece. Reglas: ganan 1 clase por recuperar si avisan "no voy" con 2 horas o más de anticipación; solo agendan en la semana en curso; lo que no recuperan en el mes se pierde.</div>
+        <div class="small muted">Elige cuántos cupos de recuperación das en cada bloque (— = no se recupera ahí). Esos cupos salen de los ${c.cupos} del bloque: si el bloque ya está lleno con alumnos regulares, no se ofrece. Reglas: ganan 1 clase por recuperar si avisan "no voy" con 2 horas o más de anticipación; agendan en la semana en curso o la siguiente; lo que no recuperan en el mes se pierde.</div>
         <div class="blk-grid"><table><thead><tr><th></th>${['lun','mar','mie','jue','vie','sab'].filter(d => c.dias.includes(d)).map(d => `<th>${DSHORT[d]}</th>`).join('')}</tr></thead><tbody>
           ${c.horas.map(h => `<tr><td class="num">${esc(h)}</td>${['lun','mar','mie','jue','vie','sab'].filter(d => c.dias.includes(d)).map(d => { const k = d+'-'+h; return c.noDisponible.includes(k) ? '<td><span class="muted">–</span></td>' : (() => { const rc = c.recup || {}; const v = Array.isArray(rc) ? (rc.includes(k) ? (c.recupCupo || 2) : 0) : (+rc[k] || 0);
             return `<td><select name="aj-recup" data-k="${esc(k)}" aria-label="Cupos de recuperación ${DNAME[d]} ${esc(h)}" style="min-width:52px;padding:4px;${v ? 'border-color:var(--red);color:var(--fg);font-weight:700' : 'color:var(--muted)'}">${[0,1,2,3,4].filter(n => n <= c.cupos).map(n => `<option value="${n}" ${n === v ? 'selected' : ''}>${n || '—'}</option>`).join('')}</select></td>`; })(); }).join('')}</tr>`).join('')}
@@ -1480,6 +1480,11 @@ ${isNew ? fichaNueva() : fichaExistente()}
       const n = val('fa-nombre'); if (!n) { toast('Escribe el nombre del alumno.', true); return false; }
       let codigo = isNew ? (val('fa-codigo') || nextCode()).toUpperCase() : a.codigo;
       if (isNew && S.alumnos.has(codigo)) { toast(`El código ${codigo} ya existe. Usa otro.`, true); return false; }
+      // evita duplicar personas: mismo nombre, correo o teléfono que alguien ya registrado
+      if (isNew) { const norm = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+        const tel = String(val('fa-tel') || '').replace(/\D/g, '').slice(-8), mail = norm(val('fa-email'));
+        const dup = [...S.alumnos.values()].find(x => norm(x.nombre) === norm(n) || (mail && norm(x.email) === mail) || (tel.length === 8 && String(x.telefono || '').replace(/\D/g, '').slice(-8) === tel));
+        if (dup) { toast(`Ya existe ${dup.nombre} (${dup.codigo}${dup.estado === 'inactivo' ? ', inactivo' : ''}). Ábrelo desde Alumnos${dup.estado === 'inactivo' ? ' y cámbialo a Activo' : ''}. Si es otra persona, agrega su apellido.`, true); return false; } }
       const fresh = isNew ? a : clone(S.alumnos.get(code));
       Object.assign(fresh, {codigo, nombre: n, telefono: val('fa-tel'), email: (val('fa-email') || '').toLowerCase() || null, estado: val('fa-estado'), clases: Number(val('fa-clases')) || null, notas: val('fa-notas'),
         bloques: [...document.querySelectorAll('input[name=blq]:checked')].map(x => x.value)});

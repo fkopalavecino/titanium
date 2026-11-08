@@ -510,7 +510,7 @@ function onboardingHTML() {
         <div style="display:grid;gap:6px" class="small">
           <div>• Avisa en la app con <b>al menos 2 horas de anticipación</b> (botón «No puedo ir»). Así ganas <b>1 clase para recuperar</b>.</div>
           <div>• Si avisas más tarde o no avisas, esa clase <b>no se puede recuperar</b>.</div>
-          <div>• Recuperas tú mismo en los bloques habilitados <b>de la semana en curso</b>, según los cupos disponibles.</div>
+          <div>• Recuperas tú mismo en los bloques habilitados <b>de esta semana y la próxima</b>, según los cupos disponibles.</div>
           <div>• Las clases por recuperar <b>vencen al final del mes</b>: no pasan al mes siguiente.</div>
           <div>• Puedes cancelar una recuperación hasta 2 horas antes.</div>
         </div></section>
@@ -918,7 +918,7 @@ function confirmarAsis(k, estado) { return new Promise(res => { const [f, h] = k
     <div class="small muted" style="font-weight:700">${esc(cuando)}</div>
     <div class="note small" style="display:grid;gap:6px;border-color:var(--warn)">
       <div>⚠️ ${cambio ? '<b>Este es tu único cambio.</b> Después tu respuesta queda fija.' : 'Tienes <b>solo 1 oportunidad</b> para cambiar tu respuesta después de esto.'}</div>
-      ${estado === 'no_voy' ? (aTiempo ? '<div>🔁 Como avisas con más de 2 horas, ganas <b>1 clase para recuperar</b> esta semana.</div>' : '<div>⏰ Faltan menos de 2 horas: esta clase <b>no se puede recuperar</b>.</div>') : ''}
+      ${estado === 'no_voy' ? (aTiempo ? '<div>🔁 Como avisas con más de 2 horas, ganas <b>1 clase para recuperar</b> (esta semana o la próxima, dentro del mes).</div>' : '<div>⏰ Faltan menos de 2 horas: esta clase <b>no se puede recuperar</b>.</div>') : ''}
       <div>Si después necesitas otro cambio, <b>contáctate con ${prof}</b>.</div>
     </div>
     <div class="grid2"><button class="btn" data-ca="0">Rechazar</button><button class="btn pri" data-ca="1">Aceptar</button></div></div>`;
@@ -943,9 +943,9 @@ function recupHTML() { const R = S.recup; if (!R || !R.activo) return '';
   const ops = (R.opciones || []).filter(o => !o.ya);
   return `<section class="card" style="border-color:#4da3ff;background:rgba(77,163,255,.07)">
     <div class="row"><span class="eyebrow" style="color:#7fb9ff">🔁 Recuperar clases</span><span class="small muted">vencen el ${esc(fmtD(R.vence))}</span></div>
-    ${R.disponibles ? `<div><b style="font-size:18px">Tienes ${R.disponibles} clase${R.disponibles === 1 ? '' : 's'} por recuperar</b><div class="small muted">Elige un bloque de esta semana. Lo que no recuperes este mes se pierde.</div></div>
+    ${R.disponibles ? `<div><b style="font-size:18px">Tienes ${R.disponibles} clase${R.disponibles === 1 ? '' : 's'} por recuperar</b><div class="small muted">Elige un bloque de esta semana o la próxima. Lo que no recuperes este mes se pierde.</div></div>
       ${ops.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">${ops.map(o => `<button class="btn" data-rec="${esc(o.f + '_' + o.h)}" ${o.libres ? '' : 'disabled'} style="flex-direction:column;align-items:flex-start;min-height:58px;text-align:left"><b>${esc(dia(o.f))} · ${esc(o.h)}</b><span class="small ${o.libres ? 'ok' : 'muted'}">${o.libres ? o.libres + (o.libres === 1 ? ' cupo' : ' cupos') : 'Lleno'}</span></button>`).join('')}</div>`
-        : '<div class="note small">Esta semana ya no quedan bloques para recuperar. El lunes se abren los de la próxima semana.</div>'}` : ''}
+        : '<div class="note small">No quedan bloques para recuperar esta semana ni la próxima. Revisa de nuevo el lunes, cuando se abre una semana más.</div>'}` : ''}
     ${prox.length ? `<div style="display:grid;gap:6px"><div class="small muted">Tus recuperaciones agendadas</div>${prox.map(u => `<div class="row" style="align-items:center"><span>✅ <b>${esc(dia(u.f))} · ${esc(u.h)}</b></span>${u.cancelable ? `<button class="btn" data-rcx="${esc(u.f + '_' + u.h)}" style="min-height:36px;padding:0 12px;font-size:13px">Cancelar</button>` : '<span class="small muted">no se puede cancelar</span>'}</div>`).join('')}</div>` : ''}
   </section>`; }
 async function recupAccion(k, cancelar) { const [f, h] = k.split('_');
