@@ -1037,8 +1037,12 @@ function prediccion() { const m = new Map(); const pe = progEstado(); const t = 
       const hecha = rec && rec.asis !== 'ausente' && (rec.asis === 'presente' || rec.aprobada || rec.rpe != null);
       if (rec?.rutina) m.set(f + '|' + h, rec.rutina); else if (pe) m.set(f + '|' + h, pe.ses[(pe.idx + i) % pe.ses.length][0]); if (!hecha) i++; } }
   return m; }
+// días pasados: lo registrado + sus bloques fijos de ese día (desde que empezó su primer plan), aunque nadie haya marcado nada
+const inicioAlumno = () => S.planes.map(p => p.inicio).filter(Boolean).sort()[0] || null;
 function clasesDia(f) { const t = today();
-  if (f < t) return S.clases.filter(r => r.fecha === f && !r.quitado).map(r => ({ h: r.hora, rec: r }));
+  if (f < t) { const regs = S.clases.filter(r => r.fecha === f && !r.quitado && /^\d\d:\d\d$/.test(r.hora));
+    const ini = inicioAlumno(); const fijos = ini && f >= ini && f >= addDays(t, -120) ? bloquesDe(f).filter(h => !regs.some(r => r.hora === h) && !S.clases.some(r => r.fecha === f && r.hora === h && (r.quitado || r.reag_a))) : [];
+    return [...regs.map(r => ({ h: r.hora, rec: r })), ...fijos.map(h => ({ h, rec: null }))].sort((a, b) => a.h.localeCompare(b.h)); }
   const hs = bloquesDe(f); const recs = S.clases.filter(r => r.fecha === f && !r.quitado && !hs.includes(r.hora) && (r.asis || r.ej));
   return [...hs.map(h => ({ h, rec: recOf(f, h) })), ...recs.map(r => ({ h: r.hora, rec: r }))].sort((a, b) => a.h.localeCompare(b.h)); }
 const evDia = f => S.eventos.filter(e => e.fecha === f);
