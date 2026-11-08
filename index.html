@@ -1305,6 +1305,7 @@ VIEWS.registro = () => {
         <div class="frow"><label class="f">Titular<input type="text" id="aj-ptit" value="${esc(c.pago?.titular || '')}" placeholder="Titanium Sport SPA"></label><label class="f">Correo para el comprobante<input type="email" id="aj-pmail" value="${esc(c.pago?.correo || '')}"></label></div>
         <div class="frow" style="align-items:end"><label class="f">Días de gracia después del vencimiento<input type="number" id="aj-pgracia" min="0" max="30" value="${c.pago?.gracia ?? 5}"></label>
           <label class="chip" style="min-height:44px"><input type="checkbox" id="aj-pbloq" ${c.pago?.bloquearRecup === false ? '' : 'checked'} style="accent-color:var(--red)"> Si debe, no puede recuperar clases</label></div>
+        <label class="chip" style="min-height:44px;justify-self:start"><input type="checkbox" id="aj-papp" ${c.pago?.bloquearApp === false ? '' : 'checked'} style="accent-color:var(--red)"> Si debe (pasados los días de gracia), su app se bloquea y solo ve la pantalla de pago</label>
       </fieldset>
       <fieldset style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:0;display:grid;gap:10px"><legend class="small" style="font-weight:700;padding:0 6px">🔁 Recuperaciones automáticas</legend>
         <div class="small muted">Elige cuántos cupos de recuperación das en cada bloque (— = no se recupera ahí). Esos cupos salen de los ${c.cupos} del bloque: si el bloque ya está lleno con alumnos regulares, no se ofrece. Reglas: ganan 1 clase por recuperar si avisan "no voy" con 2 horas o más de anticipación; agendan en la semana en curso o la siguiente; lo que no recuperan antes de que termine su plan se pierde.</div>
@@ -2058,7 +2059,7 @@ document.addEventListener('submit', e => {
       recup: Object.fromEntries([...document.querySelectorAll('select[name=aj-recup]')].map(x => [x.dataset.k, +x.value]).filter(([, n]) => n > 0))});
     delete c.recupCupo;
     c.pago = {banco: val('aj-pbanco'), tipo: val('aj-ptipo'), numero: val('aj-pnum'), rut: val('aj-prut'), titular: val('aj-ptit'), correo: val('aj-pmail'),
-      gracia: Math.max(0, Number(val('aj-pgracia')) || 0), bloquearRecup: !!document.getElementById('aj-pbloq')?.checked};
+      gracia: Math.max(0, Number(val('aj-pgracia')) || 0), bloquearRecup: !!document.getElementById('aj-pbloq')?.checked, bloquearApp: !!document.getElementById('aj-papp')?.checked};
     saveCfg(c); toast('Ajustes guardados.');
   }
 });
