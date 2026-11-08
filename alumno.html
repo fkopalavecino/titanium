@@ -43,7 +43,7 @@ h2{font-size:22px}
 .ej-f{border-top:0;padding:0;gap:8px}.ej-f .ej-n{font:700 30px/1.05 'Barlow Condensed',sans-serif;letter-spacing:.01em}.ej-f .set input,.ej-f .set .chk{height:52px}.ej-f .set input{font-size:22px}
 .tec-d summary{cursor:pointer;color:var(--red-t);font-weight:600;font-size:14px;list-style:none}.tec-d summary::-webkit-details-marker{display:none}
 .tec-d ol,.tec-ol{margin:8px 0 4px;padding-left:20px;display:grid;gap:6px;line-height:1.4}.tec-d .btn{margin-top:6px}
-.foco-top{display:flex;justify-content:space-between;align-items:center;gap:8px}.foco-bar,.foco-bar>i{height:4px}.foco-go{width:100%}.as-st:empty{display:none}.ej:first-of-type{border-top:0;padding-top:0}
+.red-t{color:var(--red-t);font-weight:600}.foco-top{display:flex;justify-content:space-between;align-items:center;gap:8px}.foco-bar,.foco-bar>i{height:4px}.foco-go{width:100%}.as-st:empty{display:none}.ej:first-of-type{border-top:0;padding-top:0}
 .sets{display:grid;gap:6px;margin-top:4px}
 .set-h,.set{display:grid;grid-template-columns:30px minmax(0,1fr) 74px 64px 44px;gap:8px;align-items:center}
 .set-h{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:0 6px}
@@ -772,6 +772,7 @@ function cerrarTimer() { clearInterval(TM); TM = null; document.getElementById('
 /* ---------- en el gimnasio: técnica, carga sugerida, guardado en vivo, pantalla encendida ---------- */
 const normEj = n => String(n || '').toLowerCase().replace(/^(min(uto)?\s*\d+|\d+[ab]?|par \d+|min (par|impar)|test \d+|intervalo[^·]*)\s*·\s*/i, '').replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
 const tecDe = n => { const x = normEj(n); return (S.tec || []).find(t => { try { return t.re.test(x); } catch (_) { return false; } }) || null; };
+const ytBuscar = q => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q + ' técnica ejercicio');
 const fmtKg = v => String(Math.round(v * 10) / 10).replace('.', ',');
 // carga sugerida: si en la sesión anterior llegó al tope de reps en todas sus series pesadas, sube; si no, mantiene
 function sugerencia(e) { const m = String(e.dosis || '').match(/×\s*(\d+)(?:\s*[–-]\s*(\d+))?/); if (!m) return null;
@@ -786,7 +787,7 @@ function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nS
   return `<div class="ej${foco ? ' ej-f' : ''}"><div class="ej-h"><b class="ej-n">${esc(e.nombre)}</b>${tc && !foco ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</div>
     <div class="small muted">${esc(e.dosis)}${isB ? ` · ⏱ ${mmss(descansoDe(e))}` : ''}</div>
     ${sg ? `<div class="sug${sg.sube ? ' up' : ''}">${sg.sube ? '↗' : '→'} ${esc(sg.txt)}</div>` : ''}
-    ${tc && foco ? `<details class="tec-d"><summary>¿Cómo se hace?</summary><ol>${(tc.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol>${tc.video ? `<a class="btn" href="${esc(tc.video)}" target="_blank" rel="noopener">▶ Ver video</a>` : ''}</details>` : ''}
+    ${tc && foco ? `<details class="tec-d"><summary>¿Cómo se hace?</summary><ol>${(tc.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol>${tc.video ? `<a class="btn" href="${esc(tc.video)}" target="_blank" rel="noopener">▶ Ver video</a>` : `<a class="small red-t" href="${esc(ytBuscar(tc.nombre))}" target="_blank" rel="noopener">🔎 Ver ejemplos en YouTube</a>`}</details>` : ''}
     ${isB ? `<div class="sets"><div class="set-h"><span>Serie</span><span>Anterior</span><span>Kg</span><span>Reps</span><span></span></div>${Array.from({ length: n }, (_, i) => { const s0 = sets[i] || {}; const done = s0.kg != null || s0.r != null; const p = pv[i] || pv[pv.length - 1];
       const phKg = sg ? fmtKg(sg.kg) : p && p.kg != null ? String(p.kg).replace('.', ',') : 'kg';
       return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span><span class="prev">${p && (p.kg != null || p.r != null) ? esc(fmtSet(p)) : '—'}</span><input inputmode="decimal" placeholder="${esc(phKg)}" aria-label="kg serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s0.kg != null ? esc(String(s0.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${p && p.r != null ? esc(p.r) : 'reps'}" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s0.r != null ? esc(s0.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }).join('')}</div>` : ''}</div>`; }
@@ -794,7 +795,7 @@ function abrirTec(id) { const t = (S.tec || []).find(x => x.id === id); if (!t) 
   const sh = document.createElement('div'); sh.id = 'sheet';
   sh.innerHTML = `<div class="in" role="dialog" aria-modal="true" aria-label="${esc(t.nombre)}"><div class="row"><span class="eyebrow red">Técnica</span><button class="btn" data-close="1" style="width:auto;min-height:36px" aria-label="Cerrar">✕</button></div>
     <h2 style="font-size:26px;margin:0">${esc(t.nombre)}</h2><ol class="tec-ol">${(t.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol>
-    ${t.video ? `<a class="btn pri" href="${esc(t.video)}" target="_blank" rel="noopener">▶ Ver video</a>` : ''}<button class="btn" data-close="1">Listo</button></div>`;
+    ${t.video ? `<a class="btn pri" href="${esc(t.video)}" target="_blank" rel="noopener">▶ Ver video</a>` : `<a class="btn" href="${esc(ytBuscar(t.nombre))}" target="_blank" rel="noopener">🔎 Ver ejemplos en YouTube</a>`}<button class="btn" data-close="1">Listo</button></div>`;
   sh.addEventListener('click', ev => { if (ev.target === sh || ev.target.closest('[data-close]')) sh.remove(); }); document.body.appendChild(sh); }
 // junta lo anotado: lo guardado + el borrador + lo que está en pantalla
 function colectarEj() { const rd = rutinaDeHoy(); const by = {};

@@ -126,6 +126,7 @@ label.f input,label.f select,label.f textarea{color:var(--fg);font-weight:400}
 @keyframes livepulse{50%{opacity:.25}}@media (prefers-reduced-motion:reduce){.live .dot{animation:none}}
 .tec-it{border-bottom:1px solid var(--line);padding:10px 2px}.tec-it>summary{cursor:pointer;list-style:none;display:flex;gap:8px;align-items:center}.tec-it>summary::-webkit-details-marker{display:none}
 .tec-sin>summary{cursor:pointer;color:var(--warn)}
+.ej-link{border:0;background:none;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer;text-decoration:underline dotted color-mix(in srgb,currentColor 45%,transparent);text-underline-offset:3px}.ej-link:hover{color:var(--red)}
 .pill.ok{background:var(--ok-soft);color:var(--ok)}
 .pill.warn{background:var(--warn-soft);color:var(--warn)}
 .pill.crit{background:var(--crit-soft);color:var(--crit)}
@@ -1029,7 +1030,7 @@ function setEj(k, n, patch) {
 function rutinaBody(r) {
   return `<div class="rut">${(r.bloques||[]).map(b => `
     <div><h4>${esc(b.titulo)}</h4>${b.nota ? `<div class="d" style="margin:2px 0 6px">${esc(b.nota)}</div>` : ''}
-    <ol>${(b.ejercicios||[]).map(e => `<li>${esc(e.nombre)} <span class="d">· ${esc(e.dosis)}</span></li>`).join('')}</ol></div>`).join('')}</div>`;
+    <ol>${(b.ejercicios||[]).map(e => `<li><button type="button" class="ej-link" data-act="ver-tec" data-n="${esc(e.nombre)}" title="Ver cómo se hace">${esc(e.nombre)}</button> <span class="d">· ${esc(e.dosis)}</span></li>`).join('')}</ol></div>`).join('')}</div>`;
 }
 
 /* timer */
@@ -1589,6 +1590,14 @@ async function tecnicaModal() {
     <div class="list" id="tec-list" style="max-height:52vh;overflow:auto">${TEC.map(tecFila).join('')}</div>`, { wide: true, submit: 'Listo', cancel: 'Cerrar', onSubmit: () => { const o = document.querySelector('#tec-list details.tec-it[open] [data-act="tec-save"]'); if (o) { o.click(); return false; } return true; } });
   $('#tec-q')?.addEventListener('input', ev => { const q = norm(ev.target.value); document.querySelectorAll('#tec-list .tec-it').forEach(d => { d.hidden = q && !d.dataset.q.includes(q); }); });
 }
+const ytBuscar = q => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q + ' técnica ejercicio');
+async function verTec(nombre) {
+  if (!TEC.length) { const { data } = await window.__sb.from('tecnica').select('*').order('orden'); TEC = data || []; }
+  const t = tecMatch(nombre); const limpio = limpiarEj(nombre);
+  openModal(limpio, `${t ? `<div class="eyebrow">Movimiento base · ${esc(t.nombre)}</div><ol style="margin:0;padding-left:20px;display:grid;gap:6px;line-height:1.45">${(t.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol>` : '<p class="muted" style="margin:0">Este ejercicio aún no tiene claves técnicas. Puedes agregarlas en Workouts › Técnica y videos.</p>'}
+    <div style="display:grid;gap:8px">${t?.video ? `<a class="btn pri" href="${esc(t.video)}" target="_blank" rel="noopener">▶ Ver tu video</a>` : ''}<a class="btn ${t?.video ? '' : 'pri'}" href="${esc(ytBuscar(t ? t.nombre : limpio))}" target="_blank" rel="noopener">🔎 Ver ejemplos en YouTube</a></div>
+    ${t && !t.video ? '<p class="small muted" style="margin:0">Cuando encuentres o grabes un buen video, pégalo en Workouts › Técnica y videos y tus alumnos lo verán en su app.</p>' : ''}`, { submit: 'Listo', cancel: 'Cerrar', onSubmit: () => true });
+}
 const tecFila = t => `<details class="tec-it" data-q="${esc(norm(t.nombre + ' ' + t.patron))}"><summary><b>${esc(t.nombre)}</b>${t.video ? ' <span class="pill ok">▶ video</span>' : ''}</summary>
   <div style="display:grid;gap:8px;padding:8px 0 4px">
     ${[0, 1, 2].map(i => `<label class="f">Clave ${i + 1}<input type="text" id="tec-${esc(t.id)}-${i}" maxlength="90" value="${esc((t.claves || [])[i] || '')}"></label>`).join('')}
@@ -2099,6 +2108,7 @@ document.addEventListener('click', e => {
     case 'w-c': S.ui.wkCat = el.dataset.v; render(); break;
     case 'nuevo-wk': wkModal(null); break;
     case 'tecnica': tecnicaModal(); break;
+    case 'ver-tec': verTec(el.dataset.n); break;
     case 'tec-save': tecGuardar(el.dataset.id, el); break;
     case 'tec-add': tecAgregar(el.dataset.n); break;
     case 'editar-wk': wkModal(id); break;
