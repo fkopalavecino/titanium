@@ -52,6 +52,9 @@ h2{font-size:22px}
 .tec-d summary{cursor:pointer;color:var(--red-t);font-weight:600;font-size:14px;list-style:none}.tec-d summary::-webkit-details-marker{display:none}
 .tec-d ol,.tec-ol{margin:8px 0 4px;padding-left:20px;display:grid;gap:6px;line-height:1.4}.tec-d .btn{margin-top:6px}
 .red-t{color:var(--red-t);font-weight:600}
+.tg{display:inline-block;align-self:flex-start;font-size:12px;font-weight:700;letter-spacing:.02em;padding:2px 8px;border-radius:999px;margin-bottom:3px;white-space:nowrap}
+.tg.ev{color:#7fb9ff;background:rgba(77,163,255,.14);border:1px solid rgba(77,163,255,.45)}.tg.warn{color:var(--warn);background:rgba(243,180,91,.12);border:1px solid rgba(243,180,91,.4)}
+.nx.c.tg-ev{border-left-color:var(--ev)}.nx .tg{justify-self:start;margin-bottom:1px}
 .fx-q{display:grid;gap:10px}.fx-no[aria-pressed="true"]{background:rgba(111,211,154,.14)!important;border-color:var(--ok)!important;color:var(--ok)!important}
 .fx-det{display:grid;gap:10px;animation:comIn .25s ease both}.fx-det[hidden]{display:none}
 .circ{display:grid;gap:8px}.circ-it{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--sunk)}
@@ -698,7 +701,7 @@ V.hoy = () => {
   ${mensajesHTML()}
   ${(() => { const nac = S.perfil?.nac || S.a.nacimiento; return nac && nac.slice(5) === t.slice(5) ? `<section class="card" style="background:linear-gradient(135deg,#d71f30,#7a0f1a);border-color:#d71f30;text-align:center"><div style="font-size:40px">🎂</div><div class="disp" style="font-size:28px;color:#fff">¡Feliz cumpleaños, ${esc(nombreC)}!</div><div style="color:#ffe3e6">Todo el equipo Titanium te desea un gran día. Hoy celebra… y entrena con todo 💪</div></section>` : ''; })()}
   <section class="card">
-    <div class="row"><span class="eyebrow red">${rd.hoy ? 'Tu clase de hoy' : 'Tu próxima clase'}</span><span class="small muted">${prox ? esc((prox.f === t ? 'Hoy' : DL[dayKey(prox.f)] + ' ' + fmtD(prox.f)) + ' · ' + prox.h) : 'Sin clases agendadas'}</span></div>
+    <div class="row"><span class="eyebrow red">${(() => { const tg = prox ? tagClase(prox.f, prox.h, recOf(prox.f, prox.h)) : null; return tg && tg.c === 'ev' ? `<span class="tg ev" style="margin:0">${esc(tg.t)}</span>` : (prox && prox.f === t ? 'Tu clase de hoy' : 'Tu próxima clase'); })()}</span><span class="small muted">${prox ? esc((prox.f === t ? 'Hoy' : DL[dayKey(prox.f)] + ' ' + fmtD(prox.f)) + ' · ' + prox.h) : 'Sin clases agendadas'}</span></div>
     ${rd.r ? `<button class="ag-rut" ${prox ? `data-abrses="${esc(prox.f + '|' + prox.h + '|' + (rd.id || ''))}"` : 'data-go="rutina"'}><div style="flex:1;min-width:0"><div class="blk-t" style="font-size:22px">${esc(rd.r.tipo || 'Rutina')}</div><div class="small muted">${linea ? 'Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total + ' · ' : ''}${prox && prox.f === t ? 'Toca para entrenar' : 'Toca para ver la rutina'}</div></div><span class="chev" aria-hidden="true">›</span></button>` : `<div class="small muted">Franco te asigna la rutina en la clase.</div>`}
     ${prox ? asisCorto(prox.f, prox.h) : ''}
   </section>
@@ -1044,15 +1047,18 @@ function mensajesHTML() { let x = []; try { x = JSON.parse(localStorage.getItem(
   const ms = (S.mensajes || []).filter(m => !x.includes(m.id)); if (!ms.length) return '';
   const cuando = t => { const d = new Date(t), f = d.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' }); return (f === today() ? 'Hoy' : f === addDays(today(), -1) ? 'Ayer' : d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'short' })) + ' · ' + d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }); };
   return ms.map(m => `<section class="card" style="border-color:var(--red);border-left-width:5px"><div class="row"><span class="eyebrow red">📣 Mensaje de ${esc((S.cfg.coach || 'tu profe').split(' ')[0])}</span><button data-msx="${esc(m.id)}" aria-label="Ocultar mensaje" style="background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer;min-width:36px;min-height:36px">✕</button></div>${m.titulo ? `<b style="font-size:17px">${esc(m.titulo)}</b>` : ''}<div style="white-space:pre-wrap;word-break:break-word">${esc(m.cuerpo)}</div><div class="small muted">${esc(cuando(m.enviado_at))}</div></section>`).join(''); }
+// qué tipo de clase es: recuperación, clase movida o una a la que avisó que no va
+function tagClase(f, h, rec) { if (rec?.reag_de?.recup) return { t: '🔁 Recuperación', c: 'ev' }; if (rec?.reag_de) return { t: '↻ Clase movida', c: 'ev' };
+  if (S.conf?.get(f + '_' + h) === 'no_voy') return { t: '❌ Avisaste que no vas', c: 'warn' }; return null; }
 function proximoHTML() { const t = today(); const pred = prediccion(); const it = [];
   for (let d = 1; d <= 21 && it.length < 8; d++) { const f = addDays(t, d);
-    for (const x of clasesDia(f)) { const id = x.rec?.rutina || pred.get(f + '|' + x.h); const r = id ? S.rutinas.get(id) : null; it.push({ f, h: x.h, k: 'c', tit: r ? (r.tipo || 'Clase') : 'Clase', sub: r?.familia || 'Entrenamiento' }); }
+    for (const x of clasesDia(f)) { const id = x.rec?.rutina || pred.get(f + '|' + x.h); const r = id ? S.rutinas.get(id) : null; it.push({ f, h: x.h, k: 'c', tit: r ? (r.tipo || 'Clase') : 'Clase', sub: r?.familia || 'Entrenamiento', tag: tagClase(f, x.h, x.rec) }); }
     for (const e of evDia(f)) it.push({ f, h: e.hora || '', k: 'e', e }); }
   const lst = it.sort((a, b) => a.f.localeCompare(b.f) || String(a.h).localeCompare(String(b.h))).slice(0, 4);
   const fila = x => { const dt = parseISO(x.f); const dia = x.f === addDays(t, 1) ? 'Mañ' : DL[dayKey(x.f)];
     const badge = `<span class="dt"><small>${esc(dia)}</small><b>${dt.getDate()}</b></span>`;
     if (x.k === 'e') { const e = x.e; return `<button class="nx e" data-evid="${esc(e.id)}">${badge}<span><b>${EVI[e.tipo] || '📌'} ${esc(e.titulo)}</b><span class="small muted">${e.hora ? esc(e.hora.slice(0, 5)) + ' · ' : ''}${esc(e.tipo || 'Actividad')}</span></span><span class="chev" aria-hidden="true">›</span></button>`; }
-    return `<button class="nx c" data-goday="${x.f}">${badge}<span><b>🏋️ ${esc(x.tit)}</b><span class="small muted">${esc(x.h)} · ${esc(x.sub)}</span></span><span class="chev" aria-hidden="true">›</span></button>`; };
+    return `<button class="nx c${x.tag ? ' tg-' + x.tag.c : ''}" data-goday="${x.f}">${badge}<span>${x.tag ? `<span class="tg ${x.tag.c}">${esc(x.tag.t)}</span>` : ''}<b>🏋️ ${esc(x.tit)}</b><span class="small muted">${esc(x.h)} · ${esc(x.sub)}</span></span><span class="chev" aria-hidden="true">›</span></button>`; };
   return `<section class="card"><span class="eyebrow">Lo que viene</span>
     ${lst.length ? `<div style="display:grid;gap:8px">${lst.map(fila).join('')}</div>` : '<div class="small muted">No tienes clases ni actividades en los próximos días.</div>'}</section>`; }
 const EVI = { 'Reunión': '👥', 'Evaluación': '📋', 'Actividad': '🏃', 'Evento': '⭐', 'Nutrición': '🥗', 'Documento': '📄', 'Otro': '📌' };
@@ -1181,7 +1187,8 @@ function recupHTML() { const R = S.recup; if (!R || !R.activo) return '';
   const dia = f => (f === t ? 'Hoy' : f === addDays(t, 1) ? 'Mañana' : DL[dayKey(f)] + ' ' + fmtD(f));
   const ops = (R.opciones || []).filter(o => !o.ya);
   const tit = R.disponibles ? `${R.disponibles} clase${R.disponibles === 1 ? '' : 's'} por recuperar` : `Recuperación agendada · ${dia(prox[0].f)} ${prox[0].h}`;
-  return `<details class="card blk" data-sec="recup" id="recup-card" style="border-color:#4da3ff;background:rgba(77,163,255,.07)" ${secAbiertos.has('recup') ? 'open' : ''}><summary><span class="blk-l" style="border-color:#4da3ff;color:#7fb9ff">🔁</span><div style="flex:1;min-width:0"><div class="blk-t">${esc(tit)}</div><div class="small muted">${R.disponibles ? 'Toca para elegir día y hora · ' : ''}vencen el ${esc(fmtD(R.vence))}</div></div><span class="chev" aria-hidden="true">›</span></summary>
+  const subt = R.disponibles && prox.length ? `Ya agendaste: ${dia(prox[0].f)} ${prox[0].h} · ` : '';
+  return `<details class="card blk" data-sec="recup" id="recup-card" style="border-color:#4da3ff;background:rgba(77,163,255,.07)" ${secAbiertos.has('recup') ? 'open' : ''}><summary><span class="blk-l" style="border-color:#4da3ff;color:#7fb9ff">🔁</span><div style="flex:1;min-width:0"><div class="blk-t">${esc(tit)}</div><div class="small muted">${subt}${R.disponibles ? 'Toca para elegir día y hora · ' : ''}vencen el ${esc(fmtD(R.vence))}</div></div><span class="chev" aria-hidden="true">›</span></summary>
     ${R.disponibles ? `<div class="small muted">Elige un bloque de esta semana o la próxima. Lo que no recuperes antes de que termine tu plan se pierde.</div>
       ${ops.length ? (() => { const dias = [...new Set(ops.filter(o => o.libres).map(o => o.f))]; if (!dias.length) return '<div class="note small">Los bloques disponibles están llenos. Revisa más tarde.</div>';
         const sel = dias.includes(S.rDia) ? S.rDia : dias[0];
@@ -1214,7 +1221,7 @@ V.agenda = () => {
   const card = x => { const rec = x.rec; const past = S.dia < t || (S.dia === t && rec?.asis);
     const id = rec?.rutina || pred.get(S.dia + '|' + x.h); const r = id ? S.rutinas.get(id) : null;
     const est = rec?.asis === 'presente' ? '<span class="small ok" style="font-weight:700">Asististe ✓</span>' : rec?.asis === 'ausente' ? '<span class="small warn" style="font-weight:700">Faltaste</span>' : rec?.asis === 'aviso' ? '<span class="small muted" style="font-weight:700">Avisaste · no se descuenta</span>'
-      : rec?.reag_a ? '<span class="small muted" style="font-weight:700">Reagendada</span>' : past ? '<span class="small muted">Sin registro</span>' : '<span class="small red" style="font-weight:700">Agendada</span>';
+      : rec?.reag_a ? '<span class="small muted" style="font-weight:700">Movida a otro día</span>' : past ? '<span class="small muted">Sin registro</span>' : rec?.reag_de?.recup ? '<span class="tg ev" style="margin:0">🔁 Recuperación</span>' : rec?.reag_de ? '<span class="tg ev" style="margin:0">↻ Clase movida</span>' : '<span class="small red" style="font-weight:700">Agendada</span>';
     const ej = (rec?.ej || []).length ? `<div class="small muted">Anotaste ${rec.ej.length} ejercicio${rec.ej.length === 1 ? '' : 's'}${rec.carga ? ' · ' + esc(rec.carga) : ''}${rec.rpe != null ? ' · RPE ' + esc(rec.rpe) : ''}</div>` : '';
     const nv = !past ? proximas(4).findIndex(p => p.f === S.dia && p.h === x.h) : -1;
     return `<section class="card"><div class="row"><div class="disp" style="font-size:26px">${esc(x.h)}</div>${est}</div>
