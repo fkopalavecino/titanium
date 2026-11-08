@@ -66,6 +66,7 @@ nav.tabs button[aria-current=page]{color:var(--red-t)}
 .wk{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
 .wk button{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:4px;font:600 12px Barlow,sans-serif;cursor:pointer;min-height:76px}
 .wk button b{font:700 20px 'Barlow Condensed',sans-serif}
+.wk .ico{display:flex;gap:1px;height:16px;font-size:12px;line-height:16px;align-items:center}.wk .ico small{font-size:10px;color:var(--muted)}
 .wk .dots{display:flex;gap:4px;height:7px}
 .wk .dots i{width:7px;height:7px;border-radius:50%;background:var(--red)}
 .wk .dots i.ok{background:var(--ok)}
@@ -841,7 +842,9 @@ V.plan = () => {
 };
 function weekStrip(wk, sel, attr) { const t = today();
   return `<div class="wk">${Array.from({ length: 7 }, (_, i) => addDays(wk, i)).map(f => { const its = clasesDia(f); const done = its.some(x => x.rec?.asis === 'presente'); const ne = evDia(f).length;
-    return `<button ${attr}="${f}" aria-pressed="${f === sel}" class="${f === t ? 'today' : ''}" aria-label="${esc(longD(f))}${its.length ? ', con clase' : ''}${ne ? ', con actividad' : ''}">${DL[dayKey(f)].charAt(0)}<b>${pad(parseISO(f).getDate())}</b><span class="dots">${its.length ? `<i class="${done ? 'ok' : ''}"></i>` : ''}${ne ? '<i class="ev"></i>' : ''}</span></button>`; }).join('')}</div>`; }
+    return `<button ${attr}="${f}" aria-pressed="${f === sel}" class="${f === t ? 'today' : ''}" aria-label="${esc(longD(f))}${its.length ? ', con clase' : ''}${ne ? ', con actividad' : ''}">${DL[dayKey(f)].charAt(0)}<b>${pad(parseISO(f).getDate())}</b><span class="ico">${(() => { const ic = []; if (its.length) ic.push(done ? '✅' : '💪');
+      evDia(f).forEach(e => { const m = String(e.titulo || '').match(/\p{Extended_Pictographic}/u); ic.push(m ? m[0] : (EVI[e.tipo] || '📌')); });
+      const u = [...new Set(ic)]; return u.slice(0, 2).join('') + (u.length > 2 ? '<small>+</small>' : ''); })()}</span></button>`; }).join('')}</div>`; }
 const lunesDe = f => addDays(f, -((parseISO(f).getDay() + 6) % 7));
 function prediccion() { const m = new Map(); const pe = progEstado(); const t = today(); let i = 0;
   for (let d = 0; d < 70; d++) { const f = addDays(t, d);
@@ -870,8 +873,12 @@ function proximoHTML() { const t = today(); const pred = prediccion(); const it 
   return `<section class="card"><span class="eyebrow">Lo que viene</span>
     ${lst.length ? `<div style="display:grid;gap:8px">${lst.map(fila).join('')}</div>` : '<div class="small muted">No tienes clases ni actividades en los próximos días.</div>'}</section>`; }
 const EVI = { 'Reunión': '👥', 'Evaluación': '📋', 'Actividad': '🏃', 'Evento': '⭐', 'Nutrición': '🥗', 'Documento': '📄', 'Otro': '📌' };
+// color por tipo (y en Actividad, por deporte) para distinguirlas de un vistazo
+const evColor = e => { const t = String(e?.titulo || '').toLowerCase();
+  if (e?.tipo === 'Actividad') return /yoga|movilidad|estir|pilates/.test(t) ? '#b48cff' : /bici|mtb|ciclis|rodillo|🚴/.test(t) ? '#2fd0c4' : /run|trote|rodaje|series|carrera|🏃|trek|cerro/.test(t) ? '#ff8a3d' : '#4da3ff';
+  return { 'Evaluación': '#f3b45b', 'Reunión': '#4da3ff', 'Nutrición': '#6fd39a', 'Documento': '#a69ea3', 'Evento': '#ff7ab6', 'Otro': '#8fa0b3' }[e?.tipo] || '#4da3ff'; };
 const EVA = { 'Evaluación': 'Ver mis evaluaciones ›', 'Nutrición': 'Ver mi pauta ›', 'Reunión': 'Ver detalle y agendar ›', 'Documento': 'Abrir documento ›' };
-const evHTML = e => `<section class="card" style="border-color:var(--ev);border-left-width:5px;cursor:pointer" data-evid="${esc(e.id)}" role="button" tabindex="0"><div class="row"><div class="disp" style="font-size:22px">${e.hora ? esc(e.hora) : 'Todo el día'}</div><span class="chip" style="cursor:inherit;background:var(--ev);border-color:var(--ev);color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span></div><b>${esc(e.titulo)}</b>${e.detalle ? `<div class="small muted" style="white-space:pre-line;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(e.detalle)}</div>` : ''}<div class="small" style="color:var(--ev);font-weight:700">${(e.adjunto || e.link) ? '📎 ' : ''}${esc(EVA[e.tipo] || 'Ver detalle ›')}</div></section>`;
+const evHTML = e => { const c = evColor(e); return `<section class="card" style="border-color:${c};border-left-width:5px;cursor:pointer" data-evid="${esc(e.id)}" role="button" tabindex="0"><div class="row"><div class="disp" style="font-size:22px">${e.hora ? esc(e.hora) : 'Todo el día'}</div><span class="chip" style="cursor:inherit;background:${c};border-color:${c};color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span></div><b>${esc(e.titulo)}</b>${e.detalle ? `<div class="small muted" style="white-space:pre-line;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(e.detalle)}</div>` : ''}<div class="small" style="color:${c};font-weight:700">${(e.adjunto || e.link) ? '📎 ' : ''}${esc(EVA[e.tipo] || 'Ver detalle ›')}</div></section>`; };
 function icsDe(e) { const d = e.fecha.replace(/-/g, ''); const h = e.hora ? e.hora.replace(':', '') + '00' : null; const fin = h ? String(Number(h.slice(0, 2)) + 1).padStart(2, '0') + h.slice(2) : null;
   const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Titanium Sport//ES', 'BEGIN:VEVENT', 'UID:' + e.id + '@titanium', h ? 'DTSTART;TZID=America/Santiago:' + d + 'T' + h : 'DTSTART;VALUE=DATE:' + d, h ? 'DTEND;TZID=America/Santiago:' + d + 'T' + fin : 'DTEND;VALUE=DATE:' + addDays(e.fecha, 1).replace(/-/g, ''),
     'SUMMARY:' + (e.titulo || '').replace(/[,;\n]/g, ' ') + ' · Titanium', 'DESCRIPTION:' + (e.detalle || '').replace(/\n/g, '\\n').replace(/[,;]/g, ' '), 'LOCATION:Titanium Sport', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
@@ -886,7 +893,7 @@ function abrirEvento(id) { const e = S.eventos.find(x => String(x.id) === String
   if (e.fecha >= today()) acts.push(`<a class="btn" href="${icsDe(e)}" download="titanium-${esc(e.fecha)}.ics">📅 Agregar a mi calendario</a>`);
   if (n) acts.push(`<a class="btn" href="https://wa.me/${n}?text=${encodeURIComponent(`Hola Franco, soy ${nom}. Te escribo por: ${e.titulo} (${longD(e.fecha).toLowerCase()}${e.hora ? ' a las ' + e.hora : ''}).`)}" target="_blank" rel="noopener" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">💬 Escribir a Franco</a>`);
   const sh = document.createElement('div'); sh.id = 'sheet';
-  sh.innerHTML = `<div class="in" role="dialog" aria-modal="true" aria-label="${esc(e.titulo)}"><div class="row"><span class="chip" style="cursor:default;background:var(--ev);border-color:var(--ev);color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span><button class="btn" data-close="1" style="width:auto;min-height:36px" aria-label="Cerrar">✕</button></div>
+  sh.innerHTML = `<div class="in" role="dialog" aria-modal="true" aria-label="${esc(e.titulo)}"><div class="row"><span class="chip" style="cursor:default;background:${evColor(e)};border-color:${evColor(e)};color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span><button class="btn" data-close="1" style="width:auto;min-height:36px" aria-label="Cerrar">✕</button></div>
     <h2 style="font-size:26px">${esc(e.titulo)}</h2><div class="small muted">${esc(longD(e.fecha))}${e.hora ? ' · ' + esc(e.hora) : ' · todo el día'}${e.alumno ? '' : ' · para todo Titanium'}</div>
     ${e.detalle ? `<div class="note" style="white-space:pre-line">${esc(e.detalle)}</div>` : ''}
     ${doc && !esPdf ? `<img src="${esc(doc)}" alt="${esc(e.titulo)}" data-zoom="1" style="width:100%;max-height:300px;object-fit:contain;border-radius:10px;background:var(--sunk)">` : ''}
@@ -985,7 +992,7 @@ V.agenda = () => {
   return `<div class="row" style="align-items:center"><h1>Agenda</h1>${S.dia !== t ? '<button class="chip" data-hoy="1">Hoy</button>' : ''}</div>
   <div class="wknav"><button data-wk="-7" aria-label="Semana anterior">‹</button><b class="small">${esc(titulo)}</b><button data-wk="7" aria-label="Semana siguiente">›</button></div>
   ${weekStrip(S.wk, S.dia, 'data-dia')}
-  <div class="legend"><span><i style="background:var(--red)"></i>Clase</span><span><i style="background:var(--ok)"></i>Asististe</span><span><i style="background:var(--ev)"></i>Actividad</span></div>
+
   <div class="eyebrow">${esc(longD(S.dia))}</div>
   ${items.length || evs.length ? [...items.map(x => ({ k: x.h, html: card(x) })), ...evs.map(e => ({ k: e.hora || '00:00', html: evHTML(e) }))].sort((a, b) => a.k.localeCompare(b.k)).map(x => x.html).join('') : `<div class="card"><div class="muted">${S.dia < t ? 'No tuviste clase este día.' : 'No tienes nada agendado este día. ¡Descansa o muévete libre!'}</div></div>`}`;
 };
