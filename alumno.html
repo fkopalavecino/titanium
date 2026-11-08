@@ -77,6 +77,7 @@ nav.tabs button[aria-current=page]{color:var(--red-t)}
 .wk button.today:not([aria-pressed=true]){border-color:var(--red)}
 .wknav{display:flex;align-items:center;justify-content:space-between}
 .wknav button{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--fg);font-size:20px;cursor:pointer}
+.ag-rut,.ag-ses{display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer}.ag-rut{background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:12px 14px}.ag-ses{flex-direction:row}.ag-rut .chev,.ag-ses .chev{color:var(--muted);font-size:22px}.ag-rut:active,.ag-ses:active{border-color:var(--red)}
 details.ses summary{cursor:pointer;color:var(--red-t);font-weight:600;font-size:14px;list-style:none}
 details.ses summary::-webkit-details-marker{display:none}
 .ph-cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -371,7 +372,7 @@ const progLinea = (r, s) => { const p = r?.progresion; return Array.isArray(p) &
 function rutinaDeHoy() {
   const t = today(); const pe = progEstado();
   if (S.ses) { const { f, h } = S.ses; const rec = recOf(f, h); const id = S.rutSel || rec?.rutina || S.ses.id || (pe ? pe.next[0] : null); const r = id ? S.rutinas.get(id) : null;
-    return { id, r: rec?.sesion && !S.rutSel ? Object.assign({}, r || {}, { bloques: rec.sesion }) : r, hora: h, fecha: f, rec, pe, hoy: f === t, otroDia: f !== t }; }
+    return { id, r: rec?.sesion && !S.rutSel ? Object.assign({}, r || {}, { bloques: rec.sesion }) : r, hora: h, fecha: f, rec, pe, hoy: f === t && h !== 'libre', otroDia: f !== t, futuro: f > t }; }
   const prox = proximas(1)[0]; const hora = prox && prox.f === t ? prox.h : (bloquesDe(t)[0] || 'libre');
   const rec = recOf(t, hora);
   let id = S.rutSel || rec?.rutina || (pe ? pe.next[0] : null);
@@ -738,9 +739,9 @@ V.rutina = () => {
   if (!r) return `<h1>Rutina</h1><div class="card"><div class="muted">Aún no tienes una rutina asignada. Franco te la asigna en la clase.</div></div>`;
   const H = historial(); const cur = {}; (rd.rec?.ej || []).forEach(e => cur[e.n] = e);
   const bloques = r.bloques || [];
-  const sesP = rd.pe ? rd.pe.ses : [];
-  const selHTML = sesP.length > 1 ? `<div class="chips" style="margin-top:2px">${sesP.map(([id, x]) => `<button class="chip" data-rsel="${esc(id)}" aria-pressed="${id === rd.id}">${esc(String(x.tipo || 'Sesión').split('·')[0].trim())}</button>`).join('')}</div>` : '';
-  const otro = rd.otroDia ? `<section class="card" style="border-color:var(--ev);background:rgba(77,163,255,.08)"><div class="row"><b>📅 Sesión del ${esc(longD(rd.fecha).toLowerCase())}${rd.hora && rd.hora !== 'libre' ? ' · ' + esc(rd.hora) : ''}</b><button class="chip" data-sesx="1">Volver a hoy</button></div><div class="small muted">Lo que anotes se guarda en ese día.</div></section>` : '';
+  const selHTML = '';
+  const cuandoTxt = rd.fecha === today() ? 'Sesión de hoy' : 'Sesión del ' + longD(rd.fecha).toLowerCase();
+  const otro = S.ses ? `<section class="card" style="border-color:var(--ev);background:rgba(77,163,255,.08)"><div class="row" style="align-items:center"><b>📅 ${esc(cuandoTxt)}${rd.hora && rd.hora !== 'libre' ? ' · ' + esc(rd.hora) : ''}</b><button class="chip" data-sesx="1">‹ Agenda</button></div>${rd.futuro ? '<div class="small muted">Vista previa: podrás anotarla ese día.</div>' : rd.otroDia ? '<div class="small muted">Lo que anotes se guarda en ese día.</div>' : ''}</section>` : '';
   return `${otro}
   <div style="display:grid;gap:6px"><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total : ''}</div><h1 style="font-size:30px;line-height:1.05">${esc(r.tipo || 'Rutina')}</h1>${(() => { const l = rd.pe ? progLinea(r, rd.pe.semana) : ''; return l ? `<div class="small muted">💡 ${esc(l.replace(/^Semana \d+ · /, ''))}</div>` : ''; })()}
     <div class="chips" style="margin-top:2px">${r.minutos ? `<span class="chip">⏱ ~${esc(r.minutos)} min</span>` : ''}<span class="chip">${bloques.reduce((n, b) => n + (b.ejercicios || []).length, 0)} ejercicios</span>${rd.hora && rd.hora !== 'libre' ? `<span class="chip">🕒 ${esc(rd.hora)}</span>` : ''}</div>${selHTML}</div>
@@ -756,12 +757,12 @@ V.rutina = () => {
             return `<div class="sets"><div class="set-h"><span>Serie</span><span>Anterior</span><span>Kg</span><span>Reps</span><span></span></div>${Array.from({ length: n }, (_, i) => { const s = sets[i] || {}; const done = s.kg != null || s.r != null; const p = pv[i] || pv[pv.length - 1];
             return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span><span class="prev">${p ? esc(fmtSet(p)) : '—'}</span><input inputmode="decimal" placeholder="${p && p.kg != null ? esc(String(p.kg).replace('.', ',')) : 'kg'}" aria-label="kg serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s.kg != null ? esc(String(s.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${p && p.r != null ? esc(p.r) : 'reps'}" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s.r != null ? esc(s.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }).join('')}</div>`; })() : ''}</div>`; }).join('')}
     </details>`; }).join('')}
-  <section class="card">
+  ${rd.futuro ? '<section class="card"><div class="small muted">Esta sesión es de un día que aún no llega. Ábrela desde la Agenda ese día para anotar tus series.</div></section>' : `<section class="card">
     <label class="field">Resultado del bloque C<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>
     <div class="field">¿Qué tan duro fue? (RPE)<div class="chips">${[5,6,7,8,9,10].map(v => `<button class="chip" data-rpe="${v}" aria-pressed="${String(rd.rec?.rpe ?? S.rpe) === String(v)}">${v}</button>`).join('')}</div></div>
     <button class="btn pri" id="guardar">Guardar mi entrenamiento</button>
     ${rd.otroDia ? `<div class="small muted">Se guarda en tu sesión del ${esc(fmtD(rd.fecha))}.</div>` : rd.hoy ? '' : '<div class="small muted">Hoy no tienes clase agendada: se guarda como entrenamiento libre.</div>'}
-  </section>`;
+  </section>`}`;
 };
 V.progreso = () => {
   const t = today(); const mes = t.slice(0, 7);
@@ -1014,10 +1015,9 @@ V.agenda = () => {
     const ej = (rec?.ej || []).length ? `<div class="small muted">Anotaste ${rec.ej.length} ejercicio${rec.ej.length === 1 ? '' : 's'}${rec.carga ? ' · ' + esc(rec.carga) : ''}${rec.rpe != null ? ' · RPE ' + esc(rec.rpe) : ''}</div>` : '';
     const nv = !past ? proximas(4).findIndex(p => p.f === S.dia && p.h === x.h) : -1;
     return `<section class="card"><div class="row"><div class="disp" style="font-size:26px">${esc(x.h)}</div>${est}</div>
-      ${r ? `<div><b>${esc(r.tipo || 'Rutina')}</b><div class="small muted">${esc(r.familia || '')}${!rec?.rutina && !past ? ' · según tu programa' : ''}</div></div>
-      <details class="ses"><summary>Ver ejercicios</summary>${sesHTML(r)}</details>` : `<div class="small muted">${past ? 'Clase en Titanium' : 'Franco te asigna la rutina en la clase.'}</div>`}
+      ${r ? `<button class="ag-rut" data-abrses="${esc(S.dia + '|' + x.h + '|' + id)}"><div style="flex:1;min-width:0"><b>${esc(r.tipo || 'Rutina')}</b><div class="small muted">${esc(r.familia || '')}${!rec?.rutina && !past ? ' · según tu programa' : ''}</div></div><span class="chev" aria-hidden="true">›</span></button>` : `<div class="small muted">${past ? 'Clase en Titanium' : 'Franco te asigna la rutina en la clase.'}</div>`}
       ${ej}
-      ${S.dia === t && r && !past ? '<button class="btn pri" data-go="rutina">Entrenar ahora</button>' : ''}
+      ${S.dia === t && r && !past ? `<button class="btn pri" data-abrses="${esc(S.dia + '|' + x.h + '|' + id)}">Entrenar ahora</button>` : ''}
       ${r && past && S.dia >= addDays(t, -30) && rec?.asis !== 'ausente' ? `<button class="btn ${(rec?.ej || []).length ? '' : 'pri'}" data-abrses="${esc(S.dia + '|' + x.h + '|' + id)}">${(rec?.ej || []).length ? 'Ver / editar lo que anotaste' : 'Abrir y anotar esta sesión'}</button>` : ''}
       ${nv >= 0 ? asisBtns(S.dia, x.h) : ''}</section>`; };
   return `<div class="row" style="align-items:center"><h1>Agenda</h1>${S.dia !== t ? '<button class="chip" data-hoy="1">Hoy</button>' : ''}</div>
@@ -1025,7 +1025,10 @@ V.agenda = () => {
   ${weekStrip(S.wk, S.dia, 'data-dia')}
 
   <div class="eyebrow">${esc(longD(S.dia))}</div>
-  ${items.length || evs.length ? [...items.map(x => ({ k: x.h, html: card(x) })), ...evs.map(e => ({ k: e.hora || '00:00', html: evHTML(e) }))].sort((a, b) => a.k.localeCompare(b.k)).map(x => x.html).join('') : `<div class="card"><div class="muted">${S.dia < t ? 'No tuviste clase este día.' : 'No tienes nada agendado este día. ¡Descansa o muévete libre!'}</div></div>`}`;
+  ${items.length || evs.length ? [...items.map(x => ({ k: x.h, html: card(x) })), ...evs.map(e => ({ k: e.hora || '00:00', html: evHTML(e) }))].sort((a, b) => a.k.localeCompare(b.k)).map(x => x.html).join('') : `<div class="card"><div class="muted">${S.dia < t ? 'No tuviste clase este día.' : 'No tienes nada agendado este día. ¡Descansa o muévete libre!'}</div></div>`}
+  ${(() => { const pe = progEstado(); if (!pe || !pe.ses.length || S.dia < addDays(t, -30)) return '';
+    return `<div class="eyebrow" style="margin-top:6px">Tu programa · toca una sesión para ${S.dia > t ? 'verla' : 'entrenarla'}</div>
+    ${pe.ses.map(([id, x]) => `<button class="card ag-ses" data-progses="${esc(id)}"><div style="flex:1;min-width:0"><div class="row" style="justify-content:flex-start;gap:8px"><b class="blk-t">${esc(x.tipo || 'Sesión')}</b>${id === pe.next[0] ? '<span class="small red" style="font-weight:700">Te toca</span>' : ''}</div><div class="small muted">${x.minutos ? '⏱ ~' + esc(x.minutos) + ' min · ' : ''}${(x.bloques || []).reduce((n, b) => n + (b.ejercicios || []).length, 0)} ejercicios</div></div><span class="chev" aria-hidden="true">›</span></button>`).join('')}`; })()}`;
 };
 V.clases = () => {
   const t = today(); const pas = S.clases.filter(r => r.fecha < t && r.fecha >= addDays(t, -14) && (r.asis || r.quitado)).slice(-6).reverse();
@@ -1129,9 +1132,10 @@ document.addEventListener('click', async ev => {
   const fx = ev.target.closest('[data-fx]'); if (fx) { fx.setAttribute('aria-pressed', String(fx.getAttribute('aria-pressed') !== 'true')); return; }
   const pqb = ev.target.closest('[data-pq]'); if (pqb) { document.querySelectorAll(`[data-pq="${pqb.dataset.pq}"]`).forEach(b => b.setAttribute('aria-pressed', String(b === pqb))); return; }
   if (ev.target.id === 'fx-save') { guardarFicha(ev.target); return; }
+  const pses = ev.target.closest('[data-progses]'); if (pses) { const f = S.dia || today(); const id = pses.dataset.progses; const h = (clasesDia(f).find(x => !x.rec?.reag_a && x.rec?.asis !== 'ausente') || {}).h || 'libre'; S.ses = { f, h, id }; S.rutSel = id; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
   const abr = ev.target.closest('[data-abrses]'); if (abr) { const [f, h, id] = abr.dataset.abrses.split('|'); S.ses = { f, h, id }; S.rutSel = null; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
   const rsel = ev.target.closest('[data-rsel]'); if (rsel) { if (rsel.dataset.rsel === rutinaDeHoy().id) return; S.rutSel = rsel.dataset.rsel; S.rpe = null; blkAbiertos.clear(); render(); return; }
-  if (ev.target.closest('[data-sesx]')) { S.ses = null; S.rutSel = null; S.rpe = null; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
+  if (ev.target.closest('[data-sesx]')) { S.ses = null; S.rutSel = null; S.rpe = null; S.v = 'agenda'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
   const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { if ((go.dataset.go || go.dataset.v) === 'rutina') { S.ses = null; S.rutSel = null; } S.v = go.dataset.go || go.dataset.v; S.evalFirst = false; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
   const chk = ev.target.closest('[data-chk]'); if (chk) { const row = chk.closest('.set'); const ins = [...row.querySelectorAll('input')];
     if (row.dataset.ok) { delete row.dataset.ok; finDescanso(); return; }
@@ -1171,7 +1175,7 @@ document.addEventListener('click', async ev => {
   const cpy = ev.target.closest('[data-copy]'); if (cpy) { try { await navigator.clipboard.writeText(cpy.dataset.copy); toast('Copiado ✓'); } catch (_) { toast(cpy.dataset.copy); } return; }
   if (ev.target.closest('[data-gopago]')) { secAbiertos.add('pagos'); S.v = 'plan'; render(); setTimeout(() => document.getElementById('pagos-card')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50); return; }
   if (ev.target.id === 'guardar') {
-    const rd = rutinaDeHoy(); const by = {};
+    const rd = rutinaDeHoy(); const by = {}; if (rd.futuro) { toast('Podrás anotar esta sesión ese día.'); return; }
     document.querySelectorAll('.set input').forEach(i => { const v = i.value.trim().replace(',', '.'); const o = (by[i.dataset.n] = by[i.dataset.n] || []); o[i.dataset.i] = o[i.dataset.i] || {}; if (v !== '' && !isNaN(v)) o[i.dataset.i][i.dataset.f] = Number(v); });
     const ej = Object.entries(by).map(([n, sets]) => { const ss = sets.map(s => s || {}).filter(s => s.kg != null || s.r != null); if (!ss.length) return null;
       const top = ss.reduce((b, s) => (s.kg || 0) > (b.kg || 0) ? s : b, ss[0]); return { n, kg: top.kg, r: top.r, s: ss.length, sets: ss }; }).filter(Boolean);
