@@ -1307,7 +1307,7 @@ VIEWS.registro = () => {
           <label class="chip" style="min-height:44px"><input type="checkbox" id="aj-pbloq" ${c.pago?.bloquearRecup === false ? '' : 'checked'} style="accent-color:var(--red)"> Si debe, no puede recuperar clases</label></div>
       </fieldset>
       <fieldset style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:0;display:grid;gap:10px"><legend class="small" style="font-weight:700;padding:0 6px">🔁 Recuperaciones automáticas</legend>
-        <div class="small muted">Elige cuántos cupos de recuperación das en cada bloque (— = no se recupera ahí). Esos cupos salen de los ${c.cupos} del bloque: si el bloque ya está lleno con alumnos regulares, no se ofrece. Reglas: ganan 1 clase por recuperar si avisan "no voy" con 2 horas o más de anticipación; agendan en la semana en curso o la siguiente; lo que no recuperan en el mes se pierde.</div>
+        <div class="small muted">Elige cuántos cupos de recuperación das en cada bloque (— = no se recupera ahí). Esos cupos salen de los ${c.cupos} del bloque: si el bloque ya está lleno con alumnos regulares, no se ofrece. Reglas: ganan 1 clase por recuperar si avisan "no voy" con 2 horas o más de anticipación; agendan en la semana en curso o la siguiente; lo que no recuperan antes de que termine su plan se pierde.</div>
         <div class="blk-grid"><table><thead><tr><th></th>${['lun','mar','mie','jue','vie','sab'].filter(d => c.dias.includes(d)).map(d => `<th>${DSHORT[d]}</th>`).join('')}</tr></thead><tbody>
           ${c.horas.map(h => `<tr><td class="num">${esc(h)}</td>${['lun','mar','mie','jue','vie','sab'].filter(d => c.dias.includes(d)).map(d => { const k = d+'-'+h; return c.noDisponible.includes(k) ? '<td><span class="muted">–</span></td>' : (() => { const rc = c.recup || {}; const v = Array.isArray(rc) ? (rc.includes(k) ? (c.recupCupo || 2) : 0) : (+rc[k] || 0);
             return `<td><select name="aj-recup" data-k="${esc(k)}" aria-label="Cupos de recuperación ${DNAME[d]} ${esc(h)}" style="min-width:52px;padding:4px;${v ? 'border-color:var(--red);color:var(--fg);font-weight:700' : 'color:var(--muted)'}">${[0,1,2,3,4].filter(n => n <= c.cupos).map(n => `<option value="${n}" ${n === v ? 'selected' : ''}>${n || '—'}</option>`).join('')}</select></td>`; })(); }).join('')}</tr>`).join('')}
@@ -1530,7 +1530,7 @@ function abrirMesModal(mes) {
         if (!sel.has(x.a.codigo)) return;
         const fresh = clone(S.alumnos.get(x.a.codigo));
         if (!fresh || (fresh.planes||[]).some(p => p.mes === mes)) return;
-        fresh.planes = [...(fresh.planes||[]), {id: 'p' + Date.now().toString(36) + i.toString(36), inicio: x.ini, fin: addDays(x.ini, c.cicloDias), monto: x.monto, clases: x.clases, pagos: [], mes}];
+        fresh.planes = [...(fresh.planes||[]), {id: 'p' + Date.now().toString(36) + i.toString(36), inicio: x.ini, fin: finPlan(fresh, x.ini, x.clases, c), monto: x.monto, clases: x.clases, pagos: [], mes}];
         saveAlumno(fresh); n++; total += x.monto;
       });
       S.ui.pagosF = 'saldo';
@@ -1539,14 +1539,24 @@ function abrirMesModal(mes) {
   });
 }
 
+// fechas de las sesiones del plan: sus días fijos desde el inicio hasta completar las clases; renueva el día de su siguiente clase
+function sesionesPlan(a, ini, n) { const dias = new Set((a?.bloques||[]).map(k => String(k).split('-')[0])); n = Number(n) || 0;
+  if (!ini || !dias.size || !n) return null; const out = []; let f = ini;
+  for (let i = 0; i < 400 && out.length <= n; i++) { if (dias.has(dayKey(f))) out.push(f); f = addDays(f, 1); }
+  return out.length > n ? { fechas: out.slice(0, n), fin: out[n] } : null; }
+const finPlan = (a, ini, n, c) => sesionesPlan(a, ini, n)?.fin || (ini ? addDays(ini, c.cicloDias) : null);
+const DCORTO = {dom:'dom',lun:'lun',mar:'mar',mie:'mié',jue:'jue',vie:'vie',sab:'sáb'};
+function sesionesTxt(a, ini, n) { const sp = sesionesPlan(a, ini, n);
+  if (!sp) return (a?.bloques||[]).length ? 'Pon la cantidad de clases para calcular sus sesiones.' : 'Este alumno no tiene días fijos: la renovación se calcula a días corridos.';
+  return `<b>Sus ${sp.fechas.length} sesiones:</b> ${sp.fechas.map(f => DCORTO[dayKey(f)] + ' ' + parseISO(f).getDate() + '/' + (parseISO(f).getMonth() + 1)).join(' · ')}<br>Renueva el ${esc(fmtDY(sp.fin))} (su siguiente clase). Recupera hasta el día anterior.`; }
 function planModal(code, pid, mode) {
   const a = clone(S.alumnos.get(code)); if (!a) return;
   const c = cfg(), t = today();
   const cur = planActual(a);
   let p;
   if (mode === 'editar') p = a.planes.find(x => x.id === pid);
-  else if (mode === 'renovar') { const ini = cur?.fin && cur.fin >= addDays(t, -14) ? cur.fin : t; p = {id: 'p'+Date.now().toString(36), inicio: ini, fin: addDays(ini, c.cicloDias), monto: cur?.monto || '', clases: cur?.clases || a.clases || '', pagos: []}; }
-  else p = {id: 'p'+Date.now().toString(36), inicio: t, fin: addDays(t, c.cicloDias), monto: '', clases: a.clases || '', pagos: []};
+  else if (mode === 'renovar') { const ini = cur?.fin && cur.fin >= addDays(t, -14) ? cur.fin : t; const ncl = cur?.clases || a.clases || ''; p = {id: 'p'+Date.now().toString(36), inicio: ini, fin: finPlan(a, ini, ncl, c), monto: cur?.monto || '', clases: ncl, pagos: []}; }
+  else p = {id: 'p'+Date.now().toString(36), inicio: t, fin: finPlan(a, t, a.clases, c), monto: '', clases: a.clases || '', pagos: []};
   if (!p) return;
   const title = {editar: 'Editar plan', renovar: 'Renovar plan', nuevo: 'Nuevo plan'}[mode];
   openModal(`${title} · ${a.nombre}`, `
@@ -1558,7 +1568,7 @@ function planModal(code, pid, mode) {
       <label class="f">Inicio<input type="date" id="pl-ini" value="${esc(p.inicio || '')}"></label>
       <label class="f">Renueva el<input type="date" id="pl-fin" value="${esc(p.fin || '')}"></label>
     </div>
-    <p class="small muted" style="margin:0">Al cambiar el inicio, la renovación se calcula a ${c.cicloDias} días.</p>
+    <p class="small" id="pl-ses" style="margin:0;line-height:1.5">${sesionesTxt(a, p.inicio, p.clases)}</p>
     ${mode !== 'editar' ? `<div class="frow">
       <label class="f">Abono ahora (opcional)<input type="number" id="pl-abono" min="0" step="1" placeholder="0"></label>
       <label class="f">Medio<select id="pl-medio">${MEDIOS.map(m => `<option>${m}</option>`).join('')}</select></label></div>`
@@ -1568,7 +1578,7 @@ function planModal(code, pid, mode) {
     extra: mode === 'editar' ? `<button type="button" class="btn ghost" style="color:var(--crit)" data-act="borrar-plan">Eliminar plan</button>` : '',
     onSubmit: () => {
       const fresh = clone(S.alumnos.get(code));
-      const monto = Number(val('pl-monto')) || 0, ini = val('pl-ini') || null, fin = val('pl-fin') || (ini ? addDays(ini, c.cicloDias) : null);
+      const monto = Number(val('pl-monto')) || 0, ini = val('pl-ini') || null, fin = val('pl-fin') || finPlan(a, ini, val('pl-clases'), c);
       const np = Object.assign({}, p, {monto, clases: Number(val('pl-clases')) || null, inicio: ini, fin, mes: monthOf(ini) || p.mes || t.slice(0,7)});
       if (mode === 'editar') np.pagos = p.pagos;
       const ab = Number(val('pl-abono')) || 0;
@@ -1579,7 +1589,8 @@ function planModal(code, pid, mode) {
     }
   });
   const ini = $('#pl-ini');
-  ini?.addEventListener('change', () => { if (ini.value) $('#pl-fin').value = addDays(ini.value, c.cicloDias); });
+  const recalc = () => { if (ini?.value) $('#pl-fin').value = finPlan(a, ini.value, val('pl-clases'), c); $('#pl-ses').innerHTML = sesionesTxt(a, ini?.value, val('pl-clases')); };
+  ini?.addEventListener('change', recalc); $('#pl-clases')?.addEventListener('input', recalc);
   $('#modal').dataset.code = code; $('#modal').dataset.pid = p.id;
   editingPlan = p;
 }
@@ -1950,7 +1961,7 @@ document.addEventListener('click', e => {
     case 'asis': { const {f,h,code} = toggleOne(el.dataset.k); const cur = rec(f,h,code).asis; const nv = cur === el.dataset.v ? null : el.dataset.v;
       // avisó que no venía: el profe elige en una ventana clara si le da la recuperación o queda Ausente
       if (nv === 'aviso') { const k = el.dataset.k, n = esc(firstName(nombre(code)));
-        openModal(`${firstName(nombre(code))} avisó que no venía`, `<p style="margin:0 0 12px">¿Le das una clase para recuperar este mes?</p>
+        openModal(`${firstName(nombre(code))} avisó que no venía`, `<p style="margin:0 0 12px">¿Le das una clase para recuperar antes de que termine su plan?</p>
           <div style="display:grid;gap:10px">
             <button type="button" class="btn pri" data-act="aviso-si" data-k="${esc(k)}" style="min-height:56px;justify-content:flex-start;text-align:left"><span>🔁 <b>Sí, dar recuperación</b><br><span class="small" style="font-weight:400">${n} la agenda desde su app · no cuenta como falta</span></span></button>
             <button type="button" class="btn" data-act="aviso-no" data-k="${esc(k)}" style="min-height:56px;justify-content:flex-start;text-align:left"><span>❌ <b>No, queda Ausente</b><br><span class="small muted" style="font-weight:400">Cuenta como falta · no recupera</span></span></button>

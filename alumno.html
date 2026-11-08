@@ -528,7 +528,7 @@ function onboardingHTML() {
           <div>• Avisa en la app con <b>al menos 2 horas de anticipación</b> (botón «No puedo ir»). Así ganas <b>1 clase para recuperar</b>.</div>
           <div>• Si avisas más tarde o no avisas, esa clase <b>no se puede recuperar y se descuenta de tu plan</b>.</div>
           <div>• Recuperas tú mismo en los bloques habilitados <b>de esta semana y la próxima</b>, según los cupos disponibles.</div>
-          <div>• Las clases por recuperar <b>vencen al final del mes</b>: no pasan al mes siguiente.</div>
+          <div>• Las clases por recuperar <b>vencen cuando termina tu plan</b>: no pasan al plan siguiente.</div>
           <div>• Elige bien el bloque: una vez agendada la recuperación, <b>no se puede cambiar</b>. Si no asistes, la pierdes.</div>
         </div></section>
       <section class="card" style="gap:8px">
@@ -1002,7 +1002,7 @@ function confirmarAsis(k, estado) { return new Promise(res => { const [f, h] = k
     <div class="note small" style="display:grid;gap:6px;border-color:var(--warn)">
       <div>⚠️ ${cambio ? '<b>Este es tu único cambio.</b> Después tu respuesta queda fija.' : 'Tienes <b>solo 1 oportunidad</b> para cambiar tu respuesta después de esto.'}</div>
       ${estado === 'voy' ? '<div>❌ Si confirmas y después faltas sin avisar, <b>la clase se descuenta de tu plan</b>.</div>' : ''}
-      ${estado === 'no_voy' ? (aTiempo ? '<div>🔁 Como avisas con más de 2 horas, ganas <b>1 clase para recuperar</b> (esta semana o la próxima, dentro del mes).</div>' : '<div>⏰ Faltan menos de 2 horas: esta clase <b>no se puede recuperar</b>.</div>') : ''}
+      ${estado === 'no_voy' ? (aTiempo ? '<div>🔁 Como avisas con más de 2 horas, ganas <b>1 clase para recuperar</b> (esta semana o la próxima, antes de que termine tu plan).</div>' : '<div>⏰ Faltan menos de 2 horas: esta clase <b>no se puede recuperar</b>.</div>') : ''}
       <div>Si después necesitas otro cambio, <b>contáctate con ${prof}</b>.</div>
     </div>
     <div class="grid2"><button class="btn" data-ca="0">Rechazar</button><button class="btn pri" data-ca="1">Aceptar</button></div></div>`;
@@ -1027,7 +1027,7 @@ function recupHTML() { const R = S.recup; if (!R || !R.activo) return '';
   const ops = (R.opciones || []).filter(o => !o.ya);
   return `<section class="card" id="recup-card" style="border-color:#4da3ff;background:rgba(77,163,255,.07)">
     <div class="row"><span class="eyebrow" style="color:#7fb9ff">🔁 Recuperar clases</span><span class="small muted">vencen el ${esc(fmtD(R.vence))}</span></div>
-    ${R.disponibles ? `<div><b style="font-size:18px">Tienes ${R.disponibles} clase${R.disponibles === 1 ? '' : 's'} por recuperar</b><div class="small muted">Elige un bloque de esta semana o la próxima. Lo que no recuperes este mes se pierde.</div></div>
+    ${R.disponibles ? `<div><b style="font-size:18px">Tienes ${R.disponibles} clase${R.disponibles === 1 ? '' : 's'} por recuperar</b><div class="small muted">Elige un bloque de esta semana o la próxima. Lo que no recuperes antes de que termine tu plan se pierde.</div></div>
       ${ops.length ? (() => { const dias = [...new Set(ops.filter(o => o.libres).map(o => o.f))]; if (!dias.length) return '<div class="note small">Los bloques disponibles están llenos. Revisa más tarde.</div>';
         const sel = dias.includes(S.rDia) ? S.rDia : dias[0];
         return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;min-width:0">${dias.map(f => `<button class="chip" data-rdia="${esc(f)}" aria-pressed="${f === sel}" style="justify-content:center;min-width:0;padding:0 6px;font-size:13px">${esc(f === t ? 'Hoy' : f === addDays(t, 1) ? 'Mañana' : DL[dayKey(f)] + ' ' + fmtD(f))}</button>`).join('')}</div>
