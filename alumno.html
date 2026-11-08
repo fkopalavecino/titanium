@@ -367,12 +367,16 @@ function progEstado() {
 }
 const progIdx = s => s <= 8 ? s - 1 : 4 + ((s - 9) % 4);
 const progLinea = (r, s) => { const p = r?.progresion; return Array.isArray(p) && p.length ? p[Math.min(progIdx(s), p.length - 1)] : ''; };
+// S.ses = {f, h, id}: sesión de otro día abierta desde la Agenda · S.rutSel: rutina del programa elegida a mano
 function rutinaDeHoy() {
-  const t = today(); const prox = proximas(1)[0]; const hora = prox && prox.f === t ? prox.h : (bloquesDe(t)[0] || 'libre');
-  const rec = recOf(t, hora); const pe = progEstado();
-  let id = rec?.rutina || (pe ? pe.next[0] : null);
+  const t = today(); const pe = progEstado();
+  if (S.ses) { const { f, h } = S.ses; const rec = recOf(f, h); const id = S.rutSel || rec?.rutina || S.ses.id || (pe ? pe.next[0] : null); const r = id ? S.rutinas.get(id) : null;
+    return { id, r: rec?.sesion && !S.rutSel ? Object.assign({}, r || {}, { bloques: rec.sesion }) : r, hora: h, fecha: f, rec, pe, hoy: f === t, otroDia: f !== t }; }
+  const prox = proximas(1)[0]; const hora = prox && prox.f === t ? prox.h : (bloquesDe(t)[0] || 'libre');
+  const rec = recOf(t, hora);
+  let id = S.rutSel || rec?.rutina || (pe ? pe.next[0] : null);
   const r = id ? S.rutinas.get(id) : null;
-  return { id, r: rec?.sesion ? Object.assign({}, r || {}, { bloques: rec.sesion }) : r, hora, rec, pe, hoy: !!(prox && prox.f === t) };
+  return { id, r: rec?.sesion && !S.rutSel ? Object.assign({}, r || {}, { bloques: rec.sesion }) : r, hora, fecha: t, rec, pe, hoy: !!(prox && prox.f === t) };
 }
 function historial() { // {nombre: [{f, kg, r}]}
   const h = {}; for (const r of S.clases) for (const e of r.ej || []) { const sets = e.sets && e.sets.length ? e.sets : [{ kg: e.kg, r: e.r }];
@@ -383,10 +387,10 @@ const nSer = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\
 const fmtSet = s => s ? (s.kg != null ? String(s.kg).replace('.', ',') + ' kg' : '') + (s.r != null ? ' × ' + s.r : '') : '';
 
 /* ---------- borrador de la sesión (no se pierde si se cierra la app) ---------- */
-const DKEY = () => 'tl-draft-' + codigo + '-' + today();
+const DKEY = () => 'tl-draft-' + codigo + '-' + (S.ses ? S.ses.f + '-' + String(S.ses.h).replace(':', '') : today()) + (S.rutSel ? '-' + S.rutSel : '');
 const getDraft = () => { try { return JSON.parse(localStorage.getItem(DKEY()) || 'null') || { sets: {} }; } catch (e) { return { sets: {} }; } };
 const putDraft = d => { try { localStorage.setItem(DKEY(), JSON.stringify(d)); } catch (e) {} };
-const clearDraft = () => { try { localStorage.removeItem(DKEY()); Object.keys(localStorage).filter(k => k.startsWith('tl-draft-' + codigo + '-') && k !== DKEY()).forEach(k => localStorage.removeItem(k)); } catch (e) {} };
+const clearDraft = () => { try { localStorage.removeItem(DKEY()); Object.keys(localStorage).filter(k => k.startsWith('tl-draft-' + codigo + '-') && k !== DKEY() && k.slice(('tl-draft-' + codigo + '-').length, ('tl-draft-' + codigo + '-').length + 10) < addDays(today(), -30)).forEach(k => localStorage.removeItem(k)); } catch (e) {} };
 function applyDraft() { if (S.v !== 'rutina') return; const d = getDraft();
   document.querySelectorAll('.set input').forEach(i => { const v = d.sets?.[i.dataset.n]?.[i.dataset.i]?.[i.dataset.f]; if (v != null && v !== '') i.value = v; });
   document.querySelectorAll('.set').forEach(box => box.classList.toggle('done', [...box.querySelectorAll('input')].some(i => i.value.trim() !== '')));
@@ -644,7 +648,7 @@ V.hoy = () => {
 };
 const blkAbiertos = new Set(); // los bloques parten minimizados cada vez que se entra a Rutina
 document.addEventListener('toggle', ev => { const d = ev.target; if (d.dataset && d.dataset.sec) { if (d.open) secAbiertos.add(d.dataset.sec); else secAbiertos.delete(d.dataset.sec); return; } if (!d.matches || !d.matches('details.blk')) return; const i = Number(d.dataset.blk); if (d.open) blkAbiertos.add(i); else blkAbiertos.delete(i); }, true);
-function prevSets(nombre) { const t = today(); for (let i = S.clases.length - 1; i >= 0; i--) { const r = S.clases[i]; if (r.fecha >= t) continue; const e = (r.ej || []).find(x => x.n === nombre); if (e) return e.sets && e.sets.length ? e.sets : [{ kg: e.kg, r: e.r }]; } return []; }
+function prevSets(nombre) { const t = S.ses ? S.ses.f : today(); for (let i = S.clases.length - 1; i >= 0; i--) { const r = S.clases[i]; if (r.fecha >= t) continue; const e = (r.ej || []).find(x => x.n === nombre); if (e) return e.sets && e.sets.length ? e.sets : [{ kg: e.kg, r: e.r }]; } return []; }
 /* ---------- descanso entre series (bloque de fuerza) ---------- */
 const COMPUESTO = /sentadilla|squat|peso muerto|deadlift|press (banca|banco|militar|plano|inclinado)|bench|hip thrust|dominada|remo con barra|zancada|b[uú]lgara|clean|cargada|arranque|envi[oó]n|trap bar|good morning|fondos/i;
 function descansoDe(e) { const d = String(e.dosis || ''); const ex = d.match(/desc(?:anso)?\.?\s*(\d+)\s*(s|seg|'|min|m)\b/i);
@@ -734,9 +738,12 @@ V.rutina = () => {
   if (!r) return `<h1>Rutina</h1><div class="card"><div class="muted">Aún no tienes una rutina asignada. Franco te la asigna en la clase.</div></div>`;
   const H = historial(); const cur = {}; (rd.rec?.ej || []).forEach(e => cur[e.n] = e);
   const bloques = r.bloques || [];
-  return `
+  const sesP = rd.pe ? rd.pe.ses : [];
+  const selHTML = sesP.length > 1 ? `<div class="chips" style="margin-top:2px">${sesP.map(([id, x]) => `<button class="chip" data-rsel="${esc(id)}" aria-pressed="${id === rd.id}">${esc(String(x.tipo || 'Sesión').split('·')[0].trim())}</button>`).join('')}</div>` : '';
+  const otro = rd.otroDia ? `<section class="card" style="border-color:var(--ev);background:rgba(77,163,255,.08)"><div class="row"><b>📅 Sesión del ${esc(longD(rd.fecha).toLowerCase())}${rd.hora && rd.hora !== 'libre' ? ' · ' + esc(rd.hora) : ''}</b><button class="chip" data-sesx="1">Volver a hoy</button></div><div class="small muted">Lo que anotes se guarda en ese día.</div></section>` : '';
+  return `${otro}
   <div style="display:grid;gap:6px"><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total : ''}</div><h1 style="font-size:30px;line-height:1.05">${esc(r.tipo || 'Rutina')}</h1>${(() => { const l = rd.pe ? progLinea(r, rd.pe.semana) : ''; return l ? `<div class="small muted">💡 ${esc(l.replace(/^Semana \d+ · /, ''))}</div>` : ''; })()}
-    <div class="chips" style="margin-top:2px">${r.minutos ? `<span class="chip">⏱ ~${esc(r.minutos)} min</span>` : ''}<span class="chip">${bloques.reduce((n, b) => n + (b.ejercicios || []).length, 0)} ejercicios</span>${rd.hora && rd.hora !== 'libre' ? `<span class="chip">🕒 ${esc(rd.hora)}</span>` : ''}</div></div>
+    <div class="chips" style="margin-top:2px">${r.minutos ? `<span class="chip">⏱ ~${esc(r.minutos)} min</span>` : ''}<span class="chip">${bloques.reduce((n, b) => n + (b.ejercicios || []).length, 0)} ejercicios</span>${rd.hora && rd.hora !== 'libre' ? `<span class="chip">🕒 ${esc(rd.hora)}</span>` : ''}</div>${selHTML}</div>
   ${bloques.map((b, bi) => { const isB = /bloque b/i.test(b.titulo || '');
     const nEj = (b.ejercicios || []).length; const cerrado = !blkAbiertos.has(bi);
     const m = String(b.titulo || '').match(/^bloque\s+([a-z])\s*[·:-]?\s*(.*)$/i); const letra = m ? m[1].toUpperCase() : String.fromCharCode(65 + bi); const nomB = (m ? m[2] : b.titulo) || 'Bloque ' + letra;
@@ -753,7 +760,7 @@ V.rutina = () => {
     <label class="field">Resultado del bloque C<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>
     <div class="field">¿Qué tan duro fue? (RPE)<div class="chips">${[5,6,7,8,9,10].map(v => `<button class="chip" data-rpe="${v}" aria-pressed="${String(rd.rec?.rpe ?? S.rpe) === String(v)}">${v}</button>`).join('')}</div></div>
     <button class="btn pri" id="guardar">Guardar mi entrenamiento</button>
-    ${rd.hoy ? '' : '<div class="small muted">Hoy no tienes clase agendada: se guarda como entrenamiento libre.</div>'}
+    ${rd.otroDia ? `<div class="small muted">Se guarda en tu sesión del ${esc(fmtD(rd.fecha))}.</div>` : rd.hoy ? '' : '<div class="small muted">Hoy no tienes clase agendada: se guarda como entrenamiento libre.</div>'}
   </section>`;
 };
 V.progreso = () => {
@@ -1011,6 +1018,7 @@ V.agenda = () => {
       <details class="ses"><summary>Ver ejercicios</summary>${sesHTML(r)}</details>` : `<div class="small muted">${past ? 'Clase en Titanium' : 'Franco te asigna la rutina en la clase.'}</div>`}
       ${ej}
       ${S.dia === t && r && !past ? '<button class="btn pri" data-go="rutina">Entrenar ahora</button>' : ''}
+      ${r && past && S.dia >= addDays(t, -30) && rec?.asis !== 'ausente' ? `<button class="btn ${(rec?.ej || []).length ? '' : 'pri'}" data-abrses="${esc(S.dia + '|' + x.h + '|' + id)}">${(rec?.ej || []).length ? 'Ver / editar lo que anotaste' : 'Abrir y anotar esta sesión'}</button>` : ''}
       ${nv >= 0 ? asisBtns(S.dia, x.h) : ''}</section>`; };
   return `<div class="row" style="align-items:center"><h1>Agenda</h1>${S.dia !== t ? '<button class="chip" data-hoy="1">Hoy</button>' : ''}</div>
   <div class="wknav"><button data-wk="-7" aria-label="Semana anterior">‹</button><b class="small">${esc(titulo)}</b><button data-wk="7" aria-label="Semana siguiente">›</button></div>
@@ -1121,7 +1129,10 @@ document.addEventListener('click', async ev => {
   const fx = ev.target.closest('[data-fx]'); if (fx) { fx.setAttribute('aria-pressed', String(fx.getAttribute('aria-pressed') !== 'true')); return; }
   const pqb = ev.target.closest('[data-pq]'); if (pqb) { document.querySelectorAll(`[data-pq="${pqb.dataset.pq}"]`).forEach(b => b.setAttribute('aria-pressed', String(b === pqb))); return; }
   if (ev.target.id === 'fx-save') { guardarFicha(ev.target); return; }
-  const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.v = go.dataset.go || go.dataset.v; S.evalFirst = false; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
+  const abr = ev.target.closest('[data-abrses]'); if (abr) { const [f, h, id] = abr.dataset.abrses.split('|'); S.ses = { f, h, id }; S.rutSel = null; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
+  const rsel = ev.target.closest('[data-rsel]'); if (rsel) { if (rsel.dataset.rsel === rutinaDeHoy().id) return; S.rutSel = rsel.dataset.rsel; S.rpe = null; blkAbiertos.clear(); render(); return; }
+  if (ev.target.closest('[data-sesx]')) { S.ses = null; S.rutSel = null; S.rpe = null; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
+  const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { if ((go.dataset.go || go.dataset.v) === 'rutina') { S.ses = null; S.rutSel = null; } S.v = go.dataset.go || go.dataset.v; S.evalFirst = false; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
   const chk = ev.target.closest('[data-chk]'); if (chk) { const row = chk.closest('.set'); const ins = [...row.querySelectorAll('input')];
     if (row.dataset.ok) { delete row.dataset.ok; finDescanso(); return; }
     ins.forEach(i => { if (i.value.trim() === '' && !/kg|reps/.test(i.placeholder)) { i.value = i.placeholder; i.dispatchEvent(new Event('input', { bubbles: true })); } });
@@ -1166,7 +1177,7 @@ document.addEventListener('click', async ev => {
       const top = ss.reduce((b, s) => (s.kg || 0) > (b.kg || 0) ? s : b, ss[0]); return { n, kg: top.kg, r: top.r, s: ss.length, sets: ss }; }).filter(Boolean);
     const btn = ev.target; btn.disabled = true;
     const rpe = S.rpe ?? rd.rec?.rpe ?? null;
-    const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: today(), p_hora: rd.hora, p_ej: ej, p_carga: $('#carga').value.trim() || null, p_rpe: rpe });
+    const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: rd.fecha || today(), p_hora: rd.hora, p_ej: ej, p_carga: $('#carga').value.trim() || null, p_rpe: rpe, p_rutina: rd.id || null });
     btn.disabled = false;
     if (error) { toast('No se pudo guardar: ' + error.message); return; }
     clearDraft(); await load(); toast('Entrenamiento guardado 💪'); render();
