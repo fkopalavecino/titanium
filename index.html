@@ -1311,6 +1311,7 @@ VIEWS.registro = () => {
     </div>
     <form class="card pad" id="ajustes" style="display:grid;gap:12px">
       <div class="eyebrow">Ajustes</div>
+      <div class="f"><span class="small muted" style="font-weight:600">WhatsApp en este computador</span><div class="chips">${[['app', '💻 App de WhatsApp'], ['web', '🌐 WhatsApp Web']].map(([v, l]) => `<button type="button" class="chip" data-act="wa-modo" data-v="${v}" aria-pressed="${waModo() === v}">${l}</button>`).join('')}</div></div>
       <div class="frow">
         <label class="f">Nombre del coach<input type="text" id="aj-coach" value="${esc(c.coach)}"></label>
         <label class="f">Lema<input type="text" id="aj-lema" value="${esc(c.lema)}"></label>
@@ -1442,7 +1443,7 @@ function fichaAlumno(code) {
         ${tile('Programa', a.programa?.familia ? esc(a.programa.familia) : '<span class="muted">Sin programa</span>', pg ? `Semana ${Math.min(pg.semana, pg.total)} de ${pg.total} · próxima: ${esc(pg.next[1].tipo || '')}` : '')}
         ${tile('Asistencia · 30 días', pc == null ? '—' : pc + ' %', `${a30.pres} presentes · ${a30.aus} ausencias`)}
         ${tile('Horario', esc(bloquesTexto(a) || '—'), (a.clases || '—') + ' clases por ciclo')}
-        ${tile('Contacto', tel ? `<a href="https://wa.me/${tel}" target="_blank" rel="noopener">${esc(a.telefono)}</a>` : '<span class="muted">Sin teléfono</span>', a.email ? (a.vinculado ? 'App activa ✓' : 'Correo cargado · aún no entra') : (a.vinculado ? 'App activa ✓' : 'Aún no entra a la app'))}
+        ${tile('Contacto', tel ? `<a href="https://wa.me/${tel}" data-act="wa-chat" data-tel="${esc(tel)}">${esc(a.telefono)}</a>` : '<span class="muted">Sin teléfono</span>', a.email ? (a.vinculado ? 'App activa ✓' : 'Correo cargado · aún no entra') : (a.vinculado ? 'App activa ✓' : 'Aún no entra a la app'))}
       </div>`; })()}
     ${a.vinculado ? `<div class="card pad" style="box-shadow:none;background:var(--sunk);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="grow small">📱 <b>Usa la app${a.email ? ' con ' + esc(a.email) : ''}.</b> ${(() => { const e = appEstado(a); return `<span class="${e.t}">${esc(e.l)}</span> · ${e.push ? '🔔 Avisos activos' : '🔕 Avisos apagados'} · ${e.reglas ? '✅ Leyó la información (' + esc(e.reglasF) + ')' : '⏳ No ha leído la información'}`; })()}<br>Si borró la app o cambió de teléfono, mándale un código nuevo con Reinvitar (vale 24 horas).</span><button type="button" class="btn sm" data-act="reinvitar" data-id="${esc(a.codigo)}">🔄 Reinvitar</button></div>` : ''}
     ${!a.vinculado ? `<div class="card pad" style="box-shadow:none;background:var(--sunk);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="grow small">📲 <b>${esc(firstName(a.nombre))} aún no usa la app.</b> Mándale su link personal por WhatsApp: entra con el correo que quiera y queda vinculado a esta ficha.</span><button type="button" class="btn sm pri" data-act="invitar" data-id="${esc(a.codigo)}">Invitar a la app</button></div>` : ''}
@@ -2013,6 +2014,9 @@ document.addEventListener('click', e => {
   const act = el.dataset.act, id = el.dataset.id;
   if (el.tagName === 'SELECT' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return;
   if (act === 'cerrar') { closeModal(); return; }
+  if (act === 'wa-modo') { e.preventDefault(); try { localStorage.setItem('tl-wa-modo', el.dataset.v); } catch (_) {} closeModal();
+    if (WA_PEND) { const f = WA_PEND; WA_PEND = null; f(); } else { render(); toast(el.dataset.v === 'app' ? 'Listo: se abrirá la app de WhatsApp.' : 'Listo: se abrirá WhatsApp Web.'); } return; }
+  if (act === 'wa-chat') { e.preventDefault(); const t = el.dataset.tel; if (esMovil()) window.open('https://wa.me/' + t, '_blank'); else waAbrir(t, ''); return; }
   if (act === 'inv-msg') { e.preventDefault(); if (INV) compartirTexto(INV.msg, INV.tel).then(ok => { if (ok) closeModal(); }); return; }
   if (act === 'inv-guia') { e.preventDefault(); compartirGuia().then(ok => { if (ok) el.textContent = '✓ Guía enviada'; }); return; }
   if (act === 'link-grupo') { e.preventDefault(); linkGrupo(); return; }
@@ -2194,13 +2198,26 @@ let GUIA = null; // se precarga para poder compartirla al instante (iPhone exige
 fetch('guia-app-titanium.jpg?v=1794075963').then(r => r.ok ? r.blob() : null).then(b => { if (b) GUIA = new File([b], 'guia-app-titanium.jpg', { type: 'image/jpeg' }); }).catch(() => {});
 let INV = null; // mensaje pendiente de enviar {msg, tel}
 const esMovil = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+/* WhatsApp en el computador: la app de escritorio (sin pestañas nuevas) o WhatsApp Web; se elige una vez y queda guardado */
+const waModo = () => { try { return localStorage.getItem('tl-wa-modo'); } catch (_) { return null; } };
+let WA_PEND = null;
+function pedirModoWA(seguir) { WA_PEND = seguir;
+  openModal('¿Cómo abres WhatsApp en este computador?', `<p class="small muted" style="margin:0">Lo eliges una vez. Puedes cambiarlo en Ajustes.</p>
+    <div style="display:grid;gap:10px">
+      <button type="button" class="btn pri" data-act="wa-modo" data-v="app" style="min-height:56px;justify-content:flex-start;text-align:left"><span>💻 <b>App de WhatsApp</b><br><span class="small" style="font-weight:400">Recomendado: el mensaje llega listo a la app, sin abrir pestañas</span></span></button>
+      <button type="button" class="btn" data-act="wa-modo" data-v="web" style="min-height:56px;justify-content:flex-start;text-align:left"><span>🌐 <b>WhatsApp Web</b><br><span class="small muted" style="font-weight:400">Si no tienes la app instalada</span></span></button>
+    </div>`, { cancel: 'Cancelar' }); }
+function waAbrir(tel, msg) {
+  const m = waModo(); if (!m) { pedirModoWA(() => waAbrir(tel, msg)); return; }
+  const q = (tel ? 'phone=' + tel + '&' : '') + 'text=' + encodeURIComponent(msg || '');
+  if (m === 'app') { location.href = 'whatsapp://send?' + q; return; }
+  const w = window.open('https://web.whatsapp.com/send?' + q, 'tl-whatsapp'); try { w && w.focus(); } catch (_) {} }
 async function compartirTexto(msg, tel) {
-  if (!esMovil()) { // computador: WhatsApp Web (o la app de escritorio) con el mensaje listo; además queda copiado
+  if (!esMovil()) { // computador: app de escritorio o WhatsApp Web con el mensaje listo; además queda copiado
     try { await navigator.clipboard.writeText(msg); } catch (_) {}
-    // siempre la MISMA pestaña de WhatsApp Web (así no pide cerrar la otra sesión)
-    const w = window.open(tel ? `https://web.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(msg)}` : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`, 'tl-whatsapp');
-    try { w && w.focus(); } catch (_) {}
-    toast('WhatsApp Web: elige el chat o el grupo y envía. El mensaje también quedó copiado (Ctrl + V).'); return true; }
+    if (!waModo()) { pedirModoWA(() => compartirTexto(msg, tel)); return false; }
+    waAbrir(tel, msg);
+    toast(waModo() === 'app' ? 'Se abrió WhatsApp con el mensaje listo: elige el chat y envía. También quedó copiado.' : 'WhatsApp Web: elige el chat o el grupo y envía. El mensaje también quedó copiado (Ctrl + V).'); return true; }
   if (tel) { window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank'); return true; }
   if (navigator.share) { try { await navigator.share({ text: msg }); return true; } catch (e) { if (e && e.name === 'AbortError') return false; } }
   try { await navigator.clipboard.writeText(msg); toast('Mensaje copiado. Pégalo en WhatsApp.'); return true; } catch (_) { window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank'); return true; }
