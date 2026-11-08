@@ -943,7 +943,7 @@ function recupHTML() { const R = S.recup; if (!R || !R.activo) return '';
   if (R.bloqueado && !prox.length) return `<section class="card" style="border-color:#4da3ff"><div class="row"><span class="eyebrow" style="color:#7fb9ff">🔁 Recuperar clases</span></div><div><b>Tienes ${R.disponibles} clase${R.disponibles === 1 ? '' : 's'} por recuperar</b><div class="small muted">Para agendarlas, primero regulariza tu pago.</div></div><button class="btn" data-gopago="1">💳 Ver mi pago</button></section>`;
   const dia = f => (f === t ? 'Hoy' : f === addDays(t, 1) ? 'Mañana' : DL[dayKey(f)] + ' ' + fmtD(f));
   const ops = (R.opciones || []).filter(o => !o.ya);
-  return `<section class="card" style="border-color:#4da3ff;background:rgba(77,163,255,.07)">
+  return `<section class="card" id="recup-card" style="border-color:#4da3ff;background:rgba(77,163,255,.07)">
     <div class="row"><span class="eyebrow" style="color:#7fb9ff">🔁 Recuperar clases</span><span class="small muted">vencen el ${esc(fmtD(R.vence))}</span></div>
     ${R.disponibles ? `<div><b style="font-size:18px">Tienes ${R.disponibles} clase${R.disponibles === 1 ? '' : 's'} por recuperar</b><div class="small muted">Elige un bloque de esta semana o la próxima. Lo que no recuperes este mes se pierde.</div></div>
       ${ops.length ? (() => { const dias = [...new Set(ops.filter(o => o.libres).map(o => o.f))]; if (!dias.length) return '<div class="note small">Los bloques disponibles están llenos. Revisa más tarde.</div>';
@@ -1081,7 +1081,9 @@ document.addEventListener('click', async ev => {
   const pt = ev.target.closest('[data-pushtest]'); if (pt) { probarPush(pt); return; }
   if (ev.target.closest('[data-pushoff]')) { desactivarPush(); return; }
   const rec = ev.target.closest('[data-rec]'); if (rec) { recupAccion(rec.dataset.rec, false); return; }
-  const rdia = ev.target.closest('[data-rdia]'); if (rdia) { S.rDia = rdia.dataset.rdia; const y = window.scrollY; render(); window.scrollTo(0, y); return; }
+  // cambiar de día solo redibuja la tarjeta (sin redibujar toda la pantalla ni mover el scroll)
+  const rdia = ev.target.closest('[data-rdia]'); if (rdia) { S.rDia = rdia.dataset.rdia; const card = document.getElementById('recup-card');
+    if (card) { const tmp = document.createElement('div'); tmp.innerHTML = recupHTML(); const nuevo = tmp.firstElementChild; if (nuevo) card.replaceWith(nuevo); } else render(); return; }
   const rcx = ev.target.closest('[data-rcx]'); if (rcx) { recupAccion(rcx.dataset.rcx, true); return; }
   const msx = ev.target.closest('[data-msx]'); if (msx) { try { const x = JSON.parse(localStorage.getItem('tl-msx') || '[]'); x.push(Number(msx.dataset.msx)); localStorage.setItem('tl-msx', JSON.stringify(x.slice(-30))); } catch (_) {} render(); return; }
   if (ev.target.closest('[data-pushx]')) { try { localStorage.setItem('tl-pushx', '1'); } catch (_) {} render(); return; }
