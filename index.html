@@ -1323,12 +1323,12 @@ VIEWS.registro = () => {
 
 /* ---------- modal ---------- */
 let modalSubmit = null;
-function openModal(title, body, {submit = 'Guardar', onSubmit = null, extra = '', wide = false} = {}) {
+function openModal(title, body, {submit = 'Guardar', onSubmit = null, extra = '', wide = false, cancel = 'Cancelar'} = {}) {
   const m = $('#modal');
   m.innerHTML = `<form class="sheet${wide ? ' wide' : ''}" id="mform" role="dialog" aria-modal="true" aria-labelledby="mtitle">
     <header><h2 id="mtitle">${esc(title)}</h2><button type="button" class="btn ghost" data-act="cerrar" aria-label="Cerrar">✕</button></header>
     <div class="content">${body}</div>
-    <footer>${extra}<span style="flex:1"></span><button type="button" class="btn" data-act="cerrar">Cancelar</button>${onSubmit ? `<button type="submit" class="btn pri">${esc(submit)}</button>` : ''}</footer>
+    <footer>${extra}<span style="flex:1"></span><button type="button" class="btn" data-act="cerrar">${esc(cancel)}</button>${onSubmit ? `<button type="submit" class="btn pri">${esc(submit)}</button>` : ''}</footer>
   </form>`;
   modalSubmit = onSubmit; m.hidden = false;
   const first = m.querySelector('.content input, .content select, .content textarea'); if (first) setTimeout(() => first.focus(), 30);
@@ -1939,13 +1939,21 @@ document.addEventListener('click', e => {
     case 'rx-del': { const [f, h] = el.dataset.k.split('_'); const c = clone(cfg()); c.recupExtra = (c.recupExtra || []).filter(x => !(x.f === f && x.h === h)); saveCfg(c); toast('Bloque extra quitado.'); break; }
     case 'quitar-extra': { const {f,h,code} = toggleOne(el.dataset.k); patchDia(f, h, code, {extra: null, quitado: null, asis: null, rutina: null, aprobada: null}); break; }
     case 'todos-presentes': { const f = S.ui.claseFecha || today(), h = S.ui.claseHora; roster(f,h).filter(cd => !rec(f,h,cd).asis).forEach((cd,i) => { const pg = !rec(f,h,cd).rutina ? progEstado(S.alumnos.get(cd), f) : null; patchDia(f, h, cd, Object.assign({asis:'presente'}, pg ? {rutina: pg.next[0]} : {})); }); break; }
-    case 'asis': { const {f,h,code} = toggleOne(el.dataset.k); const cur = rec(f,h,code).asis; let nv = cur === el.dataset.v ? null : el.dataset.v;
-      // avisó que no venía: el profe decide. Con recuperación no cuenta como falta; sin recuperación queda como Ausente (falta).
-      let dar = null;
-      if (nv === 'aviso') { dar = confirm(`${firstName(nombre(code))} avisó que no venía.\n\n¿Le das 1 clase para recuperar este mes?\n\nAceptar = sí: puede recuperarla desde su app y no cuenta como falta.\nCancelar = no: queda como Ausente (cuenta como falta).`); if (!dar) nv = 'ausente'; }
-      else if (cur === 'aviso') dar = false;
+    case 'asis': { const {f,h,code} = toggleOne(el.dataset.k); const cur = rec(f,h,code).asis; const nv = cur === el.dataset.v ? null : el.dataset.v;
+      // avisó que no venía: el profe elige en una ventana clara si le da la recuperación o queda Ausente
+      if (nv === 'aviso') { const k = el.dataset.k, n = esc(firstName(nombre(code)));
+        openModal(`${firstName(nombre(code))} avisó que no venía`, `<p style="margin:0 0 12px">¿Le das una clase para recuperar este mes?</p>
+          <div style="display:grid;gap:10px">
+            <button type="button" class="btn pri" data-act="aviso-si" data-k="${esc(k)}" style="min-height:56px;justify-content:flex-start;text-align:left"><span>🔁 <b>Sí, dar recuperación</b><br><span class="small" style="font-weight:400">${n} la agenda desde su app · no cuenta como falta</span></span></button>
+            <button type="button" class="btn" data-act="aviso-no" data-k="${esc(k)}" style="min-height:56px;justify-content:flex-start;text-align:left"><span>❌ <b>No, queda Ausente</b><br><span class="small muted" style="font-weight:400">Cuenta como falta · no recupera</span></span></button>
+          </div>`, {cancel: 'Volver'});
+        break; }
       patchDia(f, h, code, Object.assign({asis: nv}, nv === 'presente' && el.dataset.r ? {rutina: el.dataset.r} : {}));
-      if (dar !== null) window.__sb.rpc('dar_recuperacion', {p_alumno: code, p_fecha: f, p_hora: h, p_dar: dar}).then(({error}) => { if (error) toast('No se pudo guardar la recuperación: ' + error.message, true); else toast(dar ? `${firstName(nombre(code))} ya puede recuperar esta clase desde su app 🔁` : nv === 'ausente' ? `${firstName(nombre(code))} quedó como Ausente (sin recuperación).` : 'Recuperación quitada.'); });
+      if (cur === 'aviso') window.__sb.rpc('dar_recuperacion', {p_alumno: code, p_fecha: f, p_hora: h, p_dar: false}).then(({error}) => { if (!error) toast('Recuperación quitada.'); });
+      break; }
+    case 'aviso-si': case 'aviso-no': { const {f,h,code} = toggleOne(el.dataset.k); const dar = act === 'aviso-si'; closeModal();
+      patchDia(f, h, code, {asis: dar ? 'aviso' : 'ausente'});
+      window.__sb.rpc('dar_recuperacion', {p_alumno: code, p_fecha: f, p_hora: h, p_dar: dar}).then(({error}) => { if (error) toast('No se pudo guardar: ' + error.message, true); else toast(dar ? `${firstName(nombre(code))} ya puede recuperar esta clase desde su app 🔁` : `${firstName(nombre(code))} quedó como Ausente.`); });
       break; }
     case 'aprobar': { const {f,h,code} = toggleOne(el.dataset.k); patchDia(f, h, code, Object.assign({aprobada: rec(f,h,code).aprobada ? null : true}, el.dataset.r ? {rutina: el.dataset.r} : {})); break; }
     case 'asig-prog': asignarProgModal(el.dataset.fam); break;
