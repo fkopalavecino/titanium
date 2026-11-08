@@ -890,7 +890,7 @@ function studentCard(f, hora, code, ruts) {
     <div class="st-row">
       <button class="btn sm ${r.asis === 'presente' ? 'on-ok' : ''}" data-act="asis" data-v="presente" data-k="${esc(key)}" ${sug ? `data-r="${esc(sug)}"` : ''}>Presente</button>
       <button class="btn sm ${r.asis === 'ausente' ? 'on-crit' : ''}" data-act="asis" data-v="ausente" data-k="${esc(key)}">Ausente</button>
-      <button class="btn sm ${r.asis === 'aviso' ? 'on-warn' : ''}" data-act="asis" data-v="aviso" data-k="${esc(key)}" title="No vino pero te avisó: no cuenta como falta y decides si recupera">📩 Avisó</button>
+      <button class="btn sm ${r.asis === 'aviso' ? 'on-warn' : ''}" data-act="asis" data-v="aviso" data-k="${esc(key)}" title="No vino pero te avisó: decides si le das la recuperación (si no, queda Ausente)">📩 Avisó</button>
       <button class="btn sm ghost" data-act="reag" data-k="${esc(key)}" title="Mover esta clase a otro día u hora">↻ Reagendar</button>
       ${r.extra ? `<button class="btn sm ghost" data-act="quitar-extra" data-k="${esc(key)}">Quitar del bloque</button>` : ''}
     </div>
@@ -1269,7 +1269,7 @@ VIEWS.registro = () => {
       <div class="list">${codes.map(cd => { const r = rec(f,h,cd), key = f+'|'+h+'|'+cd; return `<div class="li"><span class="grow">${esc(nombre(cd))}${r.notas ? `<span class="sub small muted">${esc(r.notas)}</span>` : ''}</span>
         <button class="btn sm ${r.asis === 'presente' ? 'on-ok' : ''}" data-act="asis" data-v="presente" data-k="${esc(key)}">Presente</button>
         <button class="btn sm ${r.asis === 'ausente' ? 'on-crit' : ''}" data-act="asis" data-v="ausente" data-k="${esc(key)}">Ausente</button>
-      <button class="btn sm ${r.asis === 'aviso' ? 'on-warn' : ''}" data-act="asis" data-v="aviso" data-k="${esc(key)}" title="No vino pero te avisó: no cuenta como falta y decides si recupera">📩 Avisó</button></div>`; }).join('')}</div></div>`; }).join('')
+      <button class="btn sm ${r.asis === 'aviso' ? 'on-warn' : ''}" data-act="asis" data-v="aviso" data-k="${esc(key)}" title="No vino pero te avisó: decides si le das la recuperación (si no, queda Ausente)">📩 Avisó</button></div>`; }).join('')}</div></div>`; }).join('')
     : `<div class="card empty">No hay bloques con alumnos ese día.</div>`}
   </section>
   <section class="grid2">
@@ -1939,10 +1939,13 @@ document.addEventListener('click', e => {
     case 'rx-del': { const [f, h] = el.dataset.k.split('_'); const c = clone(cfg()); c.recupExtra = (c.recupExtra || []).filter(x => !(x.f === f && x.h === h)); saveCfg(c); toast('Bloque extra quitado.'); break; }
     case 'quitar-extra': { const {f,h,code} = toggleOne(el.dataset.k); patchDia(f, h, code, {extra: null, quitado: null, asis: null, rutina: null, aprobada: null}); break; }
     case 'todos-presentes': { const f = S.ui.claseFecha || today(), h = S.ui.claseHora; roster(f,h).filter(cd => !rec(f,h,cd).asis).forEach((cd,i) => { const pg = !rec(f,h,cd).rutina ? progEstado(S.alumnos.get(cd), f) : null; patchDia(f, h, cd, Object.assign({asis:'presente'}, pg ? {rutina: pg.next[0]} : {})); }); break; }
-    case 'asis': { const {f,h,code} = toggleOne(el.dataset.k); const cur = rec(f,h,code).asis; const nv = cur === el.dataset.v ? null : el.dataset.v; patchDia(f, h, code, Object.assign({asis: nv}, nv === 'presente' && el.dataset.r ? {rutina: el.dataset.r} : {}));
-      // avisó que no venía: el profe decide si le da la clase para recuperar (o se la quita si desmarca)
-      if (nv === 'aviso' || cur === 'aviso') { const dar = nv === 'aviso' && confirm(`${firstName(nombre(code))} avisó que no venía.\n\n¿Le das 1 clase para recuperar este mes?\n\nAceptar = sí, puede recuperarla desde su app\nCancelar = no, solo queda como "avisó" (no cuenta como falta)`);
-        window.__sb.rpc('dar_recuperacion', {p_alumno: code, p_fecha: f, p_hora: h, p_dar: dar}).then(({error}) => { if (error) toast('No se pudo guardar la recuperación: ' + error.message, true); else if (dar) toast(`${firstName(nombre(code))} ya puede recuperar esta clase desde su app 🔁`); }); }
+    case 'asis': { const {f,h,code} = toggleOne(el.dataset.k); const cur = rec(f,h,code).asis; let nv = cur === el.dataset.v ? null : el.dataset.v;
+      // avisó que no venía: el profe decide. Con recuperación no cuenta como falta; sin recuperación queda como Ausente (falta).
+      let dar = null;
+      if (nv === 'aviso') { dar = confirm(`${firstName(nombre(code))} avisó que no venía.\n\n¿Le das 1 clase para recuperar este mes?\n\nAceptar = sí: puede recuperarla desde su app y no cuenta como falta.\nCancelar = no: queda como Ausente (cuenta como falta).`); if (!dar) nv = 'ausente'; }
+      else if (cur === 'aviso') dar = false;
+      patchDia(f, h, code, Object.assign({asis: nv}, nv === 'presente' && el.dataset.r ? {rutina: el.dataset.r} : {}));
+      if (dar !== null) window.__sb.rpc('dar_recuperacion', {p_alumno: code, p_fecha: f, p_hora: h, p_dar: dar}).then(({error}) => { if (error) toast('No se pudo guardar la recuperación: ' + error.message, true); else toast(dar ? `${firstName(nombre(code))} ya puede recuperar esta clase desde su app 🔁` : nv === 'ausente' ? `${firstName(nombre(code))} quedó como Ausente (sin recuperación).` : 'Recuperación quitada.'); });
       break; }
     case 'aprobar': { const {f,h,code} = toggleOne(el.dataset.k); patchDia(f, h, code, Object.assign({aprobada: rec(f,h,code).aprobada ? null : true}, el.dataset.r ? {rutina: el.dataset.r} : {})); break; }
     case 'asig-prog': asignarProgModal(el.dataset.fam); break;
