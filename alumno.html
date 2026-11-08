@@ -36,7 +36,14 @@ h2{font-size:22px}
 .chips{display:flex;gap:8px;overflow-x:auto}
 .chip{padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 13px Barlow,sans-serif;white-space:nowrap;cursor:pointer}
 .chip[aria-pressed=true]{background:var(--red);border-color:var(--red);color:#fff}
-.ej{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line)}.ej:first-of-type{border-top:0;padding-top:0}
+.ej{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line)}
+.ej-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.ej-n{min-width:0}
+.tec-b{flex:none;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--muted);font:700 14px Barlow,sans-serif;cursor:pointer;display:grid;place-items:center}
+.sug{font-size:13px;color:var(--muted)}.sug.up{color:var(--red-t);font-weight:700}
+.ej-f{border-top:0;padding:0;gap:8px}.ej-f .ej-n{font:700 30px/1.05 'Barlow Condensed',sans-serif;letter-spacing:.01em}.ej-f .set input,.ej-f .set .chk{height:52px}.ej-f .set input{font-size:22px}
+.tec-d summary{cursor:pointer;color:var(--red-t);font-weight:600;font-size:14px;list-style:none}.tec-d summary::-webkit-details-marker{display:none}
+.tec-d ol,.tec-ol{margin:8px 0 4px;padding-left:20px;display:grid;gap:6px;line-height:1.4}.tec-d .btn{margin-top:6px}
+.foco-top{display:flex;justify-content:space-between;align-items:center;gap:8px}.foco-bar,.foco-bar>i{height:4px}.foco-go{width:100%}.as-st:empty{display:none}.ej:first-of-type{border-top:0;padding-top:0}
 .sets{display:grid;gap:6px;margin-top:4px}
 .set-h,.set{display:grid;grid-template-columns:30px minmax(0,1fr) 74px 64px 44px;gap:8px;align-items:center}
 .set-h{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:0 6px}
@@ -295,7 +302,7 @@ function avisoBanner() { const e = pushEstado(); let x = null; try { x = localSt
 
 async function load() {
   const desde = addDays(today(), -120);
-  const [a, p, c, cf, ev, cfm, ah, msj] = await Promise.all([
+  const [a, p, c, cf, ev, cfm, ah, tq, msj] = await Promise.all([
     sb.from('alumnos').select('*').eq('codigo', codigo).single(),
     sb.from('planes').select('*').eq('alumno', codigo),
     sb.from('clases').select('*').eq('alumno', codigo).gte('fecha', desde).order('fecha'),
@@ -303,9 +310,11 @@ async function load() {
     sb.from('eventos').select('*').gte('fecha', desde).order('fecha'),
     sb.from('confirmaciones').select('fecha,hora,estado,cambios').eq('alumno', codigo).gte('fecha', today()),
     sb.from('actividades_hechas').select('evento,fecha,minutos,rpe,nota').eq('alumno', codigo).gte('fecha', desde),
+    sb.from('tecnica').select('id,nombre,patron,claves,video,orden').order('orden'),
     sb.from('mensajes').select('id,titulo,cuerpo,enviado_at').not('enviado_at', 'is', null).gte('enviado_at', new Date(Date.now() - 7 * 864e5).toISOString()).order('enviado_at', { ascending: false }).limit(5),
   ]);
   S.mensajes = msj?.data || []; S.hechas = new Map((ah?.data || []).map(r => [String(r.evento), r]));
+  S.tec = (tq?.data || []).map(t => { try { return Object.assign({}, t, { re: new RegExp(t.patron, 'i') }); } catch (_) { return null; } }).filter(Boolean);
   sb.rpc('marcar_uso').then(() => {}, () => {});
   try { const { data: rc } = await sb.rpc('mis_recuperaciones'); S.recup = rc || null; } catch (_) { S.recup = null; }
   try { const [ep, sp] = await Promise.all([sb.rpc('mi_estado_pago'), sb.from('solicitudes').select('id,data,created_at').eq('alumno', codigo).eq('tipo', 'pago').eq('estado', 'pendiente').order('created_at', { ascending: false }).limit(1)]);
@@ -402,8 +411,8 @@ function applyDraft() { if (S.v !== 'rutina') return; const d = getDraft();
   if (d.carga != null && $('#carga')) $('#carga').value = d.carga;
   if (d.rpe != null) { S.rpe = d.rpe; document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.rpe) === String(d.rpe))); } }
 document.addEventListener('input', ev => { const i = ev.target; const d = getDraft();
-  if (i.matches('.set input')) { const n = i.dataset.n; ((d.sets[n] = d.sets[n] || {})[i.dataset.i] = d.sets[n][i.dataset.i] || {})[i.dataset.f] = i.value; i.closest('.set')?.classList.toggle('done', [...i.closest('.set').querySelectorAll('input')].some(x => x.value.trim() !== '')); putDraft(d); }
-  else if (i.id === 'carga') { d.carga = i.value; putDraft(d); } });
+  if (i.matches('.set input')) { const n = i.dataset.n; ((d.sets[n] = d.sets[n] || {})[i.dataset.i] = d.sets[n][i.dataset.i] || {})[i.dataset.f] = i.value; i.closest('.set')?.classList.toggle('done', [...i.closest('.set').querySelectorAll('input')].some(x => x.value.trim() !== '')); putDraft(d); autoGuardar(2500); }
+  else if (i.id === 'carga') { d.carga = i.value; putDraft(d); autoGuardar(2500); } });
 
 /* ---------- subir InBody ---------- */
 function achicar(file, max) { return new Promise((res, rej) => { const u = URL.createObjectURL(file), img = new Image();
@@ -759,6 +768,57 @@ function abrirTimer(b) { cerrarTimer(); const c = detectarTimer(b); const el = d
     if (b.dataset.tf) return terminar(); });
   document.body.appendChild(el); pintar(); }
 function cerrarTimer() { clearInterval(TM); TM = null; document.getElementById('tmr')?.remove(); try { window.SND && SND.cerrarPanel(); } catch (_) {} }
+
+/* ---------- en el gimnasio: técnica, carga sugerida, guardado en vivo, pantalla encendida ---------- */
+const normEj = n => String(n || '').toLowerCase().replace(/^(min(uto)?\s*\d+|\d+[ab]?|par \d+|min (par|impar)|test \d+|intervalo[^·]*)\s*·\s*/i, '').replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
+const tecDe = n => { const x = normEj(n); return (S.tec || []).find(t => { try { return t.re.test(x); } catch (_) { return false; } }) || null; };
+const fmtKg = v => String(Math.round(v * 10) / 10).replace('.', ',');
+// carga sugerida: si en la sesión anterior llegó al tope de reps en todas sus series pesadas, sube; si no, mantiene
+function sugerencia(e) { const m = String(e.dosis || '').match(/×\s*(\d+)(?:\s*[–-]\s*(\d+))?/); if (!m) return null;
+  const lo = Number(m[1]), hi = Number(m[2] || m[1]); const pv = prevSets(e.nombre).filter(x => x && x.kg != null && x.r != null && x.kg > 0); if (!pv.length) return null;
+  const kg = Math.max(...pv.map(x => x.kg)); const top = pv.filter(x => x.kg === kg);
+  const inc = /mancuerna|kb|kettlebell|pesa rusa/i.test(e.nombre) ? 2 : 2.5;
+  if (top.every(x => x.r >= hi)) { const nk = Math.round((kg + inc) * 2) / 2; return { kg: nk, sube: true, txt: `Hoy prueba ${fmtKg(nk)} kg · llegaste a ${hi} reps` }; }
+  if (top.some(x => x.r < lo)) return { kg, txt: `Mantén ${fmtKg(kg)} kg y apunta a ${lo}${hi !== lo ? '–' + hi : ''} reps` };
+  return { kg, txt: `Mantén ${fmtKg(kg)} kg y suma 1 rep` }; }
+function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nSer(e.dosis) : 0; const sets = c?.sets || [];
+  const tc = tecDe(e.nombre); const sg = isB ? sugerencia(e) : null; const pv = isB ? prevSets(e.nombre) : [];
+  return `<div class="ej${foco ? ' ej-f' : ''}"><div class="ej-h"><b class="ej-n">${esc(e.nombre)}</b>${tc && !foco ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</div>
+    <div class="small muted">${esc(e.dosis)}${isB ? ` · ⏱ ${mmss(descansoDe(e))}` : ''}</div>
+    ${sg ? `<div class="sug${sg.sube ? ' up' : ''}">${sg.sube ? '↗' : '→'} ${esc(sg.txt)}</div>` : ''}
+    ${tc && foco ? `<details class="tec-d"><summary>¿Cómo se hace?</summary><ol>${(tc.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol>${tc.video ? `<a class="btn" href="${esc(tc.video)}" target="_blank" rel="noopener">▶ Ver video</a>` : ''}</details>` : ''}
+    ${isB ? `<div class="sets"><div class="set-h"><span>Serie</span><span>Anterior</span><span>Kg</span><span>Reps</span><span></span></div>${Array.from({ length: n }, (_, i) => { const s0 = sets[i] || {}; const done = s0.kg != null || s0.r != null; const p = pv[i] || pv[pv.length - 1];
+      const phKg = sg ? fmtKg(sg.kg) : p && p.kg != null ? String(p.kg).replace('.', ',') : 'kg';
+      return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span><span class="prev">${p && (p.kg != null || p.r != null) ? esc(fmtSet(p)) : '—'}</span><input inputmode="decimal" placeholder="${esc(phKg)}" aria-label="kg serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s0.kg != null ? esc(String(s0.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${p && p.r != null ? esc(p.r) : 'reps'}" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s0.r != null ? esc(s0.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }).join('')}</div>` : ''}</div>`; }
+function abrirTec(id) { const t = (S.tec || []).find(x => x.id === id); if (!t) return; document.getElementById('sheet')?.remove();
+  const sh = document.createElement('div'); sh.id = 'sheet';
+  sh.innerHTML = `<div class="in" role="dialog" aria-modal="true" aria-label="${esc(t.nombre)}"><div class="row"><span class="eyebrow red">Técnica</span><button class="btn" data-close="1" style="width:auto;min-height:36px" aria-label="Cerrar">✕</button></div>
+    <h2 style="font-size:26px;margin:0">${esc(t.nombre)}</h2><ol class="tec-ol">${(t.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol>
+    ${t.video ? `<a class="btn pri" href="${esc(t.video)}" target="_blank" rel="noopener">▶ Ver video</a>` : ''}<button class="btn" data-close="1">Listo</button></div>`;
+  sh.addEventListener('click', ev => { if (ev.target === sh || ev.target.closest('[data-close]')) sh.remove(); }); document.body.appendChild(sh); }
+// junta lo anotado: lo guardado + el borrador + lo que está en pantalla
+function colectarEj() { const rd = rutinaDeHoy(); const by = {};
+  (rd.rec?.ej || []).forEach(x => { by[x.n] = (x.sets && x.sets.length ? x.sets : [{ kg: x.kg, r: x.r }]).map(z => Object.assign({}, z)); });
+  const put = (n, i, f, v) => { const o = (by[n] = by[n] || []); o[i] = o[i] || {}; v = String(v ?? '').trim().replace(',', '.'); if (v === '') delete o[i][f]; else if (!isNaN(v)) o[i][f] = Number(v); };
+  const d = getDraft(); Object.entries(d.sets || {}).forEach(([n, arr]) => Object.entries(arr || {}).forEach(([i, z]) => { if (z) ['kg', 'r'].forEach(f => { if (z[f] != null) put(n, Number(i), f, z[f]); }); }));
+  document.querySelectorAll('.set input').forEach(i => put(i.dataset.n, Number(i.dataset.i), i.dataset.f, i.value));
+  return Object.entries(by).map(([n, sets]) => { const ss = [...sets].map(z => z || {}).filter(z => z.kg != null || z.r != null); if (!ss.length) return null;
+    const top = ss.reduce((b, z) => (z.kg || 0) > (b.kg || 0) ? z : b, ss[0]); return { n, kg: top.kg, r: top.r, s: ss.length, sets: ss }; }).filter(Boolean); }
+let AS = null, ASpend = false;
+function asEstado(t, cls) { document.querySelectorAll('.as-st').forEach(el => { el.textContent = t; el.className = 'as-st small ' + (cls || 'muted'); }); }
+function autoGuardar(ms) { clearTimeout(AS); ASpend = true; AS = setTimeout(guardarYa, ms ?? 1500); }
+async function guardarYa() { clearTimeout(AS); if (!ASpend) return; ASpend = false; if (S.v !== 'rutina' || S.evSel) return;
+  const rd = rutinaDeHoy(); if (!rd.r || rd.futuro) return; const ej = colectarEj(); const carga = $('#carga') ? ($('#carga').value.trim() || null) : (rd.rec?.carga || getDraft().carga || null);
+  if (!ej.length && !carga && S.rpe == null) return;
+  asEstado('Guardando…');
+  const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: rd.fecha || today(), p_hora: rd.hora, p_ej: ej, p_carga: carga, p_rpe: S.rpe ?? rd.rec?.rpe ?? null, p_rutina: rd.id || null });
+  if (error) { ASpend = true; asEstado('Sin conexión · se guarda al volver', 'warn'); return; }
+  const h = new Date(); asEstado('✓ Guardado ' + pad(h.getHours()) + ':' + pad(h.getMinutes()), 'ok'); }
+let WL = null;
+async function wakeOn() { try { if (!WL && navigator.wakeLock && document.visibilityState === 'visible') { WL = await navigator.wakeLock.request('screen'); WL.addEventListener('release', () => { WL = null; }); } } catch (_) {} }
+function wakeOff() { try { WL && WL.release(); } catch (_) {} WL = null; }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { if (ASpend) guardarYa(); } else if (S.v === 'rutina' && document.querySelector('.ej,#guardar')) wakeOn(); });
+window.addEventListener('pagehide', () => { if (ASpend) guardarYa(); });
 V.rutina = () => {
   if (S.evSel) { const e = S.eventos.find(x => String(x.id) === String(S.evSel)); if (e) return evDetalleHTML(e); S.evSel = null; }
   // pestaña Rutina directa: muestra lo que corresponde hoy (clase, si no la actividad del día, si no descanso)
@@ -769,37 +829,44 @@ V.rutina = () => {
     return `<h1>Entreno</h1><section class="card"><b style="font-size:18px">😌 Hoy es día de descanso</b><div class="small muted">No tienes clase ni actividad agendada para hoy. Si igual quieres entrenar, abre la sesión que te toca.</div>${progEstado() ? '<button class="btn pri" data-entrenar="1">💪 Entrenar igual</button>' : ''}<button class="btn" data-go="agenda">Ver mi agenda</button></section>`; }
   const rd = rutinaDeHoy(); const r = rd.r;
   if (!r) return `<h1>Rutina</h1><div class="card"><div class="muted">Aún no tienes una rutina asignada. Franco te la asigna en la clase.</div></div>`;
-  const H = historial(); const cur = {}; (rd.rec?.ej || []).forEach(e => cur[e.n] = e);
+  const cur = {}; (rd.rec?.ej || []).forEach(e => cur[e.n] = e);
   const bloques = r.bloques || [];
-  const selHTML = '';
   const cuandoTxt = rd.fecha === today() ? 'Sesión de hoy' : 'Sesión del ' + longD(rd.fecha).toLowerCase();
   const otro = S.ses ? `<section class="card" style="border-color:var(--ev);background:rgba(77,163,255,.08)"><div class="row" style="align-items:center"><b>📅 ${esc(cuandoTxt)}${rd.hora && rd.hora !== 'libre' ? ' · ' + esc(rd.hora) : ''}</b><button class="chip" data-sesx="1">‹ Agenda</button></div>${rd.futuro ? '<div class="small muted">Vista previa: podrás anotarla ese día.</div>' : rd.otroDia ? '<div class="small muted">Lo que anotes se guarda en ese día.</div>' : ''}</section>` : '';
   const cIdx = (() => { let k = -1; bloques.forEach((b, bi) => { if (!/bloque b/i.test(b.titulo || '') && (/bloque c/i.test(b.titulo || '') || bi >= 2)) k = bi; }); return k; })();
   const cNom = cIdx >= 0 ? (String(bloques[cIdx].titulo || '').replace(/^bloque\s+[a-z]\s*[·:-]?\s*/i, '').split('·')[0].trim() || 'bloque final') : '';
-  const guardada = rd.rec && ((rd.rec.ej || []).length || rd.rec.carga || rd.rec.rpe != null);
+  const guardada = rd.rec && rd.rec.rpe != null; // terminada: el RPE se marca al final
   const okCard = guardada ? `<section class="card" style="border-color:var(--ok);background:rgba(111,211,154,.08)"><b class="ok" style="font-size:18px">✅ Sesión guardada</b><div class="small muted">${[(rd.rec.ej || []).length ? rd.rec.ej.length + ' ejercicio' + (rd.rec.ej.length === 1 ? '' : 's') + ' anotados' : '', rd.rec.carga ? 'Resultado: ' + rd.rec.carga : '', rd.rec.rpe != null ? 'RPE ' + rd.rec.rpe : ''].filter(Boolean).map(esc).join(' · ')}</div><div class="small muted">Si cambias algo, toca «Actualizar mi entrenamiento».</div></section>` : '';
   const tambien = !S.ses && claseHoy && evsHoy.length ? `<div class="chips">${evsHoy.map(x => `<button class="chip" data-evid="${esc(x.id)}">También hoy: ${EVI[x.tipo] || '📌'} ${esc(x.titulo)} ›</button>`).join('')}</div>` : '';
+  const info = b => { const m = String(b.titulo || '').match(/^bloque\s+([a-z])\s*[·:-]?\s*(.*)$/i); const bi = bloques.indexOf(b); const letra = m ? m[1].toUpperCase() : String.fromCharCode(65 + bi);
+    const isB = /bloque b/i.test(b.titulo || ''); return { letra, nomB: (m ? m[2] : b.titulo) || 'Bloque ' + letra, isB, isC: !isB && (/bloque c/i.test(b.titulo || '') || bi >= 2) }; };
+  const items = []; bloques.forEach((b, bi) => (b.ejercicios || []).forEach((e, ei) => items.push({ b, bi, e, ei })));
+  const finalHTML = rd.futuro ? '<section class="card"><div class="small muted">Esta sesión es de un día que aún no llega. Ábrela desde la Agenda ese día para anotar tus series.</div></section>' : `<section class="card">
+    ${cIdx >= 0 ? `<label class="field">Resultado · ${esc(cNom)}<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>` : ''}
+    <div class="field">¿Qué tan duro fue? (RPE)<div class="chips">${[5,6,7,8,9,10].map(v => `<button class="chip" data-rpe="${v}" aria-pressed="${String(S.rpe ?? rd.rec?.rpe) === String(v)}">${v}</button>`).join('')}</div></div>
+    <button class="btn pri" id="guardar">${guardada ? 'Actualizar mi entrenamiento' : 'Terminar y guardar'}</button>
+    <div class="small muted">${rd.otroDia ? `Se guarda en tu sesión del ${esc(fmtD(rd.fecha))}. ` : rd.hoy ? '' : 'Hoy no tienes clase agendada: queda como entrenamiento libre. '}Tus series se guardan solas mientras entrenas.</div>
+  </section>`;
+  // modo paso a paso: un ejercicio a la vez, grande y sin distracciones
+  if (S.foco != null && !rd.futuro && items.length) {
+    const k = Math.max(0, Math.min(S.foco, items.length)); const fin = k === items.length; const it = items[k];
+    const inf = it ? info(it.b) : null; const primeroC = it && inf.isC && it.ei === 0;
+    return `<div class="foco-top"><button class="chip" data-focox="1">‹ Ver todo</button><span class="as-st small muted"></span><b class="small">${fin ? 'Final' : (k + 1) + ' / ' + items.length}</b></div>
+    <div class="bar foco-bar"><i style="width:${Math.round(k / items.length * 100)}%"></i></div>
+    ${fin ? `<h1 style="font-size:30px;line-height:1.05">¡Terminaste! 💪</h1>${finalHTML}<button class="btn" data-fnav="-1">‹ Anterior</button>`
+      : `<div class="eyebrow">Bloque ${esc(inf.letra)} · ${esc(inf.nomB)}</div>
+    <section class="card foco">${it.ei === 0 && it.b.nota ? `<div class="small muted">${esc(it.b.nota)}</div>` : ''}${ejHTML(it.e, inf.isB, cur, true)}${primeroC ? `<button class="btn tbtn" data-timer="${it.bi}">⏱ Abrir temporizador · ${esc(timerTxt(detectarTimer(it.b)))}</button>` : ''}</section>
+    <div class="grid2"><button class="btn" data-fnav="-1" ${k === 0 ? 'disabled' : ''}>‹ Anterior</button><button class="btn pri" data-fnav="1">${k === items.length - 1 ? 'Terminar ›' : 'Siguiente ›'}</button></div>`}`; }
   return `${otro}${tambien}${okCard}
   <div style="display:grid;gap:6px"><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total : ''}</div><h1 style="font-size:30px;line-height:1.05">${esc(r.tipo || 'Rutina')}</h1>${(() => { const l = rd.pe ? progLinea(r, rd.pe.semana) : ''; return l ? `<div class="small muted">💡 ${esc(l.replace(/^Semana \d+ · /, ''))}</div>` : ''; })()}
-    <div class="chips" style="margin-top:2px">${r.minutos ? `<span class="chip">⏱ ~${esc(r.minutos)} min</span>` : ''}<span class="chip">${bloques.reduce((n, b) => n + (b.ejercicios || []).length, 0)} ejercicios</span>${rd.hora && rd.hora !== 'libre' ? `<span class="chip">🕒 ${esc(rd.hora)}</span>` : ''}</div>${selHTML}</div>
-  ${bloques.map((b, bi) => { const isB = /bloque b/i.test(b.titulo || '');
-    const nEj = (b.ejercicios || []).length; const cerrado = !blkAbiertos.has(bi);
-    const m = String(b.titulo || '').match(/^bloque\s+([a-z])\s*[·:-]?\s*(.*)$/i); const letra = m ? m[1].toUpperCase() : String.fromCharCode(65 + bi); const nomB = (m ? m[2] : b.titulo) || 'Bloque ' + letra;
-    const isC = !isB && (/bloque c/i.test(b.titulo || '') || bi >= 2); const det = isB ? 'anota tus series' : isC ? '⏱ con temporizador' : '';
-    return `<details class="card blk" data-blk="${bi}" ${cerrado ? '' : 'open'}><summary><span class="blk-l ${isB ? 'b' : ''}">${esc(letra)}</span><div style="flex:1;min-width:0"><div class="blk-t">${esc(nomB)}</div><div class="small muted">${nEj} ejercicio${nEj === 1 ? '' : 's'}${det ? ' · ' + esc(det) : ''}</div>${cerrado ? `<div class="blk-p">${esc((b.ejercicios || []).map(e => String(e.nombre || '').replace(/^(min(uto)?\s*\d+|\d+[ab]?)\s*·\s*/i, '')).join(' · '))}</div>` : ''}</div><span class="chev" aria-hidden="true">›</span></summary>${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}${!isB && (/bloque c/i.test(b.titulo || '') || bi >= 2) ? `<button class="btn tbtn" data-timer="${bi}">⏱ Abrir temporizador · ${esc(timerTxt(detectarTimer(b)))}</button>` : ''}
-      ${(b.ejercicios || []).map((e, ei) => { const last = (H[e.nombre] || []).filter(x => x.f < today()).slice(-1)[0]; const c = cur[e.nombre];
-        const n = isB ? nSer(e.dosis) : 0; const sets = c?.sets || [];
-        return `<div class="ej"><div class="row"><b>${esc(e.nombre)}</b><span class="small muted" style="white-space:nowrap">${esc(e.dosis)}${isB ? ` · ⏱ ${mmss(descansoDe(e))}` : ''}</span></div>
-          ${isB ? (() => { const pv = prevSets(e.nombre);
-            return `<div class="sets"><div class="set-h"><span>Serie</span><span>Anterior</span><span>Kg</span><span>Reps</span><span></span></div>${Array.from({ length: n }, (_, i) => { const s = sets[i] || {}; const done = s.kg != null || s.r != null; const p = pv[i] || pv[pv.length - 1];
-            return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span><span class="prev">${p ? esc(fmtSet(p)) : '—'}</span><input inputmode="decimal" placeholder="${p && p.kg != null ? esc(String(p.kg).replace('.', ',')) : 'kg'}" aria-label="kg serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s.kg != null ? esc(String(s.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${p && p.r != null ? esc(p.r) : 'reps'}" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s.r != null ? esc(s.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }).join('')}</div>`; })() : ''}</div>`; }).join('')}
+    <div class="chips" style="margin-top:2px">${r.minutos ? `<span class="chip">⏱ ~${esc(r.minutos)} min</span>` : ''}<span class="chip">${items.length} ejercicios</span>${rd.hora && rd.hora !== 'libre' ? `<span class="chip">🕒 ${esc(rd.hora)}</span>` : ''}</div>
+    ${!rd.futuro && items.length ? `<div class="row" style="align-items:center"><button class="btn pri foco-go" data-foco="1">▶ Empezar paso a paso</button></div><span class="as-st small muted"></span>` : ''}</div>
+  ${bloques.map((b, bi) => { const { letra, nomB, isB, isC } = info(b);
+    const nEj = (b.ejercicios || []).length; const cerrado = !blkAbiertos.has(bi); const det = isB ? 'anota tus series' : isC ? '⏱ con temporizador' : '';
+    return `<details class="card blk" data-blk="${bi}" ${cerrado ? '' : 'open'}><summary><span class="blk-l ${isB ? 'b' : ''}">${esc(letra)}</span><div style="flex:1;min-width:0"><div class="blk-t">${esc(nomB)}</div><div class="small muted">${nEj} ejercicio${nEj === 1 ? '' : 's'}${det ? ' · ' + esc(det) : ''}</div>${cerrado ? `<div class="blk-p">${esc((b.ejercicios || []).map(e => String(e.nombre || '').replace(/^(min(uto)?\s*\d+|\d+[ab]?)\s*·\s*/i, '')).join(' · '))}</div>` : ''}</div><span class="chev" aria-hidden="true">›</span></summary>${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}${isC ? `<button class="btn tbtn" data-timer="${bi}">⏱ Abrir temporizador · ${esc(timerTxt(detectarTimer(b)))}</button>` : ''}
+      ${(b.ejercicios || []).map(e => ejHTML(e, isB, cur, false)).join('')}
     </details>`; }).join('')}
-  ${rd.futuro ? '<section class="card"><div class="small muted">Esta sesión es de un día que aún no llega. Ábrela desde la Agenda ese día para anotar tus series.</div></section>' : `<section class="card">
-    ${cIdx >= 0 ? `<label class="field">Resultado · ${esc(cNom)}<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>` : ''}
-    <div class="field">¿Qué tan duro fue? (RPE)<div class="chips">${[5,6,7,8,9,10].map(v => `<button class="chip" data-rpe="${v}" aria-pressed="${String(rd.rec?.rpe ?? S.rpe) === String(v)}">${v}</button>`).join('')}</div></div>
-    <button class="btn pri" id="guardar">${guardada ? 'Actualizar mi entrenamiento' : 'Guardar mi entrenamiento'}</button>
-    ${rd.otroDia ? `<div class="small muted">Se guarda en tu sesión del ${esc(fmtD(rd.fecha))}.</div>` : rd.hoy ? '' : '<div class="small muted">Hoy no tienes clase agendada: se guarda como entrenamiento libre.</div>'}
-  </section>`}`;
+  ${finalHTML}`;
 };
 V.progreso = () => {
   const t = today(); const mes = t.slice(0, 7);
@@ -1108,6 +1175,7 @@ function render() {
   const lock = appBloqueada(); const onb = lock ? '' : onboardingHTML();
   $('#app').innerHTML = lock ? bloqueoHTML() : onb || V[S.v]();
   $('#tabs').hidden = !!(onb || lock);
+  if (!lock && !onb && S.v === 'rutina' && document.querySelector('.ej,#guardar')) wakeOn(); else wakeOff();
   document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.v === S.v || (S.v === 'clases' && b.dataset.v === 'agenda') ? 'page' : 'false'));
   applyDraft();
   window.scrollTo(0, 0); requestAnimationFrame(() => window.scrollTo(0, 0));
@@ -1174,6 +1242,12 @@ async function solicitar(tipo, data) {
   if (error) { toast('No se pudo enviar. Intenta de nuevo.'); return false; } toast('Enviado a Franco ✓'); return true;
 }
 document.addEventListener('click', async ev => {
+  // antes de cambiar de pantalla o de sesión, sube lo pendiente
+  if (ASpend && ev.target.closest('[data-go],[data-v],[data-abrses],[data-sesx],[data-evid],[data-entrenar],[data-focox],[data-fnav]')) guardarYa();
+  const tcb = ev.target.closest('[data-tec]'); if (tcb) { abrirTec(tcb.dataset.tec); return; }
+  if (ev.target.closest('[data-foco]')) { S.foco = 0; render(); window.scrollTo(0, 0); return; }
+  if (ev.target.closest('[data-focox]')) { S.foco = null; render(); return; }
+  const fnv = ev.target.closest('[data-fnav]'); if (fnv) { finDescanso(); S.foco = Math.max(0, (S.foco || 0) + Number(fnv.dataset.fnav)); render(); window.scrollTo(0, 0); return; }
   const tmb = ev.target.closest('[data-timer]'); if (tmb) { const r = rutinaDeHoy().r; if (r) abrirTimer(r.bloques[Number(tmb.dataset.timer)]); return; }
   if (ev.target.closest('[data-onbfin]')) { S.onbAvisos = false; S.v = 'hoy'; render(); toast('¡Listo! Bienvenido a tu app 💪'); return; }
   const pa = ev.target.closest('[data-push]'); if (pa) { activarPush(pa); return; }
@@ -1195,14 +1269,14 @@ document.addEventListener('click', async ev => {
   const fx = ev.target.closest('[data-fx]'); if (fx) { fx.setAttribute('aria-pressed', String(fx.getAttribute('aria-pressed') !== 'true')); return; }
   const pqb = ev.target.closest('[data-pq]'); if (pqb) { document.querySelectorAll(`[data-pq="${pqb.dataset.pq}"]`).forEach(b => b.setAttribute('aria-pressed', String(b === pqb))); return; }
   if (ev.target.id === 'fx-save') { guardarFicha(ev.target); return; }
-  const abr = ev.target.closest('[data-abrses]'); if (abr) { const [f, h, id] = abr.dataset.abrses.split('|'); S.ses = { f, h, id }; S.rutSel = null; S.evSel = null; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
+  const abr = ev.target.closest('[data-abrses]'); if (abr) { const [f, h, id] = abr.dataset.abrses.split('|'); S.ses = { f, h, id }; S.rutSel = null; S.evSel = null; S.foco = null; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
   const rsel = ev.target.closest('[data-rsel]'); if (rsel) { if (rsel.dataset.rsel === rutinaDeHoy().id) return; S.rutSel = rsel.dataset.rsel; S.rpe = null; blkAbiertos.clear(); render(); return; }
-  if (ev.target.closest('[data-sesx]')) { S.evSel = null; S.ses = null; S.rutSel = null; S.rpe = null; S.v = 'agenda'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
-  const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.evSel = null; if ((go.dataset.go || go.dataset.v) === 'rutina') { S.ses = null; S.rutSel = null; } S.v = go.dataset.go || go.dataset.v; S.evalFirst = false; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
+  if (ev.target.closest('[data-sesx]')) { S.evSel = null; S.foco = null; S.ses = null; S.rutSel = null; S.rpe = null; S.v = 'agenda'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
+  const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.evSel = null; S.foco = null; if ((go.dataset.go || go.dataset.v) === 'rutina') { S.ses = null; S.rutSel = null; } S.v = go.dataset.go || go.dataset.v; S.evalFirst = false; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
   const chk = ev.target.closest('[data-chk]'); if (chk) { const row = chk.closest('.set'); const ins = [...row.querySelectorAll('input')];
     if (row.dataset.ok) { delete row.dataset.ok; finDescanso(); return; }
     ins.forEach(i => { if (i.value.trim() === '' && !/kg|reps/.test(i.placeholder)) { i.value = i.placeholder; i.dispatchEvent(new Event('input', { bubbles: true })); } });
-    if (ins.some(i => i.value.trim() !== '')) { row.classList.add('done'); row.dataset.ok = '1'; iniciarDescanso(Number(chk.dataset.rest) || 90); } else toast('Anota los kilos y las repeticiones.'); return; }
+    if (ins.some(i => i.value.trim() !== '')) { row.classList.add('done'); row.dataset.ok = '1'; iniciarDescanso(Number(chk.dataset.rest) || 90); autoGuardar(400); } else toast('Anota los kilos y las repeticiones.'); return; }
   const dp = ev.target.closest('[data-dep]'); if (dp) { S.pfDeps = S.pfDeps || [...(S.perfil.deportes || [])]; const d = dp.dataset.dep; S.pfDeps = S.pfDeps.includes(d) ? S.pfDeps.filter(x => x !== d) : [...S.pfDeps, d]; dp.setAttribute('aria-pressed', S.pfDeps.includes(d)); return; }
   if (ev.target.id === 'pf-ok') { ev.target.disabled = true; const ig = $('#pf-ig').value.trim().replace(/^@+/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '');
     if (await guardarPerfil({ apodo: $('#pf-apodo').value.trim() || null, meta: $('#pf-meta').value.trim() || null, nac: $('#pf-nac').value || null, ig: ig || null, deportes: S.pfDeps || S.perfil.deportes || [] })) { S.pfDeps = null; toast('Perfil guardado ✓'); } else ev.target.disabled = false; return; }
@@ -1215,7 +1289,7 @@ document.addEventListener('click', async ev => {
   const ibi = ev.target.closest('[data-ibi]'); if (ibi) { S.ibInfo = S.ibInfo === ibi.dataset.ibi ? null : ibi.dataset.ibi; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'fup-open') { S.fotoUp = !S.fotoUp; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'ib-cancel') { if (S.ibNew?.prev) URL.revokeObjectURL(S.ibNew.prev); S.ibNew = null; render(); return; }
-  if (ev.target.closest('[data-entrenar]')) { const pe = progEstado(); if (!pe) return; const id = pe.next[0]; S.evSel = null; S.ses = { f: today(), h: 'libre', id }; S.rutSel = id; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
+  if (ev.target.closest('[data-entrenar]')) { const pe = progEstado(); if (!pe) return; const id = pe.next[0]; S.evSel = null; S.foco = null; S.ses = { f: today(), h: 'libre', id }; S.rutSel = id; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
   if (ev.target.closest('[data-actedit]')) { S.actEdit = true; S.actRpe = null; render(); return; }
   const arp = ev.target.closest('[data-actrpe]'); if (arp) { S.actRpe = Number(arp.dataset.actrpe); document.querySelectorAll('[data-actrpe]').forEach(b => b.setAttribute('aria-pressed', b === arp)); return; }
   const ahe = ev.target.closest('[data-acthecha]'); if (ahe) { const mn = parseInt(($('#act-min')?.value || '').replace(/\D/g, ''), 10); const nota = ($('#act-nota')?.value || '').trim();
@@ -1232,7 +1306,7 @@ document.addEventListener('click', async ev => {
   const wd = ev.target.closest('[data-dia]'); if (wd) { S.dia = wd.dataset.dia; render(); return; }
   const wn = ev.target.closest('[data-wk]'); if (wn) { S.wk = addDays(S.wk, Number(wn.dataset.wk)); const t = today(); S.dia = (t >= S.wk && t <= addDays(S.wk, 6)) ? t : S.wk; render(); return; }
   if (ev.target.closest('[data-hoy]')) { S.dia = today(); S.wk = lunesDe(S.dia); render(); return; }
-  const rp = ev.target.closest('[data-rpe]'); if (rp) { S.rpe = Number(rp.dataset.rpe); { const d = getDraft(); d.rpe = S.rpe; putDraft(d); } document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', b === rp)); return; }
+  const rp = ev.target.closest('[data-rpe]'); if (rp) { S.rpe = Number(rp.dataset.rpe); { const d = getDraft(); d.rpe = S.rpe; putDraft(d); } document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', b === rp)); autoGuardar(300); return; }
   const vy = ev.target.closest('[data-voy]'); if (vy) { const k = vy.dataset.voy;
     if (!(await confirmarAsis(k, 'voy'))) return;
     vy.disabled = true; if (!(await confirmar(k, 'voy'))) vy.disabled = false; return; }
@@ -1247,16 +1321,14 @@ document.addEventListener('click', async ev => {
   const cpy = ev.target.closest('[data-copy]'); if (cpy) { try { await navigator.clipboard.writeText(cpy.dataset.copy); toast('Copiado ✓'); } catch (_) { toast(cpy.dataset.copy); } return; }
   if (ev.target.closest('[data-gopago]')) { secAbiertos.add('pagos'); S.v = 'plan'; render(); setTimeout(() => document.getElementById('pagos-card')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50); return; }
   if (ev.target.id === 'guardar') {
-    const rd = rutinaDeHoy(); const by = {}; if (rd.futuro) { toast('Podrás anotar esta sesión ese día.'); return; }
-    document.querySelectorAll('.set input').forEach(i => { const v = i.value.trim().replace(',', '.'); const o = (by[i.dataset.n] = by[i.dataset.n] || []); o[i.dataset.i] = o[i.dataset.i] || {}; if (v !== '' && !isNaN(v)) o[i.dataset.i][i.dataset.f] = Number(v); });
-    const ej = Object.entries(by).map(([n, sets]) => { const ss = sets.map(s => s || {}).filter(s => s.kg != null || s.r != null); if (!ss.length) return null;
-      const top = ss.reduce((b, s) => (s.kg || 0) > (b.kg || 0) ? s : b, ss[0]); return { n, kg: top.kg, r: top.r, s: ss.length, sets: ss }; }).filter(Boolean);
+    const rd = rutinaDeHoy(); if (rd.futuro) { toast('Podrás anotar esta sesión ese día.'); return; }
+    clearTimeout(AS); ASpend = false; const ej = colectarEj();
     const btn = ev.target; btn.disabled = true;
-    const rpe = S.rpe ?? rd.rec?.rpe ?? null;
+    const rpe = S.rpe ?? rd.rec?.rpe ?? null; if (rpe == null) { btn.disabled = false; toast('Marca qué tan duro fue (RPE) para terminar.'); document.querySelector('[data-rpe]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
     const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: rd.fecha || today(), p_hora: rd.hora, p_ej: ej, p_carga: $('#carga') ? ($('#carga').value.trim() || null) : (rd.rec?.carga || null), p_rpe: rpe, p_rutina: rd.id || null });
     btn.disabled = false;
     if (error) { toast('No se pudo guardar: ' + error.message); return; }
-    clearDraft(); await load(); toast('Entrenamiento guardado 💪'); render();
+    clearDraft(); S.foco = null; S.rpe = null; await load(); toast('Entrenamiento guardado 💪'); render();
   }
 });
 render();

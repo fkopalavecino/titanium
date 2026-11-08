@@ -120,6 +120,12 @@ label.f input,label.f select,label.f textarea{color:var(--fg);font-weight:400}
 .count.crit{background:var(--crit-soft);color:var(--crit)}
 
 .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+.live{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:13px;padding:7px 10px;border-radius:8px;background:var(--red-soft);border:1px solid color-mix(in srgb,var(--red) 35%,transparent)}
+.live.fin{background:var(--ok-soft);border-color:color-mix(in srgb,var(--ok) 35%,transparent)}
+.live .dot{width:8px;height:8px;border-radius:50%;background:var(--red);animation:livepulse 1.6s ease-in-out infinite}
+@keyframes livepulse{50%{opacity:.25}}@media (prefers-reduced-motion:reduce){.live .dot{animation:none}}
+.tec-it{border-bottom:1px solid var(--line);padding:10px 2px}.tec-it>summary{cursor:pointer;list-style:none;display:flex;gap:8px;align-items:center}.tec-it>summary::-webkit-details-marker{display:none}
+.tec-sin>summary{cursor:pointer;color:var(--warn)}
 .pill.ok{background:var(--ok-soft);color:var(--ok)}
 .pill.warn{background:var(--warn-soft);color:var(--warn)}
 .pill.crit{background:var(--crit-soft);color:var(--crit)}
@@ -890,6 +896,7 @@ function studentCard(f, hora, code, ruts) {
       </div>
       <div class="chips">${(() => { const cf = S.conf?.get(f + '|' + hora + '|' + code); return cf === 'voy' ? '<span class="pill ok" title="Confirmó desde su app">✅ Confirmó</span>' : cf === 'no_voy' ? '<span class="pill crit" title="Avisó desde su app">❌ No viene</span>' : ''; })()}${r.extra ? '<span class="pill info" title="Agendado solo para esta fecha">↻ Clase reagendada</span>' : ''}${(() => { const cu = cumple(a, f); return cu && cu.dias === 0 ? '<span class="pill warn">🎂 Cumpleaños</span>' : ''; })()}${a.ingreso?.parq?.length ? '<span class="pill crit">PAR-Q</span>' : ''}${lesionCorta(a).length ? `<span class="pill warn" title="Lesiones informadas">⚠ ${esc(lesionCorta(a).join(', '))}</span>` : ''}${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}<button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button></div>
     </div>
+    ${enVivo(f, hora, code, rut, r)}
     ${pg ? `<div class="small" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="pill ${pg.terminado ? 'warn' : 'info'}">${esc(progTexto(pg))}</span><span class="muted num">Semana ${Math.min(pg.semana, pg.total)} de ${pg.total} · sesión ${pg.idx + 1} de ${pg.ses.length}${pg.terminado ? ' · programa terminado' : ''}</span>${sug ? `<span style="color:var(--red);font-weight:600">Le toca: ${esc(S.rutinas.get(sug)?.tipo || '')}</span>` : ''}</div>` : ''}
     ${pg && rut && !pg.terminado && progLinea(rut, pg.semana) ? `<div class="small" style="border-left:3px solid var(--red);padding:4px 8px;background:var(--bg-2, rgba(255,255,255,.04));border-radius:4px">📈 ${esc(progLinea(rut, pg.semana))}</div>` : ''}
     <div class="st-row">
@@ -917,6 +924,21 @@ function studentCard(f, hora, code, ruts) {
     </div>
     <label class="f">Notas · molestias, ajustes y sensaciones<textarea rows="2" id="nota-${esc(key)}" data-act="campo" data-field="notas" data-k="${esc(key)}">${esc(r.notas||'')}</textarea></label>
   </article>`;
+}
+// lo que el alumno va anotando desde su app durante la clase (se actualiza solo)
+const limpiarEj = n => String(n || '').replace(/^(min(uto)?\s*\d+|\d+[ab]?)\s*·\s*/i, '').replace(/\s*\(.*?\)/g, '');
+const nSerieD = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? Math.min(6, Number(m[1])) : 1; };
+function enVivo(f, hora, code, rut, r) {
+  if (f !== today() || !rut) return '';
+  const cur = r.ej || []; const hechas = cur.reduce((n, x) => n + setsOf(x).length, 0);
+  if (!hechas && r.rpe == null) return '';
+  const ejs = ejsDe(rut); const plan = ejs.reduce((n, x) => n + nSerieD(x.d), 0); const orden = ejs.map(x => x.n);
+  const ult = [...cur].sort((a, b) => orden.indexOf(b.n) - orden.indexOf(a.n))[0]; const ls = ult ? setsOf(ult).slice(-1)[0] : null;
+  const prev = cargasDe(code).filter(c => c.f < f); const al = [];
+  if (r.rpe != null && Number(r.rpe) >= 9) al.push('RPE ' + r.rpe);
+  cur.forEach(x => { const pv = prev.find(c => c.n === x.n); if (pv && pv.kg > 0 && x.kg > pv.kg * 1.15) al.push(`${limpiarEj(x.n)} +${Math.round((x.kg / pv.kg - 1) * 100)}%`); });
+  const terminado = r.rpe != null;
+  return `<div class="live ${terminado ? 'fin' : ''}">${terminado ? '✅' : '<span class="dot" aria-hidden="true"></span>'}<b>${terminado ? 'Terminó' : 'En vivo'}</b><span class="muted num">${hechas}${plan ? '/' + plan : ''} series${!terminado && ult ? ' · ' + esc(limpiarEj(ult.n)) + (ls ? ' · ' + esc(fmtSet(ls)) : '') : ''}${terminado ? ' · RPE ' + esc(r.rpe) : ''}</span>${al.map(a => `<span class="pill crit">⚠ ${esc(a)}</span>`).join('')}</div>`;
 }
 function ejsDe(rut) {
   const bs = rut?.bloques || [];
@@ -1218,7 +1240,7 @@ VIEWS.workouts = () => {
   return `
   <div class="vhead">
     <div><h1>Workouts</h1><p>Plantillas por disciplina y nivel, siempre en 3 bloques: activación y movilidad, fuerza y bloque final.</p></div>
-    <div class="tools"><button class="btn pri" data-act="nuevo-wk">+ Crear workout</button></div>
+    <div class="tools"><button class="btn" data-act="tecnica">📘 Técnica y videos</button><button class="btn pri" data-act="nuevo-wk">+ Crear workout</button></div>
   </div>
   <div class="chips" role="group" aria-label="Disciplina">${[['todas','Todas'], ...CATS.map(c => [c, c])].filter(([v]) => v === 'todas' || cnt(v)).map(([v,l]) => `<button class="chip" data-act="w-c" data-v="${esc(v)}" aria-pressed="${CAT === v}">${esc(l)}<span class="c">${cnt(v)}</span></button>`).join('')}</div>
   <div class="tools">
@@ -1550,6 +1572,44 @@ const DCORTO = {dom:'dom',lun:'lun',mar:'mar',mie:'mié',jue:'jue',vie:'vie',sab
 function sesionesTxt(a, ini, n) { const sp = sesionesPlan(a, ini, n);
   if (!sp) return (a?.bloques||[]).length ? 'Pon la cantidad de clases para calcular sus sesiones.' : 'Este alumno no tiene días fijos: la renovación se calcula a días corridos.';
   return `<b>Sus ${sp.fechas.length} sesiones:</b> ${sp.fechas.map(f => DCORTO[dayKey(f)] + ' ' + parseISO(f).getDate() + '/' + (parseISO(f).getMonth() + 1)).join(' · ')}<br>Renueva el ${esc(fmtDY(sp.fin))} (su siguiente clase). Recupera hasta el día anterior.`; }
+/* ---------- técnica de cada ejercicio: 3 claves y video que ven los alumnos en su app ---------- */
+let TEC = [];
+const tecNorm = n => String(n || '').toLowerCase().replace(/^(min(uto)?\s*\d+|\d+[ab]?|par \d+|min (par|impar)|test \d+|intervalo[^·]*)\s*·\s*/i, '').replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
+const tecMatch = n => { const x = tecNorm(n); return TEC.find(t => { try { return new RegExp(t.patron, 'i').test(x); } catch (_) { return false; } }); };
+async function tecnicaModal() {
+  const { data, error } = await window.__sb.from('tecnica').select('*').order('orden'); if (error) { toast('No se pudo cargar la técnica: ' + error.message, true); return; }
+  TEC = data || [];
+  const nombres = [...new Set([...S.rutinas.values()].flatMap(r => (r.bloques || []).flatMap(b => (b.ejercicios || []).map(e => e.nombre))).filter(Boolean))];
+  const sin = [...new Set(nombres.filter(n => !tecMatch(n)).map(n => limpiarEj(n)))].filter(n => !/pausa|gesto|pases o tiros|aproximaciones/i.test(n)).sort();
+  const conVideo = TEC.filter(t => t.video).length;
+  openModal('Técnica y videos', `
+    <p class="small muted" style="margin:0">Tus alumnos ven estas 3 claves y el video al tocar <b>?</b> o «¿Cómo se hace?» en su app. Cada movimiento cubre todas sus variantes (con barra, mancuernas, pausa, etc.). ${TEC.length} movimientos · ${conVideo} con video.</p>
+    <input type="search" class="search" id="tec-q" placeholder="Buscar movimiento" aria-label="Buscar movimiento">
+    ${sin.length ? `<details class="tec-sin"><summary class="small"><b>${sin.length} ejercicio${sin.length === 1 ? '' : 's'} sin técnica</b></summary><div class="list small">${sin.map(n => `<div class="li"><span class="grow">${esc(n)}</span><button type="button" class="btn sm" data-act="tec-add" data-n="${esc(n)}">+ Agregar</button></div>`).join('')}</div></details>` : ''}
+    <div class="list" id="tec-list" style="max-height:52vh;overflow:auto">${TEC.map(tecFila).join('')}</div>`, { wide: true, submit: 'Listo', cancel: 'Cerrar', onSubmit: () => { const o = document.querySelector('#tec-list details.tec-it[open] [data-act="tec-save"]'); if (o) { o.click(); return false; } return true; } });
+  $('#tec-q')?.addEventListener('input', ev => { const q = norm(ev.target.value); document.querySelectorAll('#tec-list .tec-it').forEach(d => { d.hidden = q && !d.dataset.q.includes(q); }); });
+}
+const tecFila = t => `<details class="tec-it" data-q="${esc(norm(t.nombre + ' ' + t.patron))}"><summary><b>${esc(t.nombre)}</b>${t.video ? ' <span class="pill ok">▶ video</span>' : ''}</summary>
+  <div style="display:grid;gap:8px;padding:8px 0 4px">
+    ${[0, 1, 2].map(i => `<label class="f">Clave ${i + 1}<input type="text" id="tec-${esc(t.id)}-${i}" maxlength="90" value="${esc((t.claves || [])[i] || '')}"></label>`).join('')}
+    <label class="f">Video (link de YouTube, Instagram o Drive)<input type="url" id="tec-${esc(t.id)}-v" placeholder="https://…" value="${esc(t.video || '')}"></label>
+    <details class="small"><summary class="muted">Avanzado · a qué ejercicios se aplica</summary><label class="f">Palabras que lo identifican (separa con |)<input type="text" id="tec-${esc(t.id)}-p" value="${esc(t.patron)}"></label></details>
+    <div><button type="button" class="btn sm pri" data-act="tec-save" data-id="${esc(t.id)}">Guardar</button></div></div></details>`;
+async function tecGuardar(id, btn) {
+  const claves = [0, 1, 2].map(i => val(`tec-${id}-${i}`)).filter(Boolean); const video = val(`tec-${id}-v`) || null; const patron = val(`tec-${id}-p`);
+  if (video && !/^https?:\/\//i.test(video)) { toast('El video debe ser un link que empiece con https://', true); return; }
+  try { new RegExp(patron, 'i'); } catch (_) { toast('Las palabras que lo identifican no son válidas.', true); return; }
+  btn.disabled = true; const { error } = await window.__sb.from('tecnica').update({ claves, video, patron, updated_at: new Date().toISOString() }).eq('id', id); btn.disabled = false;
+  if (error) { toast('No se pudo guardar: ' + error.message, true); return; }
+  const t = TEC.find(x => x.id === id); if (t) Object.assign(t, { claves, video, patron }); const d = btn.closest('details.tec-it'); if (d) { d.querySelector('summary').innerHTML = `<b>${esc(t.nombre)}</b>${video ? ' <span class="pill ok">▶ video</span>' : ''}`; d.open = false; }
+  toast('Técnica guardada ✓ Tus alumnos ya la ven.'); }
+async function tecAgregar(nombre) {
+  const id = 'x-' + norm(nombre).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) + '-' + Date.now().toString(36).slice(-4);
+  const patron = tecNorm(nombre).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const fila = { id, nombre, patron, claves: [], orden: 2 };
+  const { error } = await window.__sb.from('tecnica').insert(fila); if (error) { toast('No se pudo agregar: ' + error.message, true); return; }
+  TEC.unshift(fila); $('#tec-list').insertAdjacentHTML('afterbegin', tecFila(fila)); const d = $('#tec-list details.tec-it'); if (d) { d.open = true; d.scrollIntoView({ block: 'nearest' }); $(`#tec-${id}-0`)?.focus(); }
+  document.querySelector(`[data-act="tec-add"][data-n="${CSS.escape(nombre)}"]`)?.closest('.li')?.remove(); }
 function planModal(code, pid, mode) {
   const a = clone(S.alumnos.get(code)); if (!a) return;
   const c = cfg(), t = today();
@@ -2038,6 +2098,9 @@ document.addEventListener('click', e => {
     case 'w-n': S.ui.wkNivel = el.dataset.v; render(); break;
     case 'w-c': S.ui.wkCat = el.dataset.v; render(); break;
     case 'nuevo-wk': wkModal(null); break;
+    case 'tecnica': tecnicaModal(); break;
+    case 'tec-save': tecGuardar(el.dataset.id, el); break;
+    case 'tec-add': tecAgregar(el.dataset.n); break;
     case 'editar-wk': wkModal(id); break;
     case 'duplicar-wk': wkModal(id, true); break;
     case 'borrar-wk': deleteRutina(id); closeModal(); toast('Workout eliminado.'); break;
