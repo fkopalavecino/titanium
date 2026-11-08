@@ -4,7 +4,7 @@
    (queda guardado solo en su teléfono). La configuración también queda guardada en el teléfono. */
 (function () {
   const KEY = 'tl-sonido';
-  const DEF = { vol: 90, inicio: 'campana', fin: 'silbato', final: 'gong', cuenta: 'pitido', vib: true };
+  const DEF = { vol: 90, inicio: 'campana', fin: 'silbato', final: 'gong', cuenta: 'pitido', vib: true, efecto: {} };
   let cfg = Object.assign({}, DEF);
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (_) {}
   const guardar = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (_) {} };
@@ -99,7 +99,40 @@
     try { const ab = MIO[ev].ab.slice(0); const b = await new Promise((ok, ko) => { const r = AC.decodeAudioData(ab, ok, ko); if (r && r.then) r.then(ok, ko); }); DEC[ev] = recortar(b); } catch (_) { DEC[ev] = null; }
     return DEC[ev];
   }
-  function sonarBuffer(buf) { const src = AC.createBufferSource(), g = AC.createGain(); g.gain.value = 1.3; src.buffer = buf; src.connect(g); g.connect(OUT); src.start(AC.currentTime + 0.01); }
+  /* efectos de voz estilo dibujo animado para "Mi audio" */
+  const EFECTOS = [
+    ['normal', '🎙 Normal'], ['ardilla', '🐿 Ardilla (aguda y rápida)'], ['helio', '🎈 Globo de helio'],
+    ['gigante', '👹 Gigante (grave y lenta)'], ['monstruo', '🦖 Monstruo'], ['robot', '🤖 Robot'],
+    ['alien', '👽 Extraterrestre'], ['megafono', '📢 Megáfono'], ['estadio', '🏟 Eco de estadio'], ['lenta', '🐌 Cámara lenta']
+  ];
+  function curva(k) { const n = 2048, c = new Float32Array(n); for (let i = 0; i < n; i++) { const x = i * 2 / n - 1; c[i] = (1 + k) * x / (1 + k * Math.abs(x)); } return c; }
+  // arma la cadena de efectos: devuelve [entrada, salida] y ajusta la velocidad de la fuente
+  function cadena(src, ef, t0, dur) {
+    const ent = AC.createGain(), sal = AC.createGain(); let ult = ent;
+    const pon = n => { ult.connect(n); ult = n; return n; };
+    const rate = { ardilla: 1.55, helio: 1.3, gigante: 0.68, monstruo: 0.58, lenta: 0.78 }[ef] || 1;
+    src.playbackRate.value = rate;
+    if (ef === 'helio') { const f = AC.createBiquadFilter(); f.type = 'highshelf'; f.frequency.value = 2500; f.gain.value = 6; pon(f); }
+    if (ef === 'gigante' || ef === 'monstruo') { const f = AC.createBiquadFilter(); f.type = 'lowshelf'; f.frequency.value = 250; f.gain.value = 8; pon(f); }
+    if (ef === 'monstruo') { const d = AC.createWaveShaper(); d.curve = curva(18); pon(d); const g = AC.createGain(); g.gain.value = .55; pon(g); }
+    if (ef === 'robot' || ef === 'alien') { // modulación en anillo
+      const m = AC.createGain(); m.gain.value = 0; const o = AC.createOscillator(); o.type = ef === 'robot' ? 'square' : 'sine';
+      o.frequency.value = ef === 'robot' ? 55 : 420; o.connect(m.gain); o.start(t0); o.stop(t0 + dur + 2); pon(m);
+      if (ef === 'robot') { const dl = AC.createDelay(); dl.delayTime.value = .012; const fb = AC.createGain(); fb.gain.value = .55; m.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(sal); }
+      const g = AC.createGain(); g.gain.value = 1.8; pon(g); }
+    if (ef === 'megafono') { const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1700; bp.Q.value = .9; pon(bp); const d = AC.createWaveShaper(); d.curve = curva(30); pon(d); const g = AC.createGain(); g.gain.value = .7; pon(g); }
+    ult.connect(sal);
+    if (ef === 'estadio') { const dl = AC.createDelay(2); dl.delayTime.value = .28; const fb = AC.createGain(); fb.gain.value = .45; const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2200;
+      ult.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(sal); }
+    return [ent, sal, rate];
+  }
+  function sonarBuffer(buf, ef) {
+    const src = AC.createBufferSource(), g = AC.createGain(), t0 = AC.currentTime + 0.01; g.gain.value = 1.3; src.buffer = buf;
+    const [ent, sal, rate] = cadena(src, ef || 'normal', t0, buf.duration);
+    src.connect(ent); sal.connect(g); g.connect(OUT); src.start(t0);
+    const fin = t0 + buf.duration / rate + (ef === 'estadio' ? 1.6 : ef === 'robot' ? .3 : 0); g.gain.setValueAtTime(1.3, fin); g.gain.linearRampToValueAtTime(0, fin + .1);
+  }
+  const efDe = ev => (cfg.efecto || {})[ev] || 'normal';
   async function guardarMio(ev, blob) {
     if (blob.size > 4 * 1024 * 1024) throw new Error('El archivo es muy grande (máximo 4 MB). Usa un audio corto.');
     const ab = await blob.arrayBuffer(); const prev = MIO[ev];
@@ -133,8 +166,8 @@
     if (id === 'voz') { if (hablar(evento === 'cuenta' || evento === 'prep' ? String(n || '') || VOZ.prep : VOZ[evento] || '')) return; }
     if (!ctx()) return;
     if (id === 'mio' && evento !== 'cuenta' && evento !== 'prep') {
-      if (DEC[evento]) return sonarBuffer(DEC[evento]);
-      if (MIO[evento]) { decodificar(evento).then(b => b ? sonarBuffer(b) : SYN.pitido(AC.currentTime + .01)); return; }
+      if (DEC[evento]) return sonarBuffer(DEC[evento], efDe(evento));
+      if (MIO[evento]) { decodificar(evento).then(b => b ? sonarBuffer(b, efDe(evento)) : SYN.pitido(AC.currentTime + .01)); return; }
     }
     const t = AC.currentTime + 0.02;
     if (evento === 'cuenta' || evento === 'prep') { (id === 'pitido' ? SYN.cuenta : SYN[id] || SYN.cuenta)(t); return; }
@@ -170,6 +203,8 @@
 #sndp .mini{min-height:42px;padding:0 14px;border-radius:10px;border:1px solid #3a3439;background:#0f0d10;color:inherit;font:700 15px Barlow,system-ui,sans-serif;display:inline-flex;align-items:center;cursor:pointer}
 #sndp .mini.rec{background:#e3253d;border-color:#e3253d;color:#fff;animation:sndrec 1s infinite}
 @keyframes sndrec{50%{opacity:.6}}
+#sndp .efx{display:grid;gap:6px}
+#sndp .efx>span{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#a79fa5;font-weight:700}
 #sndp .ok{height:52px;border-radius:12px;border:0;background:#e3253d;color:#fff;font:800 18px Barlow,sans-serif;cursor:pointer}`;
   function abrirPanel() {
     cerrarPanel();
@@ -183,7 +218,8 @@
       return `<div class="mio"><div class="est">${estado}</div><div class="mb">
         <button class="mini${grab ? ' rec' : ''}" data-sg="${ev}">${grab ? '⏹ Detener' : '⏺ Grabar'}</button>
         <label class="mini">📁 Subir audio<input type="file" accept="audio/*" data-sf="${ev}" hidden></label>
-        ${MIO[ev] ? `<button class="mini" data-sb="${ev}" aria-label="Borrar mi audio">🗑</button>` : ''}</div></div>`; };
+        ${MIO[ev] ? `<button class="mini" data-sb="${ev}" aria-label="Borrar mi audio">🗑</button>` : ''}</div>
+        ${MIO[ev] ? `<div class="efx"><span>Efecto de voz</span><div class="ln"><select data-sfx="${ev}" aria-label="Efecto de voz">${EFECTOS.map(([id, n]) => `<option value="${id}"${efDe(ev) === id ? ' selected' : ''}>${n}</option>`).join('')}</select><button class="play" data-st="${ev}" aria-label="Escuchar con efecto">▶</button></div></div>` : ''}</div>`; };
     const render = () => { el.innerHTML = `<div class="sp" role="dialog" aria-label="Sonidos del temporizador">
       <h3>🔊 Sonidos <button data-sx="1" aria-label="Cerrar">✕</button></h3>
       <div class="row"><span>Volumen</span><div class="vol"><input type="range" min="0" max="100" step="5" value="${cfg.vol}" data-sv="1" aria-label="Volumen"><b id="sndp-v">${cfg.vol}%</b><button class="play" data-st="inicio" aria-label="Probar volumen">▶</button></div></div>
@@ -214,6 +250,7 @@
       if (t.dataset.sv) { unlock(); play('cuenta', 3); }
       if (t.dataset.se) { cfg[t.dataset.se] = t.value; guardar(); unlock(); if (t.value !== 'mio' || MIO[t.dataset.se]) play(t.dataset.se, 3); if (t.value === 'mio') { await decodificar(t.dataset.se); } refrescar(); }
       if (t.dataset.svib) { cfg.vib = t.checked; guardar(); }
+      if (t.dataset.sfx) { cfg.efecto = Object.assign({}, cfg.efecto, { [t.dataset.sfx]: t.value }); guardar(); unlock(); play(t.dataset.sfx); }
       if (t.dataset.sf && t.files && t.files[0]) { const e = t.dataset.sf; unlock(); aviso[e] = '⏳ Cargando…'; refrescar();
         try { await guardarMio(e, t.files[0]); delete aviso[e]; play(e); } catch (err) { aviso[e] = '⚠️ ' + err.message; } refrescar(); }
     });
