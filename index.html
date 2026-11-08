@@ -606,9 +606,10 @@ function cumple(a, t) {
 }
 function prsDe(code) { // récords: superar el mejor kg (o mismas kg con más reps) de ese ejercicio
   const xs = cargasDe(code).slice().reverse(); const best = {}; const out = [];
-  xs.forEach(x => { if (x.kg == null) return; const b = best[x.n];
-    if (b && (x.kg > b.kg || (x.kg === b.kg && (x.r || 0) > (b.r || 0)))) out.push(Object.assign({prev: b}, x));
-    if (!b || x.kg > b.kg || (x.kg === b.kg && (x.r || 0) > (b.r || 0))) best[x.n] = x; });
+  xs.forEach(x => { const v = valE(x); if (v == null) return; const b = best[x.n]; const bv = b ? valE(b) : null;
+    const mejora = b && (v > bv || (v === bv && x.t == null && (x.r || 0) > (b.r || 0)));
+    if (mejora) out.push(Object.assign({prev: b}, x));
+    if (!b || mejora) best[x.n] = x; });
   return out.reverse();
 }
 function totalPresentes(code) { return asistencias(code).pres; }
@@ -923,7 +924,7 @@ function studentCard(f, hora, code, ruts) {
     a.ingreso?.parq?.length ? '<span class="sc-ic crit" title="Respondió sí en el PAR-Q">PAR-Q</span>' : '',
     debe ? '<span class="sc-ic crit" title="Tiene un pago pendiente">$ debe</span>' : '',
     cu && cu.dias === 0 ? '<span title="Cumpleaños">🎂</span>' : ''].filter(Boolean).join('');
-  const rutNom = rid ? String(S.rutinas.get(rid)?.tipo || 'Rutina').split(' · ')[0] : 'Sin rutina';
+  const rutNom = r.rutina ? String(S.rutinas.get(r.rutina)?.tipo || 'Rutina').split(' · ')[0] : sug ? 'Le toca ' + String(S.rutinas.get(sug)?.tipo || '').split(' · ')[0] : 'Sin rutina';
   const v = vivoInfo(f, hora, code, rut, r);
   const estado = v ? v.txt : (cf === 'no_voy' && !vino ? '<span class="crit-t">Avisó que no viene</span>' : cf === 'voy' ? 'Confirmó que viene' : '');
   const seg = (val, txt, ttl) => `<button class="seg-b ${r.asis === val ? 'on ' + val : ''}" data-act="asis" data-v="${val}" data-k="${esc(key)}" ${val === 'presente' && sug ? `data-r="${esc(sug)}"` : ''} ${ttl ? `title="${ttl}"` : ''}>${txt}</button>`;
@@ -963,7 +964,7 @@ function studentCard(f, hora, code, ruts) {
 // lo que el alumno va anotando desde su app durante la clase (se actualiza solo)
 const limpiarEj = n => String(n || '').replace(/^(min(uto)?\s*\d+|\d+[ab]?)\s*·\s*/i, '').replace(/\s*\(.*?\)/g, '');
 const sinDescE = d => String(d || '').replace(/desc(?:anso)?\.?\s*\d+\s*(?:s|seg|min|m|')(?![a-z])/gi, '');
-const esTiempo = (n, d) => { d = sinDescE(d); if (/×\s*\d+\s*(s|seg|"|min)(?![a-z])/i.test(d)) return true; if (/reps?\b/i.test(d)) return false; return /plancha(?!.*copenhag)|plank|hollow|isom[eé]tric|wall ?sit|sentadilla en (la )?pared|colgad|dead ?hang|l-?sit/i.test(n || ''); };
+const esTiempo = (n, d) => { d = sinDescE(d); if (/×\s*\d+(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i.test(d)) return true; if (/×\s*\d+|\breps?\b|repeticiones|\d+\s*\/\s*(lado|pierna|brazo)/i.test(d)) return false; if (/\d+(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i.test(d)) return true; return /plancha(?!.*copenhag)|plank|hollow|isom[eé]tric|wall ?sit|sentadilla en (la )?pared|colgad|dead ?hang|l-?sit/i.test(n || ''); };
 const ejCorto = n => limpiarEj(n).split(/,|\s+—\s+/)[0].trim();
 const nSerieD = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? Math.min(6, Number(m[1])) : 1; };
 function vivoInfo(f, hora, code, rut, r) {
@@ -980,6 +981,7 @@ function vivoInfo(f, hora, code, rut, r) {
     : `${vivo ? '<span class="dot" aria-hidden="true"></span><b>En vivo</b> · ' : ''}${hechas}${plan ? '/' + plan : ''} series${ult ? ' · ' + esc(ejCorto(ult.n)) + (ls ? ' ' + esc(fmtSetC(ls)) : '') : ''}`;
   return {txt, al};
 }
+const valE = x => x.kg != null ? x.kg : x.t != null ? x.t : null;
 const fmtSetC = x => x.t != null ? x.t + ' s' : (x.kg != null ? String(x.kg).replace('.', ',') : '') + (x.r != null ? (x.kg != null ? '×' : '') + x.r + (x.kg != null ? '' : ' reps') : '');
 function ejsDe(rut) {
   const bs = rut?.bloques || [];
@@ -1021,7 +1023,7 @@ function setSerie(k, n, i, patch) {
 function cargasHTML(f, hora, code, key, rut, r) {
   const ejs = ejsDe(rut); if (!ejs.length) return '';
   const cur = r.ej || [];
-  const hechos = ejs.filter(e => cur.some(x => x.n === e.n)).length;
+  const hechos = ejs.filter(e => cur.some(x => x.n === e.n && setsOf(x).some(z => z.kg != null || z.r != null || z.t != null))).length;
   const open = !!S.ui.openCar[key];
   const btn = `<button class="btn sm ${open ? 'on-ok' : 'car'}" data-act="ver-car" data-k="${esc(key)}">${open ? '✓ Listo' : hechos ? '✎ Corregir series' : '✎ Anotar kg y reps'}</button>`;
   if (!open) return `<div class="res">${ejs.map(e => { const c = cur.find(x => x.n === e.n); const ss = c ? setsOf(c).filter(z => z.kg != null || z.r != null || z.t != null) : []; const ap = (c?.ap || []).filter(z => z && (z.kg != null || z.r != null));
@@ -1510,7 +1512,7 @@ function fichaAlumno(code) {
     <div><b>Asistencia</b> <span class="muted small num">· ${as.pres} presentes, ${as.aus} ausencias en total</span>
       <div class="list small" style="margin-top:4px">${hist.slice(0,8).map(([f,h,r]) => `<div class="li"><span class="grow num">${fmtDY(f)} · ${esc(h)}${r.carga ? ' · ' + esc(r.carga) : ''}${r.rpe ? ' · RPE ' + esc(r.rpe) : ''}</span><span class="pill ${r.asis === 'presente' ? 'ok' : r.asis === 'aviso' ? 'warn' : 'crit'}">${r.asis === 'presente' ? 'Presente' : r.asis === 'aviso' ? 'Avisó' : 'Ausente'}</span></div>`).join('') || '<div class="muted">Sin registros todavía.</div>'}</div></div>
     ${(() => { const cs = cargasDe(a.codigo); if (!cs.length) return ''; const by = {}; cs.forEach(x => (by[x.n] = by[x.n] || []).push(x));
-      return `<div><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><span><b>Cargas registradas</b> <span class="muted small">· última vez y mejor marca</span></span><button type="button" class="btn sm" data-act="progreso" data-id="${esc(a.codigo)}">Ver progreso completo</button></div><div class="list small" style="margin-top:4px">${Object.entries(by).slice(0, 6).map(([n, xs]) => { const best = xs.filter(x => x.kg != null).sort((p, q) => q.kg - p.kg || (q.r || 0) - (p.r || 0))[0]; return `<div class="li"><span class="grow"><b>${esc(n)}</b><span class="muted num"> · ${fmtDY(xs[0].f)}: ${esc(fmtSet(xs[0]))}${xs.length > 1 ? ` · antes: ${esc(fmtSet(xs[1]))}` : ''}</span>${(xs.find(x => x.c) || {}).c ? `<br><span class="muted" style="font-style:italic">💬 ${esc(xs.find(x => x.c).c)}</span>` : ''}</span>${best ? `<span class="pill info num">Mejor ${esc(fmtSet(best))}</span>` : ''}</div>`; }).join('')}</div></div>`; })()}
+      return `<div><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><span><b>Cargas registradas</b> <span class="muted small">· última vez y mejor marca</span></span><button type="button" class="btn sm" data-act="progreso" data-id="${esc(a.codigo)}">Ver progreso completo</button></div><div class="list small" style="margin-top:4px">${Object.entries(by).slice(0, 6).map(([n, xs]) => { const best = xs.filter(x => valE(x) != null).sort((p, q) => valE(q) - valE(p) || (q.r || 0) - (p.r || 0))[0]; return `<div class="li"><span class="grow"><b>${esc(n)}</b><span class="muted num"> · ${fmtDY(xs[0].f)}: ${esc(fmtSet(xs[0]))}${xs.length > 1 ? ` · antes: ${esc(fmtSet(xs[1]))}` : ''}</span>${(xs.find(x => x.c) || {}).c ? `<br><span class="muted" style="font-style:italic">💬 ${esc(xs.find(x => x.c).c)}</span>` : ''}</span>${best ? `<span class="pill info num">Mejor ${esc(fmtSet(best))}</span>` : ''}</div>`; }).join('')}</div></div>`; })()}
     </div>
     </details>
     <details class="sec" ${isNew ? 'open' : ''}><summary>Horario fijo <span class="small muted" style="font-weight:500">· ${esc(bloquesTexto(a))}</span></summary>
@@ -1849,8 +1851,8 @@ function progresoModal(code) {
   const cs = cargasDe(code), by = {}; cs.slice().reverse().forEach(x => (by[x.n] = by[x.n] || []).push(x));
   const prs = prsDe(code);
   const filas = Object.entries(by).sort((x, y) => y[1][y[1].length - 1].f.localeCompare(x[1][x[1].length - 1].f)).map(([n, xs]) => {
-    const last = xs[xs.length - 1], first = xs.find(x => x.kg != null), best = xs.filter(x => x.kg != null).sort((p, q) => q.kg - p.kg || (q.r || 0) - (p.r || 0))[0];
-    return `<tr><td><b>${esc(n)}</b><span class="sub">${xs.length} registro${xs.length === 1 ? '' : 's'} · desde ${fmtD(xs[0].f)}</span></td><td class="num">${esc(fmtSet(last))}<span class="sub">${fmtD(last.f)}</span></td><td class="num">${best ? esc(fmtSet(best)) : '—'}</td><td>${spark(xs.map(x => x.kg))}</td><td class="r num">${first && last.kg != null && xs.length > 1 ? pctTxt(last.kg, first.kg) : '<span class="muted">—</span>'}</td></tr>`; }).join('');
+    const last = xs[xs.length - 1], first = xs.find(x => valE(x) != null), best = xs.filter(x => valE(x) != null).sort((p, q) => valE(q) - valE(p) || (q.r || 0) - (p.r || 0))[0];
+    return `<tr><td><b>${esc(n)}</b><span class="sub">${xs.length} registro${xs.length === 1 ? '' : 's'} · desde ${fmtD(xs[0].f)}</span></td><td class="num">${esc(fmtSet(last))}<span class="sub">${fmtD(last.f)}</span></td><td class="num">${best ? esc(fmtSet(best)) : '—'}</td><td>${spark(xs.map(valE))}</td><td class="r num">${first && valE(last) != null && xs.length > 1 ? pctTxt(valE(last), valE(first)) : '<span class="muted">—</span>'}</td></tr>`; }).join('');
   const med = a.medidas || [];
   const lg = logrosDe(a), hechos = lg.filter(x => x.ok).length;
   const ing = ingDe(a);

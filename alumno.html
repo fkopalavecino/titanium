@@ -82,7 +82,7 @@ h2{font-size:22px}
 .set.done{border-color:var(--ok);background:rgba(111,211,154,.08)}
 .set .n{text-align:center;font-weight:700}.set input.raro{border-color:#f0b35a;color:#f0b35a}
 .set-h .t2,.set input.t2{grid-column:span 2}.set.ap{background:transparent;border-style:dashed}.set.ap .n{color:var(--muted)}.set.ap input{font-weight:600;color:var(--muted)}.set.ap.done{border-style:solid}
-.ap-add{justify-self:start;border:0;background:none;color:var(--muted);font:600 13px Barlow,sans-serif;padding:6px 4px;cursor:pointer}
+.ap-add{justify-self:start;border:0;background:none;color:var(--muted);font:600 14px Barlow,sans-serif;min-height:44px;padding:0 6px;cursor:pointer}
 .set .prev{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .set input{width:100%;height:42px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:700 18px Barlow,sans-serif;text-align:center;padding:0}
 .set input::placeholder{color:#5b5358;font-weight:600}
@@ -422,8 +422,8 @@ function rutinaDeHoy() {
   return { id, r: rec?.sesion && !S.rutSel ? Object.assign({}, r || {}, { bloques: rec.sesion }) : r, hora, fecha: t, rec, pe, hoy: !!(prox && prox.f === t) };
 }
 function historial() { // {nombre: [{f, kg, r}]}
-  const h = {}; for (const r of S.clases) for (const e of r.ej || []) { const sets = e.sets && e.sets.length ? e.sets.filter(z => z && (z.kg != null || z.r != null)) : [{ kg: e.kg, r: e.r }];
-    for (const s of sets) if (s.kg != null || s.r != null) (h[e.n] = h[e.n] || []).push({ f: r.fecha, kg: s.kg, r: s.r }); }
+  const h = {}; for (const r of S.clases) for (const e of r.ej || []) { const sets = e.sets && e.sets.length ? e.sets.filter(conDato) : [{ kg: e.kg, r: e.r, t: e.t }];
+    for (const s of sets) if (conDato(s)) (h[e.n] = h[e.n] || []).push({ f: r.fecha, kg: s.kg, r: s.r, t: s.t }); }
   return h;
 }
 const nSer = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? Math.min(6, Number(m[1])) : 1; };
@@ -431,13 +431,15 @@ const fmtSet = s => s ? (s.t != null ? s.t + ' s' : (s.kg != null ? String(s.kg)
 const conDato = z => !!z && (z.kg != null || z.r != null || z.t != null);
 // tipo de ejercicio: por tiempo (plancha…), peso corporal (dominadas…) o con kilos
 const sinDesc = d => String(d || '').replace(/desc(?:anso)?\.?\s*\d+\s*(?:s|seg|min|m|')(?![a-z])/gi, '');
-const SEG_RE = /×\s*(\d+)\s*(s|seg|"|min)(?![a-z])/i;
+const SEG_RE = /×\s*(\d+)(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i;
 const TIEMPO_RE = /plancha(?!.*copenhag)|plank|hollow|isom[eé]tric|wall ?sit|sentadilla en (la )?pared|colgad|dead ?hang|l-?sit/i;
-const CORPORAL_RE = /dominada|pull-?up|chin-?up|fondos|\bdips\b|flexi[oó]n|push-?up|remo invertido|muscle-?up/i;
-function tipoEj(e) { const d = sinDesc(e.dosis); if (SEG_RE.test(d)) return 'tiempo'; if (/reps?\b/i.test(d)) return CORPORAL_RE.test(e.nombre || '') ? 'corporal' : 'kg';
-  if (TIEMPO_RE.test(e.nombre || '')) return 'tiempo'; if (CORPORAL_RE.test(e.nombre || '')) return 'corporal'; return 'kg'; }
-const segObj = e => { const m = sinDesc(e.dosis).match(SEG_RE); return m ? Number(m[1]) * (/min/i.test(m[2]) ? 60 : 1) : 0; };
-const nAprox = e => Number((String(e.dosis || '').match(/(\d)\s*aprox/i) || [])[1]) || 0;
+const CORPORAL_RE = /dominada|pull-?up|chin-?up|fondos|\bdips\b|flexiones|flexi[oó]n de brazos|push-?up|remo invertido|muscle-?up|copenhag/i;
+// orden: tiempo explícito en la dosis > reps explícitas en la dosis > nombre del ejercicio
+const SEG2_RE = /(\d+)(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i;
+function tipoEj(e) { const d = sinDesc(e.dosis), nm = e.nombre || ''; if (SEG_RE.test(d)) return 'tiempo';
+  const reps = /×\s*\d+|\breps?\b|repeticiones|\d+\s*\/\s*(lado|pierna|brazo)/i.test(d); if (!reps && (SEG2_RE.test(d) || TIEMPO_RE.test(nm))) return 'tiempo'; return CORPORAL_RE.test(nm) ? 'corporal' : 'kg'; }
+const segObj = e => { const m = sinDesc(e.dosis).match(SEG_RE) || sinDesc(e.dosis).match(SEG2_RE); return m ? Number(m[1]) * (/min/i.test(m[2]) ? 60 : 1) : 0; };
+const nAprox = e => { const m = String(e.dosis || '').match(/(rir\s*)?(\d)\s*(?:series?\s*(?:de\s*)?)?aprox/i); return m && !m[1] ? Math.min(4, Number(m[2])) : 0; };
 
 /* ---------- borrador de la sesión (no se pierde si se cierra la app) ---------- */
 const DKEY = () => { const rd = rutinaDeHoy(); return 'tl-draft-' + codigo + '-' + rd.fecha + '-' + String(rd.hora || 'libre').replace(':', '') + (S.rutSel ? '-' + S.rutSel : ''); };
@@ -749,7 +751,9 @@ document.addEventListener('change', ev => { const i = ev.target; if (!i.matches 
   const pk = Math.max(0, ...prevSets(i.dataset.n).map(x => (x && x.kg) || 0)); const raro = pk > 0 ? v > pk * 1.8 && v - pk >= 10 : v > 250;
   i.classList.toggle('raro', raro); if (raro) toast(`¿${String(v).replace('.', ',')} kg? Es mucho más que la vez anterior (${String(pk).replace('.', ',')} kg). Revisa que esté bien.`); });
 function prevCom(nombre) { const t = S.ses ? S.ses.f : today(); for (let i = S.clases.length - 1; i >= 0; i--) { const r = S.clases[i]; if (r.fecha >= t) continue; const e = (r.ej || []).find(x => x.n === nombre && x.c); if (e) return e.c; } return ''; }
-function prevSets(nombre) { const t = S.ses ? S.ses.f : today(); for (let i = S.clases.length - 1; i >= 0; i--) { const r = S.clases[i]; if (r.fecha >= t) continue; const e = (r.ej || []).find(x => x.n === nombre); if (e) return e.sets && e.sets.length ? e.sets : [{ kg: e.kg, r: e.r }]; } return []; }
+function prevSets(nombre) { const t = S.ses ? S.ses.f : today(); for (let i = S.clases.length - 1; i >= 0; i--) { const r = S.clases[i]; if (r.fecha >= t) continue; const e = (r.ej || []).find(x => x.n === nombre);
+  // se salta las sesiones donde ese ejercicio solo tiene comentario o aproximaciones
+  if (e) { const ss = e.sets && e.sets.length ? e.sets : [{ kg: e.kg, r: e.r, t: e.t }]; if (ss.some(conDato)) return ss; } } return []; }
 /* ---------- descanso entre series (bloque de fuerza) ---------- */
 const COMPUESTO = /sentadilla|squat|peso muerto|deadlift|press (banca|banco|militar|plano|inclinado)|bench|hip thrust|dominada|remo con barra|zancada|b[uú]lgara|clean|cargada|arranque|envi[oó]n|trap bar|good morning|fondos/i;
 function descansoDe(e) { const d = String(e.dosis || ''); const ex = d.match(/desc(?:anso)?\.?\s*(\d+)\s*(s|seg|'|min|m)\b/i);
@@ -816,22 +820,24 @@ function abrirTimer(b) { cerrarTimer(); const c = detectarTimer(b); const el = d
       <div class="tfase">${esc(fase)}</div><div class="tbig" aria-live="off">${big}</div><div class="tsub">${esc(sub)}</div>
       <div class="tbar"><i style="width:${T ? Math.min(100, e / T * 100) : 0}%"></i></div>
       <div class="tbtns">${c.modo === 'crono' ? '<button class="btn" data-tv="1">+1 vuelta</button>' : ''}<button class="btn" data-tp="1">${st.fase === 'pausa' ? '▶ Seguir' : '⏸ Pausa'}</button><button class="btn pri" data-tf="1">${c.modo === 'crono' ? '■ Terminé' : '■ Terminar'}</button></div></div>`; };
-  const ponerRes = v => { if (!v) return; const inp = document.getElementById('carga'); if (inp) { inp.value = v; inp.dispatchEvent(new Event('input', { bubbles: true })); } else { const d = getDraft(); d.carga = v; putDraft(d); autoGuardar(800); } };
-  const terminar = () => { const e = transcurrido(); clearInterval(TM); TM = null; st.fase = 'fin'; snd('final');
+  const auto = x => !String(x || '').trim() || /rondas?\b|^\d{1,2}:\d\d(\s·.*)?$/i.test(String(x).trim());
+  const ponerRes = v => { if (!v) return; const inp = document.getElementById('carga'); if (inp) { if (!auto(inp.value) && !confirm(`¿Reemplazar «${inp.value}» por «${v}»?`)) return; inp.value = v; inp.dispatchEvent(new Event('input', { bubbles: true })); } else { const d = getDraft(); if (!auto(d.carga ?? rutinaDeHoy().rec?.carga)) return; d.carga = v; putDraft(d); autoGuardar(800); } };
+  const terminar = () => { const e = Math.max(0, transcurrido()); clearInterval(TM); TM = null; st.fase = 'fin'; snd('final');
     let res = '';
     if (c.modo === 'crono') res = mmss(Math.floor(e)) + (st.vuelta ? ' · ' + st.vuelta + ' vueltas' : '');
     else if (c.modo === 'emom') { const r = Math.min(c.n, Math.floor(e / c.w)); res = r >= c.n ? `${c.nombre} completo · ${c.n} rondas` : `${c.nombre} · ${r} de ${c.n} rondas`; }
-    else if (c.modo === 'int') { const r = Math.min(c.n, Math.ceil(e / (c.w + c.r))); res = r >= c.n ? `${c.nombre} completo · ${c.n} rondas` : `${c.nombre} · ${r} de ${c.n} rondas`; }
-    const pide = c.modo === 'amrap';
+    else if (c.modo === 'int') { const r = Math.min(c.n, Math.ceil(e / (c.w + c.r))); res = r >= c.n && e >= total() - 0.5 ? `${c.nombre} completo · ${c.n} rondas` : `${c.nombre} · hasta la ronda ${r} de ${c.n}`; }
+    if (e < 5) res = ''; // lo detuvo al tiro: no se anota nada
+    const pide = c.modo === 'amrap' && e >= 5;
     if (!pide) ponerRes(res);
     el.innerHTML = `<div class="tin"><div class="trow"><b class="tname">${esc(c.nombre)}</b><button data-tx="1" aria-label="Cerrar">✕</button></div><div class="tbig">✓</div>
       ${pide ? `<div class="tsub">¿Cuántas rondas hiciste?</div><input id="tm-res" class="tm-res" inputmode="text" placeholder="Ej: 5 rondas + 8" autocomplete="off"><button class="btn pri" data-tok="1">Anotar y cerrar</button>`
         : `<div class="tsub">${res ? 'Resultado: <b>' + esc(res) + '</b> · quedó anotado' : '¡Bloque terminado!'}</div><button class="btn pri" data-tx="1">Listo</button>`}</div>`;
-    if (pide) setTimeout(() => el.querySelector('#tm-res')?.focus(), 200);
+    if (pide) { const ti = el.querySelector('#tm-res'); ti.addEventListener('keydown', k => { if (k.key === 'Enter') el.querySelector('[data-tok]').click(); }); setTimeout(() => ti.focus(), 200); }
     try { wake && wake.release(); } catch (_) {} };
   el.addEventListener('click', async ev => { const b = ev.target.closest('button'); if (!b) return; ev.stopPropagation();
     if (b.dataset.tx) return cerrarTimer();
-    if (b.dataset.tok) { const v = (el.querySelector('#tm-res')?.value || '').trim(); ponerRes(v ? v + (/ronda/i.test(v) ? '' : ' rondas') : ''); return cerrarTimer(); }
+    if (b.dataset.tok) { const v = (el.querySelector('#tm-res')?.value || '').trim(); ponerRes(/^\d+$/.test(v) ? v + (v === '1' ? ' ronda' : ' rondas') : v); return cerrarTimer(); }
     if (b.dataset.tsnd) { try { window.SND && (SND.unlock(), SND.abrirPanel()); } catch (_) {} return; }
     if (b.dataset.tc) { const k = b.dataset.tc, d = Number(b.dataset.d); if (k === 'total' || k === 'tope') c[k] = Math.max(k === 'tope' ? 0 : 60, c[k] + d * 60); else c[k] = Math.max(k === 'n' ? 1 : 5, c[k] + d); return pintar(); }
     if (b.dataset.ts) { try { window.SND && SND.unlock(); } catch (_) {} st.fase = 'run'; st.t0 = Date.now() + 3000; st.pausa = 0; st.last = -1; let k = 3;
@@ -865,9 +871,9 @@ function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nS
     <div class="small muted">${esc(e.dosis)}${isB && !/desc|\d\s*(min|s)\b/i.test(String(e.dosis || '').replace(/^\d+\s*[×x]\s*[\d–-]+/, '')) ? ` · ⏱ ${mmss(descansoDe(e))}` : ''}</div>
     ${sg ? `<div class="sug${sg.sube ? ' up' : ''}">${sg.sube ? '↗' : '→'} ${esc(sg.txt)}</div>` : ''}
     ${tc && foco ? `<details class="tec-d"><summary>¿Cómo se hace?</summary><ol>${(tc.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol>${tc.video ? `<a class="btn" href="${esc(tc.video)}" target="_blank" rel="noopener">▶ Ver video</a>` : `<a class="small red-t" href="${esc(ytBuscar(tc.nombre))}" target="_blank" rel="noopener">🔎 Ver ejemplos en YouTube</a>`}</details>` : ''}
-    ${isB ? (() => { const tp = tipoEj(e); const ap = tp === 'kg' ? Math.max(nAprox(e), (c?.ap || []).length, (S.apX || {})[e.nombre] || 0, ...Object.keys(getDraft().ap?.[e.nombre] || {}).map(k => Number(k) + 1)) : 0; const aps = c?.ap || [];
+    ${isB ? (() => { const tp = tipoEj(e); const ap = tp === 'kg' ? Math.max(nAprox(e), (c?.ap || []).length, (S.apX || {})[DKEY() + e.nombre] || 0, ...Object.keys(getDraft().ap?.[e.nombre] || {}).map(k => Number(k) + 1)) : 0; const aps = c?.ap || [];
       const base = sg?.kg ?? (pv.length ? Math.max(0, ...pv.map(x => x.kg || 0)) : 0); const inc = /mancuerna|kb|kettlebell|pesa rusa/i.test(e.nombre) ? 1 : 2.5;
-      const PCT = ap === 1 ? [[0.6, 5]] : ap === 2 ? [[0.5, 8], [0.75, 3]] : [[0.4, 10], [0.6, 5], [0.8, 2], [0.9, 1]];
+      const PCT = [[0.5, 8], [0.75, 3], [0.85, 2], [0.9, 1]];
       const apRow = i => { const s0 = aps[i] || {}; const [pc, rp] = PCT[Math.min(i, PCT.length - 1)]; const kgS = base ? Math.round(base * pc / inc) * inc : null;
         return `<div class="set ap ${conDato(s0) ? 'done' : ''}"><span class="n">A</span><span class="prev">${kgS ? '~' + Math.round(pc * 100) + '%' : 'aprox.'}</span><input inputmode="decimal" placeholder="${kgS ? esc(fmtKg(kgS)) : 'kg'}" aria-label="kg aproximación ${i + 1} ${esc(e.nombre)}" data-ap="1" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s0.kg != null ? esc(String(s0.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${rp}" aria-label="reps aproximación ${i + 1} ${esc(e.nombre)}" data-ap="1" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s0.r != null ? esc(s0.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="60" aria-label="Marcar aproximación ${i + 1} hecha">✓</button></div>`; };
       const head = tp === 'tiempo' ? '<span>Serie</span><span>Anterior</span><span class="t2">Segundos</span><span></span>' : `<span>Serie</span><span>Anterior</span><span>${tp === 'corporal' ? '+Kg' : 'Kg'}</span><span>Reps</span><span></span>`;
@@ -897,15 +903,15 @@ function colectarEj() { const rd = rutinaDeHoy(); const by = {}, apBy = {};
   document.querySelectorAll('.com-i').forEach(i => { coms[i.dataset.comn] = i.value; }); Object.keys(coms).forEach(n => { coms[n] = String(coms[n] || '').trim().slice(0, 80); if (!by[n]) by[n] = []; });
   Object.keys(apBy).forEach(n => { if (!by[n]) by[n] = []; });
   const limpia = arr => { const pos = Array.from(arr || [], z => conDato(z) ? ['kg', 'r', 't'].reduce((o, f) => (z[f] != null && (o[f] = z[f]), o), {}) : {}); while (pos.length && !conDato(pos[pos.length - 1])) pos.pop(); return pos; };
-  return Object.entries(by).map(([n, sets]) => { const cm = coms[n] || ''; const pos = limpia(sets); const ap = limpia(apBy[n]).filter(conDato);
-    const extra = Object.assign({}, cm ? { c: cm } : {}, ap.length ? { ap } : {});
+  return Object.entries(by).map(([n, sets]) => { const cm = coms[n] || ''; const pos = limpia(sets); const ap = limpia(apBy[n]);
+    const extra = Object.assign({}, cm ? { c: cm } : {}, ap.some(conDato) ? { ap } : {});
     const ss = pos.filter(conDato); if (!ss.length) return Object.keys(extra).length ? Object.assign({ n, s: 0, sets: [] }, extra) : null;
     const tt = ss.filter(z => z.t != null); if (tt.length) { const top = tt.reduce((b, z) => z.t > b.t ? z : b, tt[0]); return Object.assign({ n, t: top.t, s: ss.length, sets: pos }, extra); }
     const top = ss.reduce((b, z) => (z.kg || 0) > (b.kg || 0) ? z : b, ss[0]); return Object.assign({ n, kg: top.kg ?? null, r: top.r ?? null, s: ss.length, sets: pos }, extra); }).filter(Boolean); }
 let AS = null, ASpend = false;
-let ASTXT = { t: '', c: 'muted' };
-const asHTML = () => `<span class="as-st small ${ASTXT.c}">${esc(ASTXT.t)}</span>`;
-function asEstado(t, cls) { ASTXT = { t, c: cls || 'muted' }; document.querySelectorAll('.as-st').forEach(el => { el.textContent = t; el.className = 'as-st small ' + (cls || 'muted'); }); }
+let ASTXT = { t: '', c: 'muted', k: '' };
+const asHTML = () => { const ok = ASTXT.k === DKEY(); return `<span class="as-st small ${ok ? ASTXT.c : 'muted'}">${ok ? esc(ASTXT.t) : ''}</span>`; };
+function asEstado(t, cls) { ASTXT = { t, c: cls || 'muted', k: DKEY() }; document.querySelectorAll('.as-st').forEach(el => { el.textContent = t; el.className = 'as-st small ' + (cls || 'muted'); }); }
 function autoGuardar(ms) { clearTimeout(AS); ASpend = true; AS = setTimeout(guardarYa, ms ?? 1500); }
 let ASvuelo = false;
 async function guardarYa() { clearTimeout(AS); if (!ASpend) return; if (ASvuelo) { AS = setTimeout(guardarYa, 600); return; } ASpend = false; if (S.v !== 'rutina' || S.evSel) return;
@@ -1049,14 +1055,15 @@ V.progreso = () => {
   const t = today(); const mes = t.slice(0, 7);
   const delMes = S.clases.filter(r => r.fecha.startsWith(mes) && r.asis === 'presente').length;
   const marcadas = S.clases.filter(r => r.fecha.startsWith(mes) && (r.asis === 'presente' || r.asis === 'ausente')).length;
-  const H = historial(); const best = Object.entries(H).map(([n, l]) => [n, l.reduce((b, x) => (x.kg || 0) > (b.kg || 0) ? x : b, l[0]), l]).filter(([, b]) => b && b.kg);
+  const H = historial(); const mejor = l => l.some(x => x.t != null) ? l.reduce((b, x) => (x.t || 0) > (b.t || 0) ? x : b, l[0]) : l.reduce((b, x) => (x.kg || 0) > (b.kg || 0) || ((x.kg || 0) === (b.kg || 0) && (x.r || 0) > (b.r || 0)) ? x : b, l[0]);
+  const best = Object.entries(H).map(([n, l]) => [n, mejor(l), l]).filter(([, b]) => b && (b.kg || b.t));
   best.sort((a, b) => b[2].length - a[2].length);
   const top = best.find(x => x[0] === S.pej) || best[0];
   let chart = '';
-  if (top) { const byF = {}; top[2].forEach(x => { if (x.kg != null) byF[x.f] = Math.max(byF[x.f] || 0, x.kg); });
+  if (top) { const uT = top[2].some(x => x.t != null) ? 's' : 'kg'; const byF = {}; top[2].forEach(x => { const v = uT === 's' ? x.t : x.kg; if (v != null) byF[x.f] = Math.max(byF[x.f] || 0, v); });
     const pts = Object.entries(byF).sort(); if (pts.length >= 2) { const mn = Math.min(...pts.map(p => p[1])), mx = Math.max(...pts.map(p => p[1])); const W = 320, Hh = 110;
       const xy = pts.map(([f, v], i) => [10 + i * (W - 20) / (pts.length - 1), Hh - 10 - (mx === mn ? 0.5 : (v - mn) / (mx - mn)) * (Hh - 30)]);
-      chart = `<svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="${esc(top[0])}: de ${mn} a ${mx} kg"><polyline points="${xy.map(p => p.join(',')).join(' ')}" fill="none" stroke="#d71f30" stroke-width="3" stroke-linejoin="round"/>${xy.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#d71f30"/>`).join('')}<text x="${W - 4}" y="14" text-anchor="end" fill="#f2eef0" font-size="13" font-weight="700">${String(mx).replace('.', ',')} kg</text></svg>`; } }
+      chart = `<svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="${esc(top[0])}: de ${mn} a ${mx} ${uT}"><polyline points="${xy.map(p => p.join(',')).join(' ')}" fill="none" stroke="#d71f30" stroke-width="3" stroke-linejoin="round"/>${xy.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#d71f30"/>`).join('')}<text x="${W - 4}" y="14" text-anchor="end" fill="#f2eef0" font-size="13" font-weight="700">${String(mx).replace('.', ',')} ${uT}</text></svg>`; } }
   const ANG = [['frente', 'Frente'], ['perfil', 'Perfil'], ['espalda', 'Espalda']]; const ang = S.fang || 'frente';
   const ses = S.fotos.slice().sort((a, b) => a.f < b.f ? -1 : a.f > b.f ? 1 : 0);
   const fA = ses.find(x => x.f === S.fA) || ses[0], fB = ses.find(x => x.f === S.fB) || ses[ses.length - 1];
@@ -1339,7 +1346,7 @@ V.agenda = () => {
     const id = rec?.rutina || pred.get(S.dia + '|' + x.h); const r = id ? S.rutinas.get(id) : null;
     const est = rec?.asis === 'presente' ? '<span class="small ok" style="font-weight:700">Asististe ✓</span>' : rec?.asis === 'ausente' ? '<span class="small warn" style="font-weight:700">Faltaste</span>' : rec?.asis === 'aviso' ? '<span class="small muted" style="font-weight:700">Avisaste · no se descuenta</span>'
       : rec?.reag_a ? '<span class="small muted" style="font-weight:700">Movida a otro día</span>' : past ? '<span class="small muted">Sin registro</span>' : rec?.reag_de?.recup ? '<span class="tg ev" style="margin:0">🔁 Recuperación</span>' : rec?.reag_de ? '<span class="tg ev" style="margin:0">↻ Clase movida</span>' : '<span class="small red" style="font-weight:700">Agendada</span>';
-    const ej = (rec?.ej || []).length ? `<div class="small muted">Anotaste ${rec.ej.length} ejercicio${rec.ej.length === 1 ? '' : 's'}${rec.carga ? ' · ' + esc(rec.carga) : ''}${rec.rpe != null ? ' · RPE ' + esc(rec.rpe) : ''}</div>` : '';
+    const nEjA = (rec?.ej || []).filter(x => (x.sets || []).some(conDato) || conDato(x)).length; const ej = nEjA ? `<div class="small muted">Anotaste ${nEjA} ejercicio${nEjA === 1 ? '' : 's'}${rec.carga ? ' · ' + esc(rec.carga) : ''}${rec.rpe != null ? ' · RPE ' + esc(rec.rpe) : ''}</div>` : '';
     const nv = !past ? proximas(4).findIndex(p => p.f === S.dia && p.h === x.h) : -1;
     return `<section class="card"><div class="row"><div class="disp" style="font-size:26px">${esc(x.h)}</div>${est}</div>
       ${r ? `<button class="ag-rut" data-abrses="${esc(S.dia + '|' + x.h + '|' + id)}"><div style="flex:1;min-width:0"><b>${esc(r.tipo || 'Rutina')}</b><div class="small muted">${esc(r.familia || '')}${!rec?.rutina && !past ? ' · según tu programa' : ''}</div></div><span class="chev" aria-hidden="true">›</span></button>` : `<div class="small muted">${past ? 'Clase en Titanium' : 'Franco te asigna la rutina en la clase.'}</div>`}
@@ -1444,7 +1451,7 @@ document.addEventListener('click', async ev => {
   const tcb = ev.target.closest('[data-tec]'); if (tcb) { abrirTec(tcb.dataset.tec); return; }
   const cmb = ev.target.closest('[data-com]'); if (cmb) { const w = document.querySelector(`[data-comw="${CSS.escape(cmb.dataset.com)}"]`); if (!w) return;
     cmb.hidden = true; w.hidden = false; w.querySelector('input').focus(); return; }
-  if (ev.target.closest('[data-foco]')) { if (!ASpend && !ASvuelo) ASTXT = { t: '', c: 'muted' }; S.foco = 0; S.cck = new Set(); S.vta = {}; render(); window.scrollTo(0, 0); return; }
+  if (ev.target.closest('[data-foco]')) { S.foco = 0; S.cck = new Set(); S.vta = {}; render(); window.scrollTo(0, 0); return; }
   const cck = ev.target.closest('[data-cck]'); if (cck) { S.cck = S.cck || new Set(); const k = cck.dataset.cck; const on = !S.cck.has(k); on ? S.cck.add(k) : S.cck.delete(k);
     cck.setAttribute('aria-pressed', on); cck.closest('.circ-it')?.classList.toggle('ok', on); if (on && navigator.vibrate) try { navigator.vibrate(15); } catch (_) {} return; }
   const vta = ev.target.closest('[data-vuelta]'); if (vta) { const bi = vta.dataset.vuelta; S.vta = S.vta || {}; S.vta[bi] = (S.vta[bi] || 1) + 1; [...(S.cck || [])].filter(k => k.startsWith(bi + '-')).forEach(k => S.cck.delete(k)); render(); window.scrollTo(0, 0); return; }
@@ -1480,7 +1487,7 @@ document.addEventListener('click', async ev => {
   const rsel = ev.target.closest('[data-rsel]'); if (rsel) { if (rsel.dataset.rsel === rutinaDeHoy().id) return; S.rutSel = rsel.dataset.rsel; S.rpe = null; blkAbiertos.clear(); render(); return; }
   if (ev.target.closest('[data-sesx]')) { S.evSel = null; S.foco = null; S.ses = null; S.rutSel = null; S.rpe = null; S.v = 'agenda'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
   const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.evSel = null; S.foco = null; if ((go.dataset.go || go.dataset.v) === 'rutina') { S.ses = null; S.rutSel = null; } S.v = go.dataset.go || go.dataset.v; S.evalFirst = false; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
-  const apx = ev.target.closest('[data-apx]'); if (apx) { S.apX = S.apX || {}; const n = apx.dataset.apx; const cur = apx.closest('.sets').querySelectorAll('.set.ap').length; S.apX[n] = Math.min(4, cur + 1); render(true); return; }
+  const apx = ev.target.closest('[data-apx]'); if (apx) { S.apX = S.apX || {}; const n = apx.dataset.apx; const cur = apx.closest('.sets').querySelectorAll('.set.ap').length; S.apX[DKEY() + n] = Math.min(4, cur + 1); render(true); return; }
   const chk = ev.target.closest('[data-chk]'); if (chk) { const row = chk.closest('.set'); const ins = [...row.querySelectorAll('input')];
     if (row.dataset.ok) { delete row.dataset.ok; finDescanso(); return; }
     ins.forEach(i => { if (i.value.trim() === '' && !/kg|reps|seg/.test(i.placeholder)) { i.value = i.placeholder; i.dispatchEvent(new Event('input', { bubbles: true })); } });
@@ -1505,7 +1512,8 @@ document.addEventListener('click', async ev => {
     ahe.disabled = true; const { error } = await sb.rpc('marcar_mi_actividad', { p_evento: ahe.dataset.acthecha, p_minutos: mn > 0 ? mn : null, p_rpe: rpe, p_nota: nota || null });
     ahe.disabled = false; if (error) { toast('No se pudo guardar: ' + error.message); return; }
     S.actEdit = false; S.actRpe = null; await load(); toast('¡Actividad registrada! 💪'); render(); return; }
-  const adl = ev.target.closest('[data-actdel]'); if (adl) { adl.disabled = true; const { error } = await sb.rpc('desmarcar_mi_actividad', { p_evento: adl.dataset.actdel }); if (error) { toast('No se pudo quitar: ' + error.message); return; } S.actEdit = false; S.actRpe = null; await load(); toast('Listo, quedó sin marcar'); render(); return; }
+  const adl = ev.target.closest('[data-actdel]'); if (adl) { if (!adl.dataset.seguro) { adl.dataset.seguro = '1'; const tx = adl.textContent; adl.textContent = '¿Quitar? Toca otra vez'; setTimeout(() => { if (adl.isConnected) { delete adl.dataset.seguro; adl.textContent = tx; } }, 3000); return; }
+    adl.disabled = true; const { error } = await sb.rpc('desmarcar_mi_actividad', { p_evento: adl.dataset.actdel }); if (error) { adl.disabled = false; toast('No se pudo quitar: ' + error.message); return; } S.actEdit = false; S.actRpe = null; await load(); toast('Listo, quedó sin marcar'); render(); return; }
   const ei = ev.target.closest('[data-evid]'); if (ei) { S.actEdit = false; S.actRpe = null; S.evSel = ei.dataset.evid; S.ses = null; S.rutSel = null; S.v = 'rutina'; render(); window.scrollTo(0, 0); return; }
   const eg = ev.target.closest('[data-evgo]'); if (eg) { S.evSel = null; S.v = eg.dataset.evgo; S.evalFirst = S.v === 'progreso'; if (S.evalFirst) S.ptab = 'cuerpo'; render(); return; }
   const gd = ev.target.closest('[data-goday]'); if (gd) { S.dia = gd.dataset.goday; S.wk = lunesDe(S.dia); S.v = 'agenda'; render(); return; }
