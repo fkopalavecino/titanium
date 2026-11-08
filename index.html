@@ -714,6 +714,8 @@ function render() {
 function route() {
   let h = (location.hash || '#inicio').slice(1);
   // link de un aviso: #clase/2026-11-09/11:30 abre esa clase en su día y bloque
+  // link de un comprobante: abre el Inicio y el panel de solicitudes
+  if (h === 'solicitudes') { history.replaceState(null, '', '#inicio'); h = 'inicio'; let n = 0; const t = setInterval(() => { const b = document.getElementById('tl-sol'); if ((b && !b.hidden) || ++n > 20) { clearInterval(t); if (b && !b.hidden) b.click(); } }, 300); }
   const mc = h.match(/^clase\/(\d{4}-\d\d-\d\d)\/(\d\d:\d\d)$/);
   if (mc) { S.ui.claseFecha = mc[1] === today() ? null : mc[1]; S.ui.claseHora = mc[2]; h = 'clase'; history.replaceState(null, '', '#clase'); }
   S.view = VIEWS[h] ? h : 'inicio';

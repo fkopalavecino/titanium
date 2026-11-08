@@ -304,7 +304,9 @@ async function load() {
   sb.rpc('marcar_uso').then(() => {}, () => {});
   try { const { data: rc } = await sb.rpc('mis_recuperaciones'); S.recup = rc || null; } catch (_) { S.recup = null; }
   try { const [ep, sp] = await Promise.all([sb.rpc('mi_estado_pago'), sb.from('solicitudes').select('id,data,created_at').eq('alumno', codigo).eq('tipo', 'pago').eq('estado', 'pendiente').order('created_at', { ascending: false }).limit(1)]);
-    S.pago = ep.data || null; S.pagoPend = (sp.data || [])[0] || null; } catch (_) { S.pago = null; S.pagoPend = null; }
+    S.pago = ep.data || null; S.pagoPend = (sp.data || [])[0] || null;
+    const { data: rj } = await sb.from('solicitudes').select('id,estado,created_at').eq('alumno', codigo).eq('tipo', 'pago').order('created_at', { ascending: false }).limit(1);
+    S.pagoRech = rj && rj[0] && rj[0].estado === 'rechazada' && Date.now() - Date.parse(rj[0].created_at) < 14 * 864e5 ? rj[0] : null; } catch (_) { S.pago = null; S.pagoPend = null; S.pagoRech = null; }
   S.conf = new Map((cfm.data || []).map(r => [r.fecha + '_' + r.hora, r.estado])); S.confCambios = new Map((cfm.data || []).map(r => [r.fecha + '_' + r.hora, r.cambios || 0]));
   S.eventos = (ev.data || []).sort((x, y) => (x.fecha + (x.hora || '')).localeCompare(y.fecha + (y.hora || '')));
   S.a = a.data; S.planes = (p.data || []).sort((x, y) => String(x.inicio || '').localeCompare(String(y.inicio || '')));
@@ -450,7 +452,7 @@ function cuadrado(file, lado) { return new Promise((res, rej) => { const u = URL
 async function guardarPerfil(cambios) { const nuevo = Object.assign({}, S.perfil, cambios);
   const { error } = await sb.rpc('actualizar_mi_perfil', { p_perfil: nuevo }); if (error) { toast('No se pudo guardar: ' + error.message); return false; }
   await load(); render(); return true; }
-document.addEventListener('change', ev => { if (ev.target.id === 'pcomp') { const f = ev.target.files?.[0]; const l = document.getElementById('pcomp-l'); if (l) l.textContent = f ? '📎 ' + f.name : '📎 Adjuntar comprobante (opcional)'; } });
+document.addEventListener('change', ev => { if (ev.target.id === 'pcomp') { const f = ev.target.files?.[0]; const l = document.getElementById('pcomp-l'); if (l) l.textContent = f ? '✅ Foto lista: ' + f.name : '📷 Elegir foto del comprobante'; } });
 document.addEventListener('change', async ev => { if (ev.target.id !== 'av-file' || !ev.target.files?.[0]) return; const lbl = ev.target.closest('.av-up'); if (lbl) lbl.style.opacity = '.5';
   try { const blob = await cuadrado(ev.target.files[0], 480); const id = 'alumno/' + codigo + '/avatar-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()) + '.jpg';
     const { error } = await sb.storage.from('fotos').upload(id, blob, { contentType: 'image/jpeg' }); if (error) throw error;
@@ -944,7 +946,10 @@ function recupHTML() { const R = S.recup; if (!R || !R.activo) return '';
   return `<section class="card" style="border-color:#4da3ff;background:rgba(77,163,255,.07)">
     <div class="row"><span class="eyebrow" style="color:#7fb9ff">🔁 Recuperar clases</span><span class="small muted">vencen el ${esc(fmtD(R.vence))}</span></div>
     ${R.disponibles ? `<div><b style="font-size:18px">Tienes ${R.disponibles} clase${R.disponibles === 1 ? '' : 's'} por recuperar</b><div class="small muted">Elige un bloque de esta semana o la próxima. Lo que no recuperes este mes se pierde.</div></div>
-      ${ops.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">${ops.map(o => `<button class="btn" data-rec="${esc(o.f + '_' + o.h)}" ${o.libres ? '' : 'disabled'} style="flex-direction:column;align-items:flex-start;min-height:58px;text-align:left"><b>${esc(dia(o.f))} · ${esc(o.h)}</b><span class="small ${o.libres ? 'ok' : 'muted'}">${o.libres ? o.libres + (o.libres === 1 ? ' cupo' : ' cupos') : 'Lleno'}</span></button>`).join('')}</div>`
+      ${ops.length ? (() => { const dias = [...new Set(ops.filter(o => o.libres).map(o => o.f))]; if (!dias.length) return '<div class="note small">Los bloques disponibles están llenos. Revisa más tarde.</div>';
+        const sel = dias.includes(S.rDia) ? S.rDia : dias[0];
+        return `<div class="chips" style="flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px">${dias.map(f => `<button class="chip" data-rdia="${esc(f)}" aria-pressed="${f === sel}" style="white-space:nowrap">${esc(f === t ? 'Hoy' : f === addDays(t, 1) ? 'Mañana' : DL[dayKey(f)] + ' ' + fmtD(f))}</button>`).join('')}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px">${ops.filter(o => o.f === sel && o.libres).map(o => `<button class="btn" data-rec="${esc(o.f + '_' + o.h)}" style="flex-direction:column;min-height:54px"><b>${esc(o.h)}</b><span class="small ok">${o.libres} cupo${o.libres === 1 ? '' : 's'}</span></button>`).join('')}</div>`; })()
         : '<div class="note small">No quedan bloques para recuperar esta semana ni la próxima. Revisa de nuevo el lunes, cuando se abre una semana más.</div>'}` : ''}
     ${prox.length ? `<div style="display:grid;gap:6px"><div class="small muted">Tus recuperaciones agendadas</div>${prox.map(u => `<div class="row" style="align-items:center"><span>✅ <b>${esc(dia(u.f))} · ${esc(u.h)}</b></span>${u.cancelable ? `<button class="btn" data-rcx="${esc(u.f + '_' + u.h)}" style="min-height:36px;padding:0 12px;font-size:13px">Cancelar</button>` : '<span class="small muted">no se puede cancelar</span>'}</div>`).join('')}</div>` : ''}
   </section>`; }
@@ -1030,22 +1035,32 @@ function pagosCard(p, usadas, tot, ab, saldo, dias) { const cp = S.cfg?.pago || 
     ${datos.length ? `<div style="display:grid;gap:6px;border-top:1px solid var(--line);padding-top:10px"><b class="small">Datos para transferir</b>${datos.map(([l, v]) => `<div class="row small" style="align-items:center"><span class="muted">${esc(l)}</span><button class="chip" data-copy="${esc(v)}" style="max-width:62%;overflow:hidden;text-overflow:ellipsis">${esc(v)} 📋</button></div>`).join('')}<button class="btn" data-copy="${esc(todo)}">📋 Copiar todos los datos</button></div>` : '<div class="small muted">Pídele a Franco los datos de transferencia.</div>'}
     <div style="display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px">
       ${pend ? `<div class="note small">⏳ Enviaste un comprobante por <b>${esc(pend.data?.monto || '')}</b> el ${esc(fmtD(String(pend.created_at).slice(0, 10)))}. Franco lo confirmará pronto.</div>`
-        : `<b class="small">¿Ya transferiste?</b><label class="field">Monto transferido<input id="pmonto" inputmode="numeric" placeholder="${esc(montoSug)}"></label>
-      <label class="btn" style="position:relative;overflow:hidden"><span id="pcomp-l">📎 Adjuntar comprobante (opcional)</span><input type="file" accept="image/*,application/pdf" id="pcomp" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label>
-      <button class="btn pri" id="avisarPago">Ya pagué</button>`}
+        : `${S.pagoRech ? `<div class="note small" style="border-color:var(--warn)">⚠️ Tu comprobante del ${esc(fmtD(String(S.pagoRech.created_at).slice(0, 10)))} no se pudo confirmar. Revisa el monto o escríbele a ${esc((S.cfg?.coach || 'tu profe').split(' ')[0])}, y envíalo de nuevo.</div>` : ''}
+      <b class="small">¿Ya transferiste?</b><label class="field">Monto transferido<input id="pmonto" inputmode="numeric" placeholder="${esc(montoSug)}"></label>
+      <label class="btn" style="position:relative;overflow:hidden"><span id="pcomp-l">📷 Elegir foto del comprobante</span><input type="file" accept="image/*,application/pdf" id="pcomp" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label>
+      <button class="btn pri" id="avisarPago" style="background:#1f7a4d;border-color:#1f7a4d">📤 Enviar comprobante por WhatsApp</button>
+      <div class="small muted">Se abre WhatsApp con la foto y el mensaje listos: elige a ${esc((S.cfg?.coach || 'tu profe').split(' ')[0])} y envía.</div>`}
     </div>
     ${(p.pagos || []).length ? `<div style="display:grid;gap:4px;border-top:1px solid var(--line);padding-top:10px"><b class="small">Pagos registrados</b>${p.pagos.map(x => `<div class="row small"><span>${esc(fmtD(x.fecha))} · ${esc(x.medio || '')}</span><b>${clp(x.monto)}</b></div>`).join('')}</div>` : ''}
   </details>`; }
 async function avisarPagoComp() { const btn = $('#avisarPago'); const v = ($('#pmonto').value || '').replace(/\D/g, ''); const mon = Number(v) || Number($('#pmonto').placeholder) || 0;
   if (!mon) { toast('Escribe el monto que transferiste.'); $('#pmonto').focus(); return; }
-  const f = $('#pcomp').files?.[0]; btn.disabled = true; btn.textContent = 'Enviando…'; let comprobante = null;
+  const f = $('#pcomp').files?.[0]; if (!f) { toast('Primero elige la foto del comprobante.'); return; }
+  // WhatsApp con la foto: se abre al tiro (el teléfono exige que sea en el mismo toque), y en paralelo queda registrado en la app
+  const prof = (S.cfg?.coach || 'Profe').split(' ')[0];
+  const txt = `Hola ${prof}, te envío el comprobante de mi pago de ${clp(mon)} · ${S.a.nombre}`;
+  const tel = String(S.cfg?.whatsapp || '').replace(/\D/g, '');
+  let compartido = false;
+  try { if (navigator.canShare && navigator.canShare({ files: [f] })) { navigator.share({ files: [f], text: txt }).catch(() => {}); compartido = true; } } catch (_) {}
+  if (!compartido && tel) { window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent(txt + ' (adjunto la foto)'), '_blank'); }
+  btn.disabled = true; btn.textContent = 'Registrando…'; let comprobante = null;
   try { if (f) { if (f.size > 15 * 1024 * 1024) throw new Error('El archivo pesa más de 15 MB');
       const pdf = f.type === 'application/pdf'; const blob = pdf ? f : await reducirImg(f, 1600);
       comprobante = 'alumno/' + codigo + '/pago-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()) + (pdf ? '.pdf' : '.jpg');
       const { error } = await sb.storage.from('fotos').upload(comprobante, blob, { contentType: pdf ? 'application/pdf' : 'image/jpeg' }); if (error) throw error; }
     const { error } = await sb.from('solicitudes').insert({ alumno: codigo, tipo: 'pago', data: { nombre: S.a.nombre, monto: clp(mon), montoNum: mon, comprobante } });
-    if (error) throw error; toast('Enviado ✓ Franco confirmará tu pago.'); await load(); render();
-  } catch (e) { toast('No se pudo enviar: ' + (e.message || 'intenta de nuevo')); btn.disabled = false; btn.textContent = 'Ya pagué'; } }
+    if (error) throw error; toast(compartido ? 'Elige a ' + prof + ' en WhatsApp y envía ✓' : 'Registrado ✓ ' + prof + ' confirmará tu pago.'); await load(); render();
+  } catch (e) { toast('No se pudo enviar: ' + (e.message || 'intenta de nuevo')); btn.disabled = false; btn.textContent = '📤 Enviar comprobante por WhatsApp'; } }
 function reducirImg(file, max) { return new Promise((res, rej) => { const u = URL.createObjectURL(file), img = new Image();
   img.onload = () => { const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); c.toBlob(b => b ? res(b) : rej(new Error('imagen')), 'image/jpeg', 0.85); };
@@ -1066,6 +1081,7 @@ document.addEventListener('click', async ev => {
   const pt = ev.target.closest('[data-pushtest]'); if (pt) { probarPush(pt); return; }
   if (ev.target.closest('[data-pushoff]')) { desactivarPush(); return; }
   const rec = ev.target.closest('[data-rec]'); if (rec) { recupAccion(rec.dataset.rec, false); return; }
+  const rdia = ev.target.closest('[data-rdia]'); if (rdia) { S.rDia = rdia.dataset.rdia; render(); return; }
   const rcx = ev.target.closest('[data-rcx]'); if (rcx) { recupAccion(rcx.dataset.rcx, true); return; }
   const msx = ev.target.closest('[data-msx]'); if (msx) { try { const x = JSON.parse(localStorage.getItem('tl-msx') || '[]'); x.push(Number(msx.dataset.msx)); localStorage.setItem('tl-msx', JSON.stringify(x.slice(-30))); } catch (_) {} render(); return; }
   if (ev.target.closest('[data-pushx]')) { try { localStorage.setItem('tl-pushx', '1'); } catch (_) {} render(); return; }
