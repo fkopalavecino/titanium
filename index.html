@@ -1957,6 +1957,7 @@ document.addEventListener('click', e => {
           </div>`, {cancel: 'Volver'});
         break; }
       patchDia(f, h, code, Object.assign({asis: nv}, nv === 'presente' && el.dataset.r ? {rutina: el.dataset.r} : {}));
+      if (nv === 'ausente' && S.conf?.get(f + '|' + h + '|' + code) === 'no_voy') toast(`${firstName(nombre(code))} había avisado desde su app. Como Ausente se le descuenta y no recupera; si quieres darle recuperación usa «Avisó».`);
       if (cur === 'aviso') window.__sb.rpc('dar_recuperacion', {p_alumno: code, p_fecha: f, p_hora: h, p_dar: false}).then(({error}) => { if (!error) toast('Recuperación quitada.'); });
       break; }
     case 'aviso-si': case 'aviso-no': { const {f,h,code} = toggleOne(el.dataset.k); const dar = act === 'aviso-si'; closeModal();

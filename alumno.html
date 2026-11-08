@@ -1058,7 +1058,7 @@ V.agenda = () => {
   const items = clasesDia(S.dia); const evs = evDia(S.dia);
   const card = x => { const rec = x.rec; const past = S.dia < t || (S.dia === t && rec?.asis);
     const id = rec?.rutina || pred.get(S.dia + '|' + x.h); const r = id ? S.rutinas.get(id) : null;
-    const est = rec?.asis === 'presente' ? '<span class="small ok" style="font-weight:700">Asististe ✓</span>' : rec?.asis === 'ausente' ? '<span class="small warn" style="font-weight:700">Faltaste</span>'
+    const est = rec?.asis === 'presente' ? '<span class="small ok" style="font-weight:700">Asististe ✓</span>' : rec?.asis === 'ausente' ? '<span class="small warn" style="font-weight:700">Faltaste</span>' : rec?.asis === 'aviso' ? '<span class="small muted" style="font-weight:700">Avisaste · no se descuenta</span>'
       : rec?.reag_a ? '<span class="small muted" style="font-weight:700">Reagendada</span>' : past ? '<span class="small muted">Sin registro</span>' : '<span class="small red" style="font-weight:700">Agendada</span>';
     const ej = (rec?.ej || []).length ? `<div class="small muted">Anotaste ${rec.ej.length} ejercicio${rec.ej.length === 1 ? '' : 's'}${rec.carga ? ' · ' + esc(rec.carga) : ''}${rec.rpe != null ? ' · RPE ' + esc(rec.rpe) : ''}</div>` : '';
     const nv = !past ? proximas(4).findIndex(p => p.f === S.dia && p.h === x.h) : -1;
