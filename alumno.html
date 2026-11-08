@@ -909,21 +909,29 @@ function iniciarTour() { if (document.getElementById('tour')) return; finDescans
 function tourIr(i, dir) { if (!TR) return; if (i < 0) i = 0; if (i >= TOUR.length) return tourFin(); const st = TOUR[i]; TR.i = i; TR.dir = dir;
   if (st.v && S.v !== st.v) { S.v = st.v; S.evSel = null; S.foco = null; render(); }
   if (st.pre) st.pre();
-  setTimeout(() => { if (!TR || TR.i !== i) return; const tgt = st.sel ? document.querySelector(st.sel) : null;
-    if (st.sel && (!tgt || !tgt.getClientRects().length)) return tourIr(i + dir, dir); // si no existe en esta pantalla, sigue
+  setTimeout(() => { if (!TR || TR.i !== i) return;
+    // el primero que de verdad se ve (no uno escondido dentro de un bloque cerrado)
+    const tgt = st.sel ? [...document.querySelectorAll(st.sel)].find(e => e.getClientRects().length && !e.closest('details:not([open]) > :not(summary)') && !e.closest('[hidden]')) : null;
+    if (st.sel && !tgt) return tourIr(i + dir, dir); // si no existe en esta pantalla, sigue
     if (tgt && !tgt.closest('#tabs')) tgt.scrollIntoView({ block: 'center' });
-    setTimeout(() => tourPintar(st, tgt), tgt ? 260 : 0); }, 60); }
+    TR.tgt = tgt; setTimeout(() => { if (TR && TR.i === i) tourPintar(st, tgt); }, tgt ? 380 : 0); }, 60); }
+// mueve el recuadro iluminado y la tarjeta según dónde está el elemento ahora (también al hacer scroll)
+function tourUbicar() { if (!TR) return; const hole = TR.el.querySelector('.tour-hole'), card = TR.el.querySelector('.tour-card'), tgt = TR.tgt;
+  const H = window.visualViewport?.height || window.innerHeight;
+  if (tgt && tgt.isConnected) { const r = tgt.getBoundingClientRect(), p = 6;
+    Object.assign(hole.style, { left: (r.left - p) + 'px', top: (r.top - p) + 'px', width: (r.width + p * 2) + 'px', height: (r.height + p * 2) + 'px', opacity: 1 });
+    const arriba = (r.top + r.bottom) / 2 > H / 2; // si lo iluminado está abajo, la tarjeta va arriba (y al revés)
+    card.classList.remove('mid'); Object.assign(card.style, arriba ? { top: 'calc(12px + env(safe-area-inset-top))', bottom: 'auto' } : { top: 'auto', bottom: 'calc(84px + env(safe-area-inset-bottom))' }); }
+  else { Object.assign(hole.style, { left: '50%', top: '50%', width: '0px', height: '0px', opacity: 1 }); card.classList.add('mid'); Object.assign(card.style, { top: '50%', bottom: 'auto' }); } }
 function tourPintar(st, tgt) { if (!TR) return; const hole = TR.el.querySelector('.tour-hole'), card = TR.el.querySelector('.tour-card');
   const n = TOUR.length, i = TR.i, H = window.innerHeight;
-  if (tgt) { const r = tgt.getBoundingClientRect(), p = 6;
-    Object.assign(hole.style, { left: (r.left - p) + 'px', top: (r.top - p) + 'px', width: (r.width + p * 2) + 'px', height: (r.height + p * 2) + 'px', opacity: 1 });
-    const abajo = r.bottom + 230 < H; Object.assign(card.style, abajo ? { top: (r.bottom + 16) + 'px', bottom: 'auto' } : { top: 'auto', bottom: (H - r.top + 16) + 'px' }); }
-  else { Object.assign(hole.style, { left: '50%', top: '50%', width: '0px', height: '0px', opacity: 1 }); Object.assign(card.style, { top: '50%', bottom: 'auto' }); }
-  card.classList.toggle('mid', !tgt);
+  TR.tgt = tgt; tourUbicar();
   card.innerHTML = `<div class="tour-dots">${TOUR.map((_, k) => `<i class="${k === i ? 'on' : k < i ? 'ok' : ''}"></i>`).join('')}</div>
     <h2 style="font-size:24px;margin:0">${esc(st.t)}</h2><div style="line-height:1.45">${esc(st.x)}</div>
     <div class="tour-nav">${st.fin ? '' : '<button class="tour-skip" data-tr="fin">Saltar</button>'}<span style="flex:1"></span>${i > 0 && !st.fin ? '<button class="btn" data-tr="ant" style="width:auto;min-height:44px;padding:0 16px">‹</button>' : ''}<button class="btn pri" data-tr="${st.fin ? 'fin' : 'sig'}" style="width:auto;min-height:44px;padding:0 20px">${st.fin ? 'Empezar' : i === 0 ? 'Vamos' : 'Siguiente'}</button></div>`;
-  card.classList.remove('in'); void card.offsetWidth; card.classList.add('in'); card.querySelector('[data-tr="sig"],[data-tr="fin"].btn')?.focus({ preventScroll: true }); }
+  card.classList.remove('in'); void card.offsetWidth; card.classList.add('in'); card.querySelector('[data-tr="sig"],[data-tr="fin"].btn')?.focus({ preventScroll: true });
+  setTimeout(tourUbicar, 350); } // vuelve a medir por si la pantalla terminó de moverse
+window.addEventListener('scroll', () => { if (TR) tourUbicar(); }, { passive: true }); window.addEventListener('resize', () => { if (TR) tourUbicar(); });
 function tourFin() { try { localStorage.setItem(TOUR_K, '1'); } catch (_) {} TR?.el.remove(); TR = null;
   if (S.tourSes) { S.ses = null; S.tourSes = false; } S.v = 'hoy'; render(); }
 V.rutina = () => {
