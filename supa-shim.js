@@ -144,6 +144,17 @@
   };
 
   /* ---------- colecciones ---------- */
+  // caché de clases: los cambios en vivo (series que anotan los alumnos) se aplican uno a uno, sin volver a descargar todo el historial
+  let DIAS = null;
+  function aplicarClase(p) {
+    if (!DIAS) return soon('dias');
+    const o = p.old || {}, n = p.new || {};
+    if (p.eventType === 'DELETE') { if (!o.fecha || !o.hora || !o.alumno) return soon('dias');
+      const d = DIAS[o.fecha]; if (d && d.bloques[o.hora]) { delete d.bloques[o.hora][o.alumno]; if (!Object.keys(d.bloques[o.hora]).length) delete d.bloques[o.hora]; } }
+    else { if (!n.fecha || !n.hora || !n.alumno) return soon('dias');
+      const d = DIAS[n.fecha] = DIAS[n.fecha] || { fecha: n.fecha, bloques: {} }; (d.bloques[n.hora] = d.bloques[n.hora] || {})[n.alumno] = row2rec(n); }
+    clearTimeout(timers.diasVivo); timers.diasVivo = setTimeout(() => { const sn = snap(Object.entries(DIAS)); subs.dias.forEach(f => f.ok(sn)); }, 300);
+  }
   const loaders = {
     alumnos: async () => { const [al, pl, ps] = await Promise.all([all('alumnos'), all('planes'), sb.from('push_subs').select('alumno').then(r => r.data || [], () => [])]);
       const conPush = new Set(ps.map(x => x.alumno));
@@ -154,7 +165,7 @@
     rutinas: async () => (await all('rutinas')).map(r => [r.id, r.data]),
     dias: async () => { const rows = await all('clases'); const m = {};
       rows.forEach(r => { const d = m[r.fecha] = m[r.fecha] || { fecha: r.fecha, bloques: {} }; (d.bloques[r.hora] = d.bloques[r.hora] || {})[r.alumno] = row2rec(r); });
-      return Object.entries(m); },
+      DIAS = m; return Object.entries(m); },
   };
   const TABLES = { alumnos: ['alumnos', 'planes'], rutinas: ['rutinas'], dias: ['clases'] };
   const subs = { alumnos: [], rutinas: [], dias: [], cfg: [] };
@@ -170,10 +181,13 @@
   function listen() {
     if (channel) return;
     channel = sb.channel('titanium');
-    [['alumnos', 'alumnos'], ['planes', 'alumnos'], ['rutinas', 'rutinas'], ['clases', 'dias'], ['config', 'cfg']].forEach(([t, n]) =>
+    [['alumnos', 'alumnos'], ['planes', 'alumnos'], ['rutinas', 'rutinas'], ['config', 'cfg']].forEach(([t, n]) =>
       channel.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => soon(n)));
+    channel.on('postgres_changes', { event: '*', schema: 'public', table: 'clases' }, aplicarClase);
     channel.subscribe();
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) ['alumnos', 'rutinas', 'dias', 'cfg'].forEach(soon); });
+    // al volver a la pestaña solo se recarga todo si estuvo oculta más de 2 minutos (los cambios llegan en vivo)
+    let oculta = 0;
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { oculta = Date.now(); return; } if (Date.now() - oculta > 120000) ['alumnos', 'rutinas', 'dias', 'cfg'].forEach(soon); });
   }
 
   /* ---------- escrituras ---------- */
