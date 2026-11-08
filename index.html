@@ -960,6 +960,8 @@ function studentCard(f, hora, code, ruts) {
 }
 // lo que el alumno va anotando desde su app durante la clase (se actualiza solo)
 const limpiarEj = n => String(n || '').replace(/^(min(uto)?\s*\d+|\d+[ab]?)\s*·\s*/i, '').replace(/\s*\(.*?\)/g, '');
+const sinDescE = d => String(d || '').replace(/desc(?:anso)?\.?\s*\d+\s*(?:s|seg|min|m|')(?![a-z])/gi, '');
+const esTiempo = (n, d) => { d = sinDescE(d); if (/×\s*\d+\s*(s|seg|"|min)(?![a-z])/i.test(d)) return true; if (/reps?\b/i.test(d)) return false; return /plancha(?!.*copenhag)|plank|hollow|isom[eé]tric|wall ?sit|sentadilla en (la )?pared|colgad|dead ?hang|l-?sit/i.test(n || ''); };
 const ejCorto = n => limpiarEj(n).split(/,|\s+—\s+/)[0].trim();
 const nSerieD = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? Math.min(6, Number(m[1])) : 1; };
 function vivoInfo(f, hora, code, rut, r) {
@@ -987,26 +989,29 @@ function ejsDe(rut) {
 }
 function cargasDe(code) { // [{f,h,n,kg,r}] más reciente primero
   const out = [];
-  for (const [f, d] of S.dias) for (const h in d.bloques || {}) { const r = d.bloques[h][code]; (r?.ej || []).forEach(x => { if (x.kg != null || x.r != null) out.push({f, h, n: x.n, kg: x.kg, r: x.r, s: x.s, sets: x.sets, c: x.c}); }); }
+  for (const [f, d] of S.dias) for (const h in d.bloques || {}) { const r = d.bloques[h][code]; (r?.ej || []).forEach(x => { if (x.kg != null || x.r != null || x.t != null) out.push({f, h, n: x.n, kg: x.kg, r: x.r, t: x.t, s: x.s, sets: x.sets, c: x.c, ap: x.ap}); }); }
   return out.sort((a, b) => (b.f + b.h).localeCompare(a.f + a.h));
 }
-const fmtSet = x => [x.kg != null ? String(x.kg).replace('.', ',') + ' kg' : '', x.r != null ? '× ' + x.r : ''].filter(Boolean).join(' ');
-const setsOf = x => x?.sets?.length ? x.sets.map(s => s || {}) : (x && (x.kg != null || x.r != null) ? [{kg: x.kg ?? null, r: x.r ?? null}] : []);
-const fmtSets = x => { const ss = setsOf(x).filter(s => s.kg != null || s.r != null); return ss.length > 1 ? ss.map(s => (s.kg != null ? String(s.kg).replace('.', ',') : '–') + '×' + (s.r ?? '–')).join(' · ') : fmtSet(x); };
+const fmtSet = x => x.t != null ? x.t + ' s' : [x.kg != null ? String(x.kg).replace('.', ',') + ' kg' : '', x.r != null ? '× ' + x.r : ''].filter(Boolean).join(' ');
+const setsOf = x => x?.sets?.length ? x.sets.map(s => s || {}) : (x && (x.kg != null || x.r != null) ? [{kg: x.kg ?? null, r: x.r ?? null}] : x && x.t != null ? [{t: x.t}] : []);
+const fmtSets = x => { const ss = setsOf(x).filter(s => s.kg != null || s.r != null || s.t != null); return ss.length > 1 ? ss.map(s => s.t != null ? s.t + ' s' : (s.kg != null ? String(s.kg).replace('.', ',') : '–') + '×' + (s.r ?? '–')).join(' · ') : fmtSet(x); };
 function setSerie(k, n, i, patch) {
   const [f, h, code] = k.split('|');
   const ej = clone(rec(f, h, code).ej || []);
   let x = ej.find(o => o.n === n); if (!x) { x = {n}; ej.push(x); }
-  const sets = setsOf(x).map(s => ({kg: s.kg ?? null, r: s.r ?? null}));
-  while (sets.length <= i) sets.push({kg: null, r: null});
-  for (const fld in patch) { const v = patch[fld]; sets[i][fld] = v == null || v === '' || isNaN(v) ? null : Number(v); }
-  while (sets.length && sets[sets.length - 1].kg == null && sets[sets.length - 1].r == null) sets.pop();
-  const ok = sets.filter(s => s.kg != null || s.r != null);
-  delete x.kg; delete x.r; delete x.s; delete x.sets;
+  const sets = setsOf(x).map(s => s.t != null ? {t: s.t} : {kg: s.kg ?? null, r: s.r ?? null});
+  while (sets.length <= i) sets.push({});
+  for (const fld in patch) { const v = patch[fld]; if (v == null || v === '' || isNaN(v)) delete sets[i][fld]; else sets[i][fld] = Number(v); }
+  const lleno = s => s.kg != null || s.r != null || s.t != null;
+  while (sets.length && !lleno(sets[sets.length - 1])) sets.pop();
+  const ok = sets.filter(lleno);
+  delete x.kg; delete x.r; delete x.s; delete x.sets; delete x.t;
   if (ok.length) {
-    const top = ok.reduce((b, s) => (s.kg ?? -1) > (b.kg ?? -1) || ((s.kg ?? -1) === (b.kg ?? -1) && (s.r || 0) > (b.r || 0)) ? s : b);
     x.sets = sets; x.s = ok.length;
-    if (top.kg != null) x.kg = top.kg; if (top.r != null) x.r = top.r;
+    const tt = ok.filter(s => s.t != null);
+    if (tt.length) x.t = Math.max(...tt.map(s => s.t));
+    else { const top = ok.reduce((b, s) => (s.kg ?? -1) > (b.kg ?? -1) || ((s.kg ?? -1) === (b.kg ?? -1) && (s.r || 0) > (b.r || 0)) ? s : b);
+      if (top.kg != null) x.kg = top.kg; if (top.r != null) x.r = top.r; }
   }
   const ej2 = ej.filter(o => o.kg != null || o.r != null || o.t != null || o.c || (o.ap || []).length);
   patchDia(f, h, code, {ej: ej2.length ? ej2 : null});
@@ -1032,6 +1037,8 @@ function cargasHTML(f, hora, code, key, rut, r) {
       const pr = b && c.kg != null && (c.kg > b.kg || (c.kg === b.kg && (c.r || 0) > (b.r || 0)));
       return `<div class="ej-blk">
       <div class="ej-n">${esc(e.n)}${pr ? '<span class="pr">🏆 Récord</span>' : ''}<span class="d">${esc(e.d)}${l ? ` · última: <b>${esc(fmtSets(l))}</b>` : ''}</span></div>${c.c ? `<div class="small" style="color:var(--muted);font-style:italic">💬 ${esc(c.c)}</div>` : ''}
+      ${esTiempo(e.n, e.d) ? `<div class="ser-row h"><span>Serie</span><span style="grid-column:span 2">segundos</span><span></span></div>${Array.from({length: nS}, (_, j) => { const s = sets[j] || {}, ls = lsets[j]; return `
+      <div class="ser-row"><span class="sn num">${j + 1}</span><input type="text" inputmode="numeric" style="grid-column:span 2" id="tt-${kid}-${i}-${j}" data-act="ser" data-k="${esc(key)}" data-n="${esc(e.n)}" data-i="${j}" data-field="t" value="${s.t != null ? esc(s.t) : ''}" placeholder="${ls?.t != null ? esc(ls.t) : 'seg'}" aria-label="segundos serie ${j + 1} ${esc(e.n)}"><span></span></div>`; }).join('')}` : `
       <div class="ser-row h"><span>Serie</span><span>kg</span><span>reps</span><span></span></div>
       ${Array.from({length: nS}, (_, j) => { const s = sets[j] || {}, ls = lsets[j], prev = j ? sets[j - 1] : null;
         const src = ls || (prev && (prev.kg != null || prev.r != null) ? prev : null); return `
@@ -1040,7 +1047,7 @@ function cargasHTML(f, hora, code, key, rut, r) {
         <input type="text" inputmode="decimal" id="kg-${kid}-${i}-${j}" data-act="ser" data-k="${esc(key)}" data-n="${esc(e.n)}" data-i="${j}" data-field="kg" value="${s.kg != null ? esc(String(s.kg).replace('.', ',')) : ''}" placeholder="${ls?.kg != null ? esc(String(ls.kg).replace('.', ',')) : 'kg'}" aria-label="kg serie ${j + 1} ${esc(e.n)}">
         <input type="text" inputmode="numeric" id="rp-${kid}-${i}-${j}" data-act="ser" data-k="${esc(key)}" data-n="${esc(e.n)}" data-i="${j}" data-field="r" value="${s.r != null ? esc(s.r) : ''}" placeholder="${ls?.r != null ? esc(ls.r) : 'reps'}" aria-label="reps serie ${j + 1} ${esc(e.n)}">
         ${src ? `<button class="btn sm" data-act="ser-igual" data-k="${esc(key)}" data-n="${esc(e.n)}" data-i="${j}" data-kg="${src.kg ?? ''}" data-r="${src.r ?? ''}" title="${ls ? 'Repetir lo de la última vez' : 'Copiar la serie anterior'}" aria-label="${ls ? 'Repetir lo de la última vez' : 'Copiar la serie anterior'}">=</button>` : '<span></span>'}
-      </div>`; }).join('')}
+      </div>`; }).join('')}`}
       <div><button class="btn sm ghost" data-act="ser-add" data-k="${esc(key)}" data-n="${esc(e.n)}" data-c="${nS}">+ Serie</button></div>
     </div>`; }).join('')}
     <div class="small muted">Anota kg y reps de cada serie. Con <b>=</b> repites esa serie de la última vez (o copias la serie anterior). El récord se calcula con la serie más pesada.</div>

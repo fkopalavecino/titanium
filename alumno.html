@@ -43,7 +43,7 @@ h2{font-size:22px}
 .com-add span{color:var(--muted);font-weight:500}.com-add:active{transform:scale(.98);background:rgba(215,31,48,.14)}.com-add[hidden]{display:none}.com-add svg{flex:none}
 .com-w{position:relative}.com-ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none}.com-w .com-i{padding-left:36px}
 .com-w{animation:comIn .25s ease both}.com-w[hidden]{display:none}@keyframes comIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
-.com-i{width:100%;height:40px;border:1px solid var(--line);border-radius:20px;background:var(--sunk);color:var(--fg);font:500 14px Barlow,sans-serif;padding:0 14px}
+.com-i{width:100%;height:42px;border:1px solid var(--line);border-radius:21px;background:var(--sunk);color:var(--muted);font:500 16px Barlow,sans-serif;font-style:italic;padding:0 14px}.com-i:focus{font-style:normal;color:var(--fg)}
 .com-i:focus{outline:none;border-color:#5b5358}.com-i::placeholder{color:#6d6469}
 @media (prefers-reduced-motion:reduce){.com-w,.com-add{animation:none}}
 .tec-b{flex:none;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--muted);font:700 14px Barlow,sans-serif;cursor:pointer;display:grid;place-items:center}
@@ -73,14 +73,16 @@ h2{font-size:22px}
 .circ{display:grid;gap:8px}.circ-it{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--sunk)}
 .circ-it.ok{border-color:var(--ok);background:rgba(111,211,154,.08)}.circ-it.ok .circ-tx b{color:var(--muted);text-decoration:line-through}
 .circ-ck{flex:none;width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:18px;cursor:pointer}.circ-it.ok .circ-ck{background:var(--ok);border-color:var(--ok);color:#0e0c0f}
-.circ-tx{flex:1;min-width:0;display:grid;gap:2px}.circ-tx b{font:700 19px/1.15 'Barlow Condensed',sans-serif;letter-spacing:.01em}.foco-top{display:flex;justify-content:space-between;align-items:center;gap:8px}.foco-bar,.foco-bar>i{height:4px}.foco-go{width:100%}.as-st:empty{display:none}.ej:first-of-type{border-top:0;padding-top:0}
+.circ-tx{flex:1;min-width:0;display:grid;gap:2px}.circ-tx b{font:700 19px/1.15 'Barlow Condensed',sans-serif;letter-spacing:.01em}.foco-top{display:flex;justify-content:space-between;align-items:center;gap:8px}.foco-bar,.foco-bar>i{height:4px}.foco-go{width:100%}.as-st:empty{display:none}.tm-res{width:100%;height:52px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--fg);font:700 20px Barlow,sans-serif;text-align:center;margin:10px 0}.rpe-g{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}.rpe-g .chip{justify-content:center;min-height:44px}.as-st{font-weight:600}.as-st.ok{color:var(--ok)}.as-st.warn{color:#f0b35a}.ej:first-of-type{border-top:0;padding-top:0}
 .sets{display:grid;gap:6px;margin-top:4px}
 .set-h,.set{display:grid;grid-template-columns:30px minmax(0,1fr) 74px 64px 44px;gap:8px;align-items:center}
 .set-h{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:0 6px}
 .set-h span:nth-child(n+3){text-align:center}
 .set{background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:6px}
 .set.done{border-color:var(--ok);background:rgba(111,211,154,.08)}
-.set .n{text-align:center;font-weight:700}
+.set .n{text-align:center;font-weight:700}.set input.raro{border-color:#f0b35a;color:#f0b35a}
+.set-h .t2,.set input.t2{grid-column:span 2}.set.ap{background:transparent;border-style:dashed}.set.ap .n{color:var(--muted)}.set.ap input{font-weight:600;color:var(--muted)}.set.ap.done{border-style:solid}
+.ap-add{justify-self:start;border:0;background:none;color:var(--muted);font:600 13px Barlow,sans-serif;padding:6px 4px;cursor:pointer}
 .set .prev{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .set input{width:100%;height:42px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:700 18px Barlow,sans-serif;text-align:center;padding:0}
 .set input::placeholder{color:#5b5358;font-weight:600}
@@ -425,7 +427,17 @@ function historial() { // {nombre: [{f, kg, r}]}
   return h;
 }
 const nSer = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? Math.min(6, Number(m[1])) : 1; };
-const fmtSet = s => s ? (s.kg != null ? String(s.kg).replace('.', ',') + ' kg' : '') + (s.r != null ? ' × ' + s.r : '') : '';
+const fmtSet = s => s ? (s.t != null ? s.t + ' s' : (s.kg != null ? String(s.kg).replace('.', ',') + ' kg' : '') + (s.r != null ? (s.kg != null ? ' × ' : '') + s.r + (s.kg != null ? '' : ' reps') : '')) : '';
+const conDato = z => !!z && (z.kg != null || z.r != null || z.t != null);
+// tipo de ejercicio: por tiempo (plancha…), peso corporal (dominadas…) o con kilos
+const sinDesc = d => String(d || '').replace(/desc(?:anso)?\.?\s*\d+\s*(?:s|seg|min|m|')(?![a-z])/gi, '');
+const SEG_RE = /×\s*(\d+)\s*(s|seg|"|min)(?![a-z])/i;
+const TIEMPO_RE = /plancha(?!.*copenhag)|plank|hollow|isom[eé]tric|wall ?sit|sentadilla en (la )?pared|colgad|dead ?hang|l-?sit/i;
+const CORPORAL_RE = /dominada|pull-?up|chin-?up|fondos|\bdips\b|flexi[oó]n|push-?up|remo invertido|muscle-?up/i;
+function tipoEj(e) { const d = sinDesc(e.dosis); if (SEG_RE.test(d)) return 'tiempo'; if (/reps?\b/i.test(d)) return CORPORAL_RE.test(e.nombre || '') ? 'corporal' : 'kg';
+  if (TIEMPO_RE.test(e.nombre || '')) return 'tiempo'; if (CORPORAL_RE.test(e.nombre || '')) return 'corporal'; return 'kg'; }
+const segObj = e => { const m = sinDesc(e.dosis).match(SEG_RE); return m ? Number(m[1]) * (/min/i.test(m[2]) ? 60 : 1) : 0; };
+const nAprox = e => Number((String(e.dosis || '').match(/(\d)\s*aprox/i) || [])[1]) || 0;
 
 /* ---------- borrador de la sesión (no se pierde si se cierra la app) ---------- */
 const DKEY = () => { const rd = rutinaDeHoy(); return 'tl-draft-' + codigo + '-' + rd.fecha + '-' + String(rd.hora || 'libre').replace(':', '') + (S.rutSel ? '-' + S.rutSel : ''); };
@@ -436,7 +448,7 @@ const getDraft = () => { try { const k = DKEY(); let v = localStorage.getItem(k)
 const putDraft = d => { try { localStorage.setItem(DKEY(), JSON.stringify(d)); } catch (e) {} };
 const clearDraft = () => { try { localStorage.removeItem(DKEY()); Object.keys(localStorage).filter(k => k.startsWith('tl-draft-' + codigo + '-') && k !== DKEY() && k.slice(('tl-draft-' + codigo + '-').length, ('tl-draft-' + codigo + '-').length + 10) < addDays(today(), -30)).forEach(k => localStorage.removeItem(k)); } catch (e) {} };
 function applyDraft() { if (S.v !== 'rutina') return; const d = getDraft();
-  document.querySelectorAll('.set input').forEach(i => { const v = d.sets?.[i.dataset.n]?.[i.dataset.i]?.[i.dataset.f]; if (v != null && v !== '') i.value = v; });
+  document.querySelectorAll('.set input').forEach(i => { const v = d[i.dataset.ap ? 'ap' : 'sets']?.[i.dataset.n]?.[i.dataset.i]?.[i.dataset.f]; if (v != null && v !== '') i.value = v; });
   document.querySelectorAll('.set').forEach(box => box.classList.toggle('done', [...box.querySelectorAll('input')].some(i => i.value.trim() !== '')));
   if (d.carga != null && $('#carga')) $('#carga').value = d.carga;
   document.querySelectorAll('.com-i').forEach(i => { const v = d.com?.[i.dataset.comn]; if (v != null) { i.value = v; if (v.trim()) { i.closest('.com-w').hidden = false; const b = document.querySelector(`[data-com="${CSS.escape(i.dataset.comn)}"]`); if (b) b.hidden = true; } } });
@@ -444,7 +456,7 @@ function applyDraft() { if (S.v !== 'rutina') return; const d = getDraft();
 document.addEventListener('focusout', ev => { const i = ev.target; if (!i.matches || !i.matches('.com-i') || i.value.trim()) return;
   const w = i.closest('.com-w'), b = document.querySelector(`[data-com="${CSS.escape(i.dataset.comn)}"]`); if (w && b) { w.hidden = true; b.hidden = false; } });
 document.addEventListener('input', ev => { const i = ev.target; const d = getDraft();
-  if (i.matches('.set input')) { const n = i.dataset.n; ((d.sets[n] = d.sets[n] || {})[i.dataset.i] = d.sets[n][i.dataset.i] || {})[i.dataset.f] = i.value; i.closest('.set')?.classList.toggle('done', [...i.closest('.set').querySelectorAll('input')].some(x => x.value.trim() !== '')); putDraft(d); autoGuardar(2500); }
+  if (i.matches('.set input')) { const n = i.dataset.n; const g = i.dataset.ap ? (d.ap = d.ap || {}) : (d.sets = d.sets || {}); ((g[n] = g[n] || {})[i.dataset.i] = g[n][i.dataset.i] || {})[i.dataset.f] = i.value; i.closest('.set')?.classList.toggle('done', [...i.closest('.set').querySelectorAll('input')].some(x => x.value.trim() !== '')); putDraft(d); autoGuardar(2500); }
   else if (i.matches('.com-i')) { (d.com = d.com || {})[i.dataset.comn] = i.value; putDraft(d); autoGuardar(2500); }
   else if (i.id === 'carga') { d.carga = i.value; putDraft(d); autoGuardar(2500); } });
 
@@ -733,6 +745,9 @@ V.hoy = () => {
 };
 const blkAbiertos = new Set(); // los bloques parten minimizados cada vez que se entra a Rutina
 document.addEventListener('toggle', ev => { const d = ev.target; if (d.dataset && d.dataset.sec) { if (d.open) secAbiertos.add(d.dataset.sec); else secAbiertos.delete(d.dataset.sec); return; } if (!d.matches || !d.matches('details.blk')) return; const i = Number(d.dataset.blk); if (d.open) blkAbiertos.add(i); else blkAbiertos.delete(i); }, true);
+document.addEventListener('change', ev => { const i = ev.target; if (!i.matches || !i.matches('.set input[data-f="kg"]')) return; const v = Number(String(i.value).replace(',', '.')); if (!v) { i.classList.remove('raro'); return; }
+  const pk = Math.max(0, ...prevSets(i.dataset.n).map(x => (x && x.kg) || 0)); const raro = pk > 0 ? v > pk * 1.8 && v - pk >= 10 : v > 250;
+  i.classList.toggle('raro', raro); if (raro) toast(`¿${String(v).replace('.', ',')} kg? Es mucho más que la vez anterior (${String(pk).replace('.', ',')} kg). Revisa que esté bien.`); });
 function prevCom(nombre) { const t = S.ses ? S.ses.f : today(); for (let i = S.clases.length - 1; i >= 0; i--) { const r = S.clases[i]; if (r.fecha >= t) continue; const e = (r.ej || []).find(x => x.n === nombre && x.c); if (e) return e.c; } return ''; }
 function prevSets(nombre) { const t = S.ses ? S.ses.f : today(); for (let i = S.clases.length - 1; i >= 0; i--) { const r = S.clases[i]; if (r.fecha >= t) continue; const e = (r.ej || []).find(x => x.n === nombre); if (e) return e.sets && e.sets.length ? e.sets : [{ kg: e.kg, r: e.r }]; } return []; }
 /* ---------- descanso entre series (bloque de fuerza) ---------- */
@@ -801,14 +816,22 @@ function abrirTimer(b) { cerrarTimer(); const c = detectarTimer(b); const el = d
       <div class="tfase">${esc(fase)}</div><div class="tbig" aria-live="off">${big}</div><div class="tsub">${esc(sub)}</div>
       <div class="tbar"><i style="width:${T ? Math.min(100, e / T * 100) : 0}%"></i></div>
       <div class="tbtns">${c.modo === 'crono' ? '<button class="btn" data-tv="1">+1 vuelta</button>' : ''}<button class="btn" data-tp="1">${st.fase === 'pausa' ? '▶ Seguir' : '⏸ Pausa'}</button><button class="btn pri" data-tf="1">${c.modo === 'crono' ? '■ Terminé' : '■ Terminar'}</button></div></div>`; };
+  const ponerRes = v => { if (!v) return; const inp = document.getElementById('carga'); if (inp) { inp.value = v; inp.dispatchEvent(new Event('input', { bubbles: true })); } else { const d = getDraft(); d.carga = v; putDraft(d); autoGuardar(800); } };
   const terminar = () => { const e = transcurrido(); clearInterval(TM); TM = null; st.fase = 'fin'; snd('final');
-    const res = c.modo === 'crono' ? mmss(Math.floor(e)) + (st.vuelta ? ' · ' + st.vuelta + ' vueltas' : '') : c.modo === 'amrap' ? '' : '';
-    const inp = document.getElementById('carga'); if (res && inp && !inp.value.trim()) { inp.value = res; inp.dispatchEvent(new Event('input', { bubbles: true })); }
+    let res = '';
+    if (c.modo === 'crono') res = mmss(Math.floor(e)) + (st.vuelta ? ' · ' + st.vuelta + ' vueltas' : '');
+    else if (c.modo === 'emom') { const r = Math.min(c.n, Math.floor(e / c.w)); res = r >= c.n ? `${c.nombre} completo · ${c.n} rondas` : `${c.nombre} · ${r} de ${c.n} rondas`; }
+    else if (c.modo === 'int') { const r = Math.min(c.n, Math.ceil(e / (c.w + c.r))); res = r >= c.n ? `${c.nombre} completo · ${c.n} rondas` : `${c.nombre} · ${r} de ${c.n} rondas`; }
+    const pide = c.modo === 'amrap';
+    if (!pide) ponerRes(res);
     el.innerHTML = `<div class="tin"><div class="trow"><b class="tname">${esc(c.nombre)}</b><button data-tx="1" aria-label="Cerrar">✕</button></div><div class="tbig">✓</div>
-      <div class="tsub">${res ? 'Tu tiempo: <b>' + esc(res) + '</b> (quedó anotado abajo)' : '¡Bloque terminado! Anota tu resultado abajo.'}</div><button class="btn pri" data-tx="1">Listo</button></div>`;
+      ${pide ? `<div class="tsub">¿Cuántas rondas hiciste?</div><input id="tm-res" class="tm-res" inputmode="text" placeholder="Ej: 5 rondas + 8" autocomplete="off"><button class="btn pri" data-tok="1">Anotar y cerrar</button>`
+        : `<div class="tsub">${res ? 'Resultado: <b>' + esc(res) + '</b> · quedó anotado' : '¡Bloque terminado!'}</div><button class="btn pri" data-tx="1">Listo</button>`}</div>`;
+    if (pide) setTimeout(() => el.querySelector('#tm-res')?.focus(), 200);
     try { wake && wake.release(); } catch (_) {} };
   el.addEventListener('click', async ev => { const b = ev.target.closest('button'); if (!b) return; ev.stopPropagation();
     if (b.dataset.tx) return cerrarTimer();
+    if (b.dataset.tok) { const v = (el.querySelector('#tm-res')?.value || '').trim(); ponerRes(v ? v + (/ronda/i.test(v) ? '' : ' rondas') : ''); return cerrarTimer(); }
     if (b.dataset.tsnd) { try { window.SND && (SND.unlock(), SND.abrirPanel()); } catch (_) {} return; }
     if (b.dataset.tc) { const k = b.dataset.tc, d = Number(b.dataset.d); if (k === 'total' || k === 'tope') c[k] = Math.max(k === 'tope' ? 0 : 60, c[k] + d * 60); else c[k] = Math.max(k === 'n' ? 1 : 5, c[k] + d); return pintar(); }
     if (b.dataset.ts) { try { window.SND && SND.unlock(); } catch (_) {} st.fase = 'run'; st.t0 = Date.now() + 3000; st.pausa = 0; st.last = -1; let k = 3;
@@ -826,7 +849,9 @@ const tecDe = n => { const x = normEj(n); return (S.tec || []).find(t => { try {
 const ytBuscar = q => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q + ' técnica ejercicio');
 const fmtKg = v => String(Math.round(v * 10) / 10).replace('.', ',');
 // carga sugerida: si en la sesión anterior llegó al tope de reps en todas sus series pesadas, sube; si no, mantiene
-function sugerencia(e) { const m = String(e.dosis || '').match(/×\s*(\d+)(?:\s*[–-]\s*(\d+))?/); if (!m) return null;
+function sugerencia(e) { if (tipoEj(e) === 'tiempo') { const pv = prevSets(e.nombre).filter(x => x && x.t > 0); if (!pv.length) return null; const t = Math.max(...pv.map(x => x.t)); const obj = segObj(e);
+    if (!obj || pv.every(x => x.t >= obj)) return { t: t + 5, sube: true, txt: `Hoy prueba ${t + 5} s · la vez anterior aguantaste ${t} s` }; return { t, txt: `Mantén ${t} s y apunta a ${obj} s` }; }
+  const m = String(e.dosis || '').match(/×\s*(\d+)(?:\s*[–-]\s*(\d+))?/); if (!m) return null;
   const lo = Number(m[1]), hi = Number(m[2] || m[1]); const pv = prevSets(e.nombre).filter(x => x && x.kg != null && x.r != null && x.kg > 0); if (!pv.length) return null;
   const kg = Math.max(...pv.map(x => x.kg)); const top = pv.filter(x => x.kg === kg);
   const inc = /mancuerna|kb|kettlebell|pesa rusa/i.test(e.nombre) ? 2 : 2.5;
@@ -840,9 +865,19 @@ function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nS
     <div class="small muted">${esc(e.dosis)}${isB && !/desc|\d\s*(min|s)\b/i.test(String(e.dosis || '').replace(/^\d+\s*[×x]\s*[\d–-]+/, '')) ? ` · ⏱ ${mmss(descansoDe(e))}` : ''}</div>
     ${sg ? `<div class="sug${sg.sube ? ' up' : ''}">${sg.sube ? '↗' : '→'} ${esc(sg.txt)}</div>` : ''}
     ${tc && foco ? `<details class="tec-d"><summary>¿Cómo se hace?</summary><ol>${(tc.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol>${tc.video ? `<a class="btn" href="${esc(tc.video)}" target="_blank" rel="noopener">▶ Ver video</a>` : `<a class="small red-t" href="${esc(ytBuscar(tc.nombre))}" target="_blank" rel="noopener">🔎 Ver ejemplos en YouTube</a>`}</details>` : ''}
-    ${isB ? `<div class="sets"><div class="set-h"><span>Serie</span><span>Anterior</span><span>Kg</span><span>Reps</span><span></span></div>${Array.from({ length: n }, (_, i) => { const s0 = sets[i] || {}; const done = s0.kg != null || s0.r != null; const p = pv[i] || pv[pv.length - 1];
-      const phKg = sg ? fmtKg(sg.kg) : p && p.kg != null ? String(p.kg).replace('.', ',') : 'kg';
-      return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span><span class="prev">${p && (p.kg != null || p.r != null) ? esc(fmtSet(p)) : '—'}</span><input inputmode="decimal" placeholder="${esc(phKg)}" aria-label="kg serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s0.kg != null ? esc(String(s0.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${p && p.r != null ? esc(p.r) : 'reps'}" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s0.r != null ? esc(s0.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }).join('')}</div>
+    ${isB ? (() => { const tp = tipoEj(e); const ap = tp === 'kg' ? Math.max(nAprox(e), (c?.ap || []).length, (S.apX || {})[e.nombre] || 0, ...Object.keys(getDraft().ap?.[e.nombre] || {}).map(k => Number(k) + 1)) : 0; const aps = c?.ap || [];
+      const base = sg?.kg ?? (pv.length ? Math.max(0, ...pv.map(x => x.kg || 0)) : 0); const inc = /mancuerna|kb|kettlebell|pesa rusa/i.test(e.nombre) ? 1 : 2.5;
+      const PCT = ap === 1 ? [[0.6, 5]] : ap === 2 ? [[0.5, 8], [0.75, 3]] : [[0.4, 10], [0.6, 5], [0.8, 2], [0.9, 1]];
+      const apRow = i => { const s0 = aps[i] || {}; const [pc, rp] = PCT[Math.min(i, PCT.length - 1)]; const kgS = base ? Math.round(base * pc / inc) * inc : null;
+        return `<div class="set ap ${conDato(s0) ? 'done' : ''}"><span class="n">A</span><span class="prev">${kgS ? '~' + Math.round(pc * 100) + '%' : 'aprox.'}</span><input inputmode="decimal" placeholder="${kgS ? esc(fmtKg(kgS)) : 'kg'}" aria-label="kg aproximación ${i + 1} ${esc(e.nombre)}" data-ap="1" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s0.kg != null ? esc(String(s0.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${rp}" aria-label="reps aproximación ${i + 1} ${esc(e.nombre)}" data-ap="1" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s0.r != null ? esc(s0.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="60" aria-label="Marcar aproximación ${i + 1} hecha">✓</button></div>`; };
+      const head = tp === 'tiempo' ? '<span>Serie</span><span>Anterior</span><span class="t2">Segundos</span><span></span>' : `<span>Serie</span><span>Anterior</span><span>${tp === 'corporal' ? '+Kg' : 'Kg'}</span><span>Reps</span><span></span>`;
+      return `<div class="sets"><div class="set-h">${head}</div>${Array.from({ length: ap }, (_, i) => apRow(i)).join('')}${Array.from({ length: n }, (_, i) => { const s0 = sets[i] || {}; const done = conDato(s0); const p = pv[i] || pv[pv.length - 1];
+      const prev = `<span class="prev">${conDato(p) ? esc(fmtSet(p)) : '—'}</span>`;
+      if (tp === 'tiempo') { const phT = sg?.t ?? (p && p.t != null ? p.t : segObj(e) || 'seg');
+        return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span>${prev}<input class="t2" inputmode="numeric" placeholder="${esc(phT)}" aria-label="segundos serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="t" value="${s0.t != null ? esc(s0.t) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }
+      const phKg = tp === 'corporal' ? (p && p.kg ? String(p.kg).replace('.', ',') : '+kg') : sg ? fmtKg(sg.kg) : p && p.kg != null ? String(p.kg).replace('.', ',') : 'kg';
+      return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span>${prev}<input inputmode="decimal" placeholder="${esc(phKg)}" aria-label="${tp === 'corporal' ? 'lastre en kg (opcional)' : 'kg'} serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s0.kg != null ? esc(String(s0.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${p && p.r != null ? esc(p.r) : 'reps'}" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s0.r != null ? esc(s0.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }).join('')}
+      ${tp === 'kg' ? `<button type="button" class="ap-add" data-apx="${esc(e.nombre)}">+ Serie de aproximación</button>` : ''}</div>`; })() + `
     <button class="com-add" data-com="${esc(e.nombre)}" ${com ? 'hidden' : ''}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 5h16v10H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>${pcom ? 'Comentario · la vez anterior: ' + esc(pcom) : 'Agregar comentario <span>(ej: kg por mano)</span>'}</button>
     <div class="com-w" data-comw="${esc(e.nombre)}" ${com ? '' : 'hidden'}><span class="com-ic" aria-hidden="true">💬</span><input class="com-i" data-comn="${esc(e.nombre)}" maxlength="80" enterkeyhint="done" placeholder="${esc(pcom ? 'La vez anterior: ' + pcom : 'Ej: 20 kg por mano · agarre neutro')}" value="${esc(com)}"></div>` : ''}</div>`; }
 function abrirTec(id) { const t = (S.tec || []).find(x => x.id === id); if (!t) return; document.getElementById('sheet')?.remove();
@@ -852,19 +887,25 @@ function abrirTec(id) { const t = (S.tec || []).find(x => x.id === id); if (!t) 
     ${t.video ? `<a class="btn pri" href="${esc(t.video)}" target="_blank" rel="noopener">▶ Ver video</a>` : `<a class="btn" href="${esc(ytBuscar(t.nombre))}" target="_blank" rel="noopener">🔎 Ver ejemplos en YouTube</a>`}<button class="btn" data-close="1">Listo</button></div>`;
   sh.addEventListener('click', ev => { if (ev.target === sh || ev.target.closest('[data-close]')) sh.remove(); }); document.body.appendChild(sh); }
 // junta lo anotado: lo guardado + el borrador + lo que está en pantalla
-function colectarEj() { const rd = rutinaDeHoy(); const by = {};
-  (rd.rec?.ej || []).forEach(x => { by[x.n] = (x.sets && x.sets.length ? x.sets : [{ kg: x.kg, r: x.r }]).map(z => Object.assign({}, z)); });
-  const put = (n, i, f, v) => { const o = (by[n] = by[n] || []); o[i] = o[i] || {}; v = String(v ?? '').trim().replace(',', '.'); if (v === '') delete o[i][f]; else if (!isNaN(v)) o[i][f] = Number(v); };
-  const d = getDraft(); Object.entries(d.sets || {}).forEach(([n, arr]) => Object.entries(arr || {}).forEach(([i, z]) => { if (z) ['kg', 'r'].forEach(f => { if (z[f] != null) put(n, Number(i), f, z[f]); }); }));
-  document.querySelectorAll('.set input').forEach(i => put(i.dataset.n, Number(i.dataset.i), i.dataset.f, i.value));
+function colectarEj() { const rd = rutinaDeHoy(); const by = {}, apBy = {};
+  (rd.rec?.ej || []).forEach(x => { by[x.n] = (x.sets && x.sets.length ? x.sets : (conDato(x) ? [{ kg: x.kg, r: x.r }] : [])).map(z => Object.assign({}, z)); if ((x.ap || []).length) apBy[x.n] = x.ap.map(z => Object.assign({}, z)); });
+  const put = (g, n, i, f, v) => { const o = (g[n] = g[n] || []); o[i] = o[i] || {}; v = String(v ?? '').trim().replace(',', '.'); if (v === '') delete o[i][f]; else if (!isNaN(v)) o[i][f] = Number(v); };
+  const d = getDraft();
+  [['sets', by], ['ap', apBy]].forEach(([k, g]) => Object.entries(d[k] || {}).forEach(([n, arr]) => Object.entries(arr || {}).forEach(([i, z]) => { if (z) ['kg', 'r', 't'].forEach(f => { if (z[f] != null) put(g, n, Number(i), f, z[f]); }); })));
+  document.querySelectorAll('.set input').forEach(i => put(i.dataset.ap ? apBy : by, i.dataset.n, Number(i.dataset.i), i.dataset.f, i.value));
   const coms = {}; (rd.rec?.ej || []).forEach(x => { if (x.c) coms[x.n] = x.c; }); Object.entries(d.com || {}).forEach(([n, v]) => { coms[n] = v; });
   document.querySelectorAll('.com-i').forEach(i => { coms[i.dataset.comn] = i.value; }); Object.keys(coms).forEach(n => { coms[n] = String(coms[n] || '').trim().slice(0, 80); if (!by[n]) by[n] = []; });
-  return Object.entries(by).map(([n, sets]) => { const cm = coms[n] || ''; const pos = Array.from(sets, z => z && (z.kg != null || z.r != null) ? { kg: z.kg ?? null, r: z.r ?? null } : {});
-    while (pos.length && pos[pos.length - 1].kg == null && pos[pos.length - 1].r == null) pos.pop();
-    const ss = pos.filter(z => z.kg != null || z.r != null); if (!ss.length) return cm ? { n, s: 0, sets: [], c: cm } : null;
-    const top = ss.reduce((b, z) => (z.kg || 0) > (b.kg || 0) ? z : b, ss[0]); return Object.assign({ n, kg: top.kg, r: top.r, s: ss.length, sets: pos }, cm ? { c: cm } : {}); }).filter(Boolean); }
+  Object.keys(apBy).forEach(n => { if (!by[n]) by[n] = []; });
+  const limpia = arr => { const pos = Array.from(arr || [], z => conDato(z) ? ['kg', 'r', 't'].reduce((o, f) => (z[f] != null && (o[f] = z[f]), o), {}) : {}); while (pos.length && !conDato(pos[pos.length - 1])) pos.pop(); return pos; };
+  return Object.entries(by).map(([n, sets]) => { const cm = coms[n] || ''; const pos = limpia(sets); const ap = limpia(apBy[n]).filter(conDato);
+    const extra = Object.assign({}, cm ? { c: cm } : {}, ap.length ? { ap } : {});
+    const ss = pos.filter(conDato); if (!ss.length) return Object.keys(extra).length ? Object.assign({ n, s: 0, sets: [] }, extra) : null;
+    const tt = ss.filter(z => z.t != null); if (tt.length) { const top = tt.reduce((b, z) => z.t > b.t ? z : b, tt[0]); return Object.assign({ n, t: top.t, s: ss.length, sets: pos }, extra); }
+    const top = ss.reduce((b, z) => (z.kg || 0) > (b.kg || 0) ? z : b, ss[0]); return Object.assign({ n, kg: top.kg ?? null, r: top.r ?? null, s: ss.length, sets: pos }, extra); }).filter(Boolean); }
 let AS = null, ASpend = false;
-function asEstado(t, cls) { document.querySelectorAll('.as-st').forEach(el => { el.textContent = t; el.className = 'as-st small ' + (cls || 'muted'); }); }
+let ASTXT = { t: '', c: 'muted' };
+const asHTML = () => `<span class="as-st small ${ASTXT.c}">${esc(ASTXT.t)}</span>`;
+function asEstado(t, cls) { ASTXT = { t, c: cls || 'muted' }; document.querySelectorAll('.as-st').forEach(el => { el.textContent = t; el.className = 'as-st small ' + (cls || 'muted'); }); }
 function autoGuardar(ms) { clearTimeout(AS); ASpend = true; AS = setTimeout(guardarYa, ms ?? 1500); }
 let ASvuelo = false;
 async function guardarYa() { clearTimeout(AS); if (!ASpend) return; if (ASvuelo) { AS = setTimeout(guardarYa, 600); return; } ASpend = false; if (S.v !== 'rutina' || S.evSel) return;
@@ -964,7 +1005,7 @@ V.rutina = () => {
   const items = []; bloques.forEach((b, bi) => (b.ejercicios || []).forEach((e, ei) => items.push({ b, bi, e, ei })));
   const finalDe = foco => rd.futuro ? '<section class="card"><div class="small muted">Esta sesión es de un día que aún no llega. Ábrela desde la Agenda ese día para anotar tus series.</div></section>' : `<section class="card">
     ${cIdx >= 0 && !foco ? `<label class="field">Resultado · ${esc(cNom)}<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>` : ''}
-    <div class="field">¿Qué tan duro fue? (RPE)<div class="chips">${[5,6,7,8,9,10].map(v => `<button class="chip" data-rpe="${v}" aria-pressed="${String(S.rpe ?? rd.rec?.rpe) === String(v)}">${v}</button>`).join('')}</div></div>
+    <div class="field">¿Qué tan duro fue? (RPE · 1 muy fácil, 10 máximo)<div class="rpe-g">${[1,2,3,4,5,6,7,8,9,10].map(v => `<button class="chip" data-rpe="${v}" aria-pressed="${String(S.rpe ?? rd.rec?.rpe) === String(v)}">${v}</button>`).join('')}</div></div>
     <button class="btn pri" id="guardar">${guardada ? 'Actualizar mi entrenamiento' : 'Terminar y guardar'}</button>
     ${foco ? (rd.otroDia ? `<div class="small muted">Se guarda en tu sesión del ${esc(fmtD(rd.fecha))}.</div>` : '') : `<div class="small muted">${rd.otroDia ? `Se guarda en tu sesión del ${esc(fmtD(rd.fecha))}. ` : ''}Tus series se guardan solas mientras entrenas.</div>`}
   </section>`;
@@ -973,7 +1014,7 @@ V.rutina = () => {
   const pasos = []; bloques.forEach((b, bi) => { const inf = info(b); if (inf.isB) (b.ejercicios || []).forEach((e, ei) => pasos.push({ t: 'ej', b, bi, e, ei, inf })); else if ((b.ejercicios || []).length) pasos.push({ t: 'circ', b, bi, inf }); });
   if (S.foco != null && !rd.futuro && pasos.length) {
     const k = Math.max(0, Math.min(S.foco, pasos.length)); const fin = k === pasos.length; const st = pasos[k];
-    const head = `<div class="foco-top"><button class="chip" data-focox="1">‹ Ver todo</button><span class="as-st small muted"></span><b class="small">${fin ? 'Final' : (k + 1) + ' / ' + pasos.length}</b></div>
+    const head = `<div class="foco-top"><button class="chip" data-focox="1">‹ Ver todo</button>${asHTML()}<b class="small">${fin ? 'Final' : (k + 1) + ' / ' + pasos.length}</b></div>
     <div class="bar foco-bar"><i style="width:${Math.round(k / pasos.length * 100)}%"></i></div>`;
     const nav = `<div class="grid2"><button class="btn" data-fnav="-1" ${k === 0 ? 'disabled' : ''}>‹ Anterior</button><button class="btn pri" data-fnav="1">${k === pasos.length - 1 ? 'Terminar ›' : 'Siguiente ›'}</button></div>`;
     if (fin) { const res = rd.rec?.carga || getDraft().carga;
@@ -982,7 +1023,7 @@ V.rutina = () => {
     <section class="card foco">${st.ei === 0 && st.b.nota ? `<div class="small muted">${esc(st.b.nota)}</div>` : ''}${ejHTML(st.e, true, cur, true)}</section>${nav}`;
     // circuito: todos los ejercicios a la vista, se marcan al pasar; vueltas en el A, temporizador y resultado en el C
     const b = st.b, bi = st.bi, ejs = b.ejercicios || [];
-    const nV = Number((String(b.nota || '') + ' ' + String(b.titulo || '')).match(/(\d+)\s*(?:vueltas?|rondas?)/i)?.[1] || 0);
+    const nV = Number((String(b.nota || '') + ' ' + String(b.titulo || '')).match(/(\d+)\s*(?:vueltas?|rondas?)/i)?.[1] || 0) || Math.max(0, ...ejs.map(e => Number((String(e.dosis || '').match(/^\s*(\d+)\s*[×x]/) || [])[1]) || 0));
     const v = (S.vta && S.vta[bi]) || 1; const ck = S.cck || new Set();
     return `${head}<div class="eyebrow">Bloque ${esc(st.inf.letra)} · circuito</div>
     <h1 style="font-size:28px;line-height:1.05">${esc(st.inf.nomB)}</h1>
@@ -996,7 +1037,7 @@ V.rutina = () => {
   return `${otro}${tambien}${okCard}
   <div style="display:grid;gap:6px"><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total : ''}</div><h1 style="font-size:30px;line-height:1.05">${esc(r.tipo || 'Rutina')}</h1>${(() => { const l = rd.pe ? progLinea(r, rd.pe.semana) : ''; return l ? `<div class="small muted">💡 ${esc(l.replace(/^Semana \d+ · /, ''))}</div>` : ''; })()}
     <div class="chips" style="margin-top:2px">${r.minutos ? `<span class="chip">⏱ ~${esc(r.minutos)} min</span>` : ''}<span class="chip">${items.length} ejercicios</span>${rd.hora && rd.hora !== 'libre' ? `<span class="chip">🕒 ${esc(rd.hora)}</span>` : ''}</div>
-    ${(!rd.futuro || S.tourSes) && items.length ? `<div class="row" style="align-items:center"><button class="btn pri foco-go" data-foco="1">▶ Modo clase</button></div><span class="as-st small muted"></span>` : ''}</div>
+    ${(!rd.futuro || S.tourSes) && items.length ? `<div class="row" style="align-items:center"><button class="btn pri foco-go" data-foco="1">▶ Modo clase</button></div>${asHTML()}` : ''}</div>
   ${bloques.map((b, bi) => { const { letra, nomB, isB, isC } = info(b);
     const nEj = (b.ejercicios || []).length; const cerrado = !blkAbiertos.has(bi); const det = isB ? 'anota tus series' : isC ? '⏱ con temporizador' : '';
     return `<details class="card blk" data-blk="${bi}" ${cerrado ? '' : 'open'}><summary><span class="blk-l ${isB ? 'b' : ''}">${esc(letra)}</span><div style="flex:1;min-width:0"><div class="blk-t">${esc(nomB)}</div><div class="small muted">${nEj} ejercicio${nEj === 1 ? '' : 's'}${det ? ' · ' + esc(det) : ''}</div>${cerrado ? `<div class="blk-p">${esc((b.ejercicios || []).map(e => String(e.nombre || '').replace(/^(min(uto)?\s*\d+|\d+[ab]?)\s*·\s*/i, '')).join(' · '))}</div>` : ''}</div><span class="chev" aria-hidden="true">›</span></summary>${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}${isC ? `<button class="btn tbtn" data-timer="${bi}">⏱ Abrir temporizador · ${esc(timerTxt(detectarTimer(b)))}</button>` : ''}
@@ -1163,12 +1204,12 @@ const actsMes = mes => [...(S.hechas?.values() || [])].filter(r => String(r.fech
 function hechaCard(e) { if (!esEntreno(e)) return ''; const h = hechaDe(e); const t = today();
   if (e.fecha > t) return `<section class="card"><div class="small muted">Cuando llegue el día podrás marcarla como hecha ✅</div></section>`;
   if (e.fecha < addDays(t, -30)) return h ? `<section class="card"><b class="ok">✅ La hiciste</b></section>` : '';
-  if (h && !S.actEdit) return `<section class="card" style="border-color:var(--ok)"><div class="row" style="align-items:center"><b class="ok" style="font-size:18px">✅ La hiciste</b><button class="chip" data-actedit="1">Editar</button></div><div class="small muted">${[h.minutos ? h.minutos + ' min' : '', h.rpe != null ? 'RPE ' + h.rpe : '', h.nota || ''].filter(Boolean).map(esc).join(' · ') || 'Sin detalles'}</div></section>`;
+  if (h && !S.actEdit) return `<section class="card" style="border-color:var(--ok)"><div class="row" style="align-items:center"><b class="ok" style="font-size:18px">✅ La hiciste</b><span style="display:flex;gap:6px"><button class="chip" data-actedit="1">Editar</button><button class="chip" data-actdel="${esc(e.id)}">Desmarcar</button></span></div><div class="small muted">${[h.minutos ? h.minutos + ' min' : '', h.rpe != null ? 'RPE ' + h.rpe : '', h.nota || ''].filter(Boolean).map(esc).join(' · ') || 'Sin detalles'}</div></section>`;
   const sug = h?.minutos || (String(e.detalle || e.titulo || '').match(/(\d{1,3})\s*(?:[–-]\s*\d{1,3}\s*)?min/i) || [])[1] || '';
   const rpeSel = S.actRpe ?? h?.rpe;
   return `<section class="card"><h2 style="margin:0">¿La hiciste?</h2>
     <label class="field">Minutos<input id="act-min" inputmode="numeric" placeholder="Ej: 40" value="${esc(sug)}"></label>
-    <div class="field">¿Qué tan duro fue? (RPE)<div class="chips">${[3,4,5,6,7,8,9,10].map(v => `<button class="chip" data-actrpe="${v}" aria-pressed="${String(rpeSel) === String(v)}">${v}</button>`).join('')}</div></div>
+    <div class="field">¿Qué tan duro fue? (RPE)<div class="rpe-g">${[1,2,3,4,5,6,7,8,9,10].map(v => `<button class="chip" data-actrpe="${v}" aria-pressed="${String(rpeSel) === String(v)}">${v}</button>`).join('')}</div></div>
     <label class="field">Nota (opcional)<input id="act-nota" maxlength="300" placeholder="Cómo te sentiste, distancia, etc." value="${esc(h?.nota || '')}"></label>
     <button class="btn pri" data-acthecha="${esc(e.id)}">✅ La hice</button>
     ${h ? `<button class="btn" data-actdel="${esc(e.id)}">Quitar como hecha</button>` : ''}</section>`; }
@@ -1403,7 +1444,7 @@ document.addEventListener('click', async ev => {
   const tcb = ev.target.closest('[data-tec]'); if (tcb) { abrirTec(tcb.dataset.tec); return; }
   const cmb = ev.target.closest('[data-com]'); if (cmb) { const w = document.querySelector(`[data-comw="${CSS.escape(cmb.dataset.com)}"]`); if (!w) return;
     cmb.hidden = true; w.hidden = false; w.querySelector('input').focus(); return; }
-  if (ev.target.closest('[data-foco]')) { S.foco = 0; S.cck = new Set(); S.vta = {}; render(); window.scrollTo(0, 0); return; }
+  if (ev.target.closest('[data-foco]')) { if (!ASpend && !ASvuelo) ASTXT = { t: '', c: 'muted' }; S.foco = 0; S.cck = new Set(); S.vta = {}; render(); window.scrollTo(0, 0); return; }
   const cck = ev.target.closest('[data-cck]'); if (cck) { S.cck = S.cck || new Set(); const k = cck.dataset.cck; const on = !S.cck.has(k); on ? S.cck.add(k) : S.cck.delete(k);
     cck.setAttribute('aria-pressed', on); cck.closest('.circ-it')?.classList.toggle('ok', on); if (on && navigator.vibrate) try { navigator.vibrate(15); } catch (_) {} return; }
   const vta = ev.target.closest('[data-vuelta]'); if (vta) { const bi = vta.dataset.vuelta; S.vta = S.vta || {}; S.vta[bi] = (S.vta[bi] || 1) + 1; [...(S.cck || [])].filter(k => k.startsWith(bi + '-')).forEach(k => S.cck.delete(k)); render(); window.scrollTo(0, 0); return; }
@@ -1439,10 +1480,11 @@ document.addEventListener('click', async ev => {
   const rsel = ev.target.closest('[data-rsel]'); if (rsel) { if (rsel.dataset.rsel === rutinaDeHoy().id) return; S.rutSel = rsel.dataset.rsel; S.rpe = null; blkAbiertos.clear(); render(); return; }
   if (ev.target.closest('[data-sesx]')) { S.evSel = null; S.foco = null; S.ses = null; S.rutSel = null; S.rpe = null; S.v = 'agenda'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
   const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.evSel = null; S.foco = null; if ((go.dataset.go || go.dataset.v) === 'rutina') { S.ses = null; S.rutSel = null; } S.v = go.dataset.go || go.dataset.v; S.evalFirst = false; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
+  const apx = ev.target.closest('[data-apx]'); if (apx) { S.apX = S.apX || {}; const n = apx.dataset.apx; const cur = apx.closest('.sets').querySelectorAll('.set.ap').length; S.apX[n] = Math.min(4, cur + 1); render(true); return; }
   const chk = ev.target.closest('[data-chk]'); if (chk) { const row = chk.closest('.set'); const ins = [...row.querySelectorAll('input')];
     if (row.dataset.ok) { delete row.dataset.ok; finDescanso(); return; }
-    ins.forEach(i => { if (i.value.trim() === '' && !/kg|reps/.test(i.placeholder)) { i.value = i.placeholder; i.dispatchEvent(new Event('input', { bubbles: true })); } });
-    if (ins.some(i => i.value.trim() !== '')) { row.classList.add('done'); row.dataset.ok = '1'; iniciarDescanso(Number(chk.dataset.rest) || 90); autoGuardar(400); } else toast('Anota los kilos y las repeticiones.'); return; }
+    ins.forEach(i => { if (i.value.trim() === '' && !/kg|reps|seg/.test(i.placeholder)) { i.value = i.placeholder; i.dispatchEvent(new Event('input', { bubbles: true })); } });
+    if (ins.some(i => i.value.trim() !== '')) { row.classList.add('done'); row.dataset.ok = '1'; iniciarDescanso(Number(chk.dataset.rest) || 90); autoGuardar(400); } else toast(row.querySelector('[data-f="t"]') ? 'Anota los segundos.' : 'Anota los kilos y las repeticiones.'); return; }
   const dp = ev.target.closest('[data-dep]'); if (dp) { S.pfDeps = S.pfDeps || [...(S.perfil.deportes || [])]; const d = dp.dataset.dep; S.pfDeps = S.pfDeps.includes(d) ? S.pfDeps.filter(x => x !== d) : [...S.pfDeps, d]; dp.setAttribute('aria-pressed', S.pfDeps.includes(d)); return; }
   if (ev.target.id === 'pf-ok') { ev.target.disabled = true; const ig = $('#pf-ig').value.trim().replace(/^@+/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '');
     if (await guardarPerfil({ apodo: $('#pf-apodo').value.trim() || null, meta: $('#pf-meta').value.trim() || null, nac: $('#pf-nac').value || null, ig: ig || null, deportes: S.pfDeps || S.perfil.deportes || [] })) { S.pfDeps = null; toast('Perfil guardado ✓'); } else ev.target.disabled = false; return; }
@@ -1463,7 +1505,7 @@ document.addEventListener('click', async ev => {
     ahe.disabled = true; const { error } = await sb.rpc('marcar_mi_actividad', { p_evento: ahe.dataset.acthecha, p_minutos: mn > 0 ? mn : null, p_rpe: rpe, p_nota: nota || null });
     ahe.disabled = false; if (error) { toast('No se pudo guardar: ' + error.message); return; }
     S.actEdit = false; S.actRpe = null; await load(); toast('¡Actividad registrada! 💪'); render(); return; }
-  const adl = ev.target.closest('[data-actdel]'); if (adl) { const { error } = await sb.rpc('desmarcar_mi_actividad', { p_evento: adl.dataset.actdel }); if (error) { toast('No se pudo quitar: ' + error.message); return; } S.actEdit = false; S.actRpe = null; await load(); toast('Listo, quedó sin marcar'); render(); return; }
+  const adl = ev.target.closest('[data-actdel]'); if (adl) { adl.disabled = true; const { error } = await sb.rpc('desmarcar_mi_actividad', { p_evento: adl.dataset.actdel }); if (error) { toast('No se pudo quitar: ' + error.message); return; } S.actEdit = false; S.actRpe = null; await load(); toast('Listo, quedó sin marcar'); render(); return; }
   const ei = ev.target.closest('[data-evid]'); if (ei) { S.actEdit = false; S.actRpe = null; S.evSel = ei.dataset.evid; S.ses = null; S.rutSel = null; S.v = 'rutina'; render(); window.scrollTo(0, 0); return; }
   const eg = ev.target.closest('[data-evgo]'); if (eg) { S.evSel = null; S.v = eg.dataset.evgo; S.evalFirst = S.v === 'progreso'; if (S.evalFirst) S.ptab = 'cuerpo'; render(); return; }
   const gd = ev.target.closest('[data-goday]'); if (gd) { S.dia = gd.dataset.goday; S.wk = lunesDe(S.dia); S.v = 'agenda'; render(); return; }
