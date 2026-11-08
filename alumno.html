@@ -736,6 +736,12 @@ function abrirTimer(b) { cerrarTimer(); const c = detectarTimer(b); const el = d
 function cerrarTimer() { clearInterval(TM); TM = null; document.getElementById('tmr')?.remove(); try { window.SND && SND.cerrarPanel(); } catch (_) {} }
 V.rutina = () => {
   if (S.evSel) { const e = S.eventos.find(x => String(x.id) === String(S.evSel)); if (e) return evDetalleHTML(e); S.evSel = null; }
+  // pestaña Rutina directa: muestra lo que corresponde hoy (clase, si no la actividad del día, si no descanso)
+  const tHoy = today(); const claseHoy = bloquesDe(tHoy).length || S.clases.some(r => r.fecha === tHoy && !r.quitado && r.asis !== 'ausente');
+  const evsHoy = evDia(tHoy).slice().sort((a, b) => String(a.hora || '').localeCompare(String(b.hora || '')));
+  if (!S.ses && !S.rutSel && !claseHoy) {
+    if (evsHoy.length) return evDetalleHTML(evsHoy[0], true);
+    return `<h1>Rutina</h1><section class="card"><b style="font-size:18px">😌 Hoy es día de descanso</b><div class="small muted">No tienes clase ni actividad agendada para hoy. Revisa la Agenda para ver lo que viene.</div><button class="btn" data-go="agenda">Ver mi agenda</button></section>`; }
   const rd = rutinaDeHoy(); const r = rd.r;
   if (!r) return `<h1>Rutina</h1><div class="card"><div class="muted">Aún no tienes una rutina asignada. Franco te la asigna en la clase.</div></div>`;
   const H = historial(); const cur = {}; (rd.rec?.ej || []).forEach(e => cur[e.n] = e);
@@ -743,7 +749,8 @@ V.rutina = () => {
   const selHTML = '';
   const cuandoTxt = rd.fecha === today() ? 'Sesión de hoy' : 'Sesión del ' + longD(rd.fecha).toLowerCase();
   const otro = S.ses ? `<section class="card" style="border-color:var(--ev);background:rgba(77,163,255,.08)"><div class="row" style="align-items:center"><b>📅 ${esc(cuandoTxt)}${rd.hora && rd.hora !== 'libre' ? ' · ' + esc(rd.hora) : ''}</b><button class="chip" data-sesx="1">‹ Agenda</button></div>${rd.futuro ? '<div class="small muted">Vista previa: podrás anotarla ese día.</div>' : rd.otroDia ? '<div class="small muted">Lo que anotes se guarda en ese día.</div>' : ''}</section>` : '';
-  return `${otro}
+  const tambien = !S.ses && claseHoy && evsHoy.length ? `<div class="chips">${evsHoy.map(x => `<button class="chip" data-evid="${esc(x.id)}">También hoy: ${EVI[x.tipo] || '📌'} ${esc(x.titulo)} ›</button>`).join('')}</div>` : '';
+  return `${otro}${tambien}
   <div style="display:grid;gap:6px"><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total : ''}</div><h1 style="font-size:30px;line-height:1.05">${esc(r.tipo || 'Rutina')}</h1>${(() => { const l = rd.pe ? progLinea(r, rd.pe.semana) : ''; return l ? `<div class="small muted">💡 ${esc(l.replace(/^Semana \d+ · /, ''))}</div>` : ''; })()}
     <div class="chips" style="margin-top:2px">${r.minutos ? `<span class="chip">⏱ ~${esc(r.minutos)} min</span>` : ''}<span class="chip">${bloques.reduce((n, b) => n + (b.ejercicios || []).length, 0)} ejercicios</span>${rd.hora && rd.hora !== 'libre' ? `<span class="chip">🕒 ${esc(rd.hora)}</span>` : ''}</div>${selHTML}</div>
   ${bloques.map((b, bi) => { const isB = /bloque b/i.test(b.titulo || '');
@@ -910,8 +917,10 @@ function evActs(e) { const n = waNum(); const nom = String(S.perfil?.apodo || S.
   if (n) acts.push(`<a class="btn" href="https://wa.me/${n}?text=${encodeURIComponent(`Hola Franco, soy ${nom}. Te escribo por: ${e.titulo} (${longD(e.fecha).toLowerCase()}${e.hora ? ' a las ' + e.hora : ''}).`)}" target="_blank" rel="noopener" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">💬 Escribir a Franco</a>`);
   return { acts, doc, esPdf }; }
 // detalle de una actividad de la Agenda, abierto en la pestaña Rutina
-function evDetalleHTML(e) { const { acts, doc, esPdf } = evActs(e); const c = evColor(e);
-  return `<section class="card" style="border-color:var(--ev);background:rgba(77,163,255,.08)"><div class="row" style="align-items:center"><b>📅 ${esc(e.fecha === today() ? 'Hoy' : longD(e.fecha))}${e.hora ? ' · ' + esc(e.hora) : ' · todo el día'}</b><button class="chip" data-sesx="1">‹ Agenda</button></div></section>
+function evDetalleHTML(e, deHoy) { const { acts, doc, esPdf } = evActs(e); const c = evColor(e);
+  const otros = deHoy ? evDia(today()).filter(x => x !== e) : [];
+  return `<section class="card" style="border-color:var(--ev);background:rgba(77,163,255,.08)"><div class="row" style="align-items:center"><b>📅 ${esc(e.fecha === today() ? 'Hoy' : longD(e.fecha))}${e.hora ? ' · ' + esc(e.hora) : ' · todo el día'}</b>${deHoy ? '' : '<button class="chip" data-sesx="1">‹ Agenda</button>'}</div></section>
+  ${otros.length ? `<div class="chips">${otros.map(x => `<button class="chip" data-evid="${esc(x.id)}">También hoy: ${EVI[x.tipo] || '📌'} ${esc(x.titulo)} ›</button>`).join('')}</div>` : ''}
   <div style="display:grid;gap:8px"><div><span class="chip" style="cursor:default;background:${c};border-color:${c};color:#0e0c0f">${EVI[e.tipo] || '📌'} ${esc(e.tipo || 'Actividad')}</span></div>
     <h1 style="font-size:30px;line-height:1.05">${esc(e.titulo)}</h1><div class="small muted">${e.alumno ? 'Agendada para ti' : 'Para todo Titanium'}</div></div>
   ${e.detalle ? `<section class="card" style="border-color:${c};border-left-width:5px"><div style="white-space:pre-line;line-height:1.5">${esc(e.detalle)}</div></section>` : ''}
