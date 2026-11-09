@@ -548,10 +548,10 @@ function progEstado(a, fecha) {
 }
 const progTexto = e => e ? `${e.pr.familia} · ${e.pr.nivel}` : '';
 const progIdx = sem => sem <= 8 ? sem - 1 : 4 + ((sem - 9) % 4);
-function progLinea(r, sem) { const p = r && r.progresion; if (!Array.isArray(p) || !p.length || !sem) return ''; return p[Math.min(progIdx(sem), p.length - 1)] || ''; }
+function progLinea(r, sem) { const p = r && r.progresion; if (!Array.isArray(p) || !p.length || !sem) return ''; return (p.length >= sem ? p[sem - 1] : p[Math.min(progIdx(sem), p.length - 1)]) || ''; }
 function progHTML(r) {
   const p = r && r.progresion; if (!Array.isArray(p) || !p.length) return '';
-  return `<details class="prog"><summary class="small" style="cursor:pointer"><b>Progresión semana a semana</b></summary><ol class="small" style="margin:6px 0 4px;padding-left:20px;display:grid;gap:3px">${p.map(x => `<li>${esc(String(x).replace(/^Semana \d+ · /, ''))}</li>`).join('')}</ol><p class="small muted" style="margin:0">En programas de 12 semanas, las semanas 9–12 repiten la 5–8 con las cargas nuevas.</p></details>`;
+  return `<details class="prog"><summary class="small" style="cursor:pointer"><b>Progresión semana a semana</b></summary><ol class="small" style="margin:6px 0 4px;padding-left:20px;display:grid;gap:3px">${p.map(x => `<li>${esc(String(x).replace(/^Semana \d+ · /, ''))}</li>`).join('')}</ol>${p.length < 9 ? '<p class="small muted" style="margin:0">En programas de 12 semanas, las semanas 9–12 repiten la 5–8 con las cargas nuevas.</p>' : ''}</details>`;
 }
 function familias() {
   const seen = new Map();

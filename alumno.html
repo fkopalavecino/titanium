@@ -414,7 +414,7 @@ function progEstado() {
   return { pr, ses, next: ses[idx], idx, hechas, semana, total };
 }
 const progIdx = s => s <= 8 ? s - 1 : 4 + ((s - 9) % 4);
-const progLinea = (r, s) => { const p = r?.progresion; return Array.isArray(p) && p.length ? p[Math.min(progIdx(s), p.length - 1)] : ''; };
+const progLinea = (r, s) => { const p = r?.progresion; return Array.isArray(p) && p.length ? (p.length >= s ? p[s - 1] : p[Math.min(progIdx(s), p.length - 1)]) : ''; };
 // S.ses = {f, h, id}: sesión de otro día abierta desde la Agenda · S.rutSel: rutina del programa elegida a mano
 function rutinaDeHoy() {
   const t = today(); const pe = progEstado();
