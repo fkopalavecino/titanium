@@ -976,7 +976,8 @@ function pintarRest() { document.querySelectorAll('[data-rest-k]').forEach(el =>
 function vivoInfo(f, hora, code, rut, r) {
   if (!rut) return null;
   const llenos = x => setsOf(x).filter(z => z.kg != null || z.r != null || z.t != null); const cur = r.ej || []; const hechas = cur.reduce((n, x) => n + llenos(x).length, 0);
-  if (!hechas && r.rpe == null) return null;
+  const pa = (S.paso || {})[f + '|' + hora + '|' + code];
+  if (!hechas && r.rpe == null && !pa) return null;
   const ejs = ejsDe(rut); const plan = ejs.reduce((n, x) => n + nSerieD(x.d), 0); const orden = ejs.map(x => x.n);
   const ult = [...cur].filter(x => llenos(x).length).sort((a, b) => orden.indexOf(b.n) - orden.indexOf(a.n))[0]; const ls = ult ? llenos(ult).slice(-1)[0] : null;
   const prev = cargasDe(code).filter(c => c.f < f); const al = [];
@@ -984,7 +985,10 @@ function vivoInfo(f, hora, code, rut, r) {
   cur.forEach(x => { const pv = prev.find(c => c.n === x.n); if (pv && pv.kg > 0 && x.kg > pv.kg * 1.15) al.push(`${ejCorto(x.n)} +${Math.round((x.kg / pv.kg - 1) * 100)}%`); });
   const terminado = r.rpe != null; const vivo = f === today() && !terminado;
   const txt = terminado ? `<span class="ok-t">✓ Terminó</span> · ${hechas}${plan ? '/' + plan : ''} series · RPE ${esc(r.rpe)}`
-    : `${vivo ? '<span class="dot" aria-hidden="true"></span><b>En vivo</b> · ' : ''}${hechas}${plan ? '/' + plan : ''} series${ult ? ' · <b class="sc-ej">' + esc(ejCorto(ult.n)) + (ls ? ' ' + esc(fmtSetC(ls)) : '') + '</b>' : ''}`;
+    : (() => { const actN = pa ? pa.ej : ult ? ult.n : ''; const act = actN ? cur.find(x => x.n === actN) : null;
+        const ss = act ? llenos(act).map(fmtSetC) : []; const aps = act ? (act.ap || []).filter(z => z && (z.kg != null || z.r != null)).map(fmtSetC) : [];
+        const ahora = actN ? `<b class="sc-ej">${esc(pa && /^Bloque /.test(actN) ? actN : ejCorto(actN))}</b>${aps.length || ss.length ? ': ' + (aps.length ? `<span class="muted">aprox ${aps.map(esc).join(' · ')} →</span> ` : '') + `<b class="sc-ej">${ss.map(esc).join(' · ') || '—'}</b>` : pa ? ' <span class="muted">· empezando</span>' : ''}` : '';
+        return `${vivo ? '<span class="dot" aria-hidden="true"></span><b>En vivo</b> · ' : ''}${hechas}${plan ? '/' + plan : ''} series${pa && pa.n ? ` · paso ${pa.k}/${pa.n}` : ''}${ahora ? '<br>' + ahora : ''}`; })();
   return {txt, al};
 }
 const valE = x => x.kg != null ? x.kg : x.t != null ? x.t : null;
@@ -2428,7 +2432,8 @@ route();
     cargarConf(); sbc.channel('tl-conf').on('postgres_changes', { event: '*', schema: 'public', table: 'confirmaciones' }, cargarConf).subscribe();
     // reloj de descanso en vivo de cada alumno (lo envía su app; no se guarda)
     S.rest = {}; sbc.channel('tl-vivo').on('broadcast', { event: 'rest' }, ({ payload: p }) => { if (!p || !p.a) return;
-      const k = p.f + '|' + p.h + '|' + p.a; if (p.rem > 0) S.rest[k] = { fin: Date.now() + p.rem * 1000, ej: p.ej || '' }; else delete S.rest[k]; pintarRest(); }).subscribe();
+      const k = p.f + '|' + p.h + '|' + p.a; if (p.rem > 0) S.rest[k] = { fin: Date.now() + p.rem * 1000, ej: p.ej || '' }; else delete S.rest[k]; pintarRest(); })
+      .on('broadcast', { event: 'paso' }, ({ payload: p }) => { if (!p || !p.a) return; S.paso = S.paso || {}; S.paso[p.f + '|' + p.h + '|' + p.a] = { ej: p.ej || '', k: p.k, n: p.n }; schedule(); }).subscribe();
     setInterval(pintarRest, 500); }
   db.doc('config/general').onSnapshot(d => { S.cfg = d.exists ? clone(d.data()) : null; S.loaded.cfg = true; schedule(); maybeMigrateLib(); }, fail);
 })();

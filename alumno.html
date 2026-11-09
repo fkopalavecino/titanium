@@ -772,6 +772,9 @@ let REST = null, VIVO = null;
 // el panel del profe ve en la tarjeta del alumno el reloj de descanso (sin guardar nada en la base)
 const vivoCh = () => { if (!VIVO) { VIVO = sb.channel('tl-vivo', { config: { broadcast: { self: false } } }); VIVO.subscribe(); } return VIVO; };
 const avisarDescanso = (rem, ej) => { try { const rd = rutinaDeHoy(); vivoCh().send({ type: 'broadcast', event: 'rest', payload: { a: codigo, f: rd.fecha || today(), h: rd.hora || '', rem: Math.max(0, Math.round(rem)), ej: ej || '' } }); } catch (_) {} };
+let PASOTX = '';
+const avisarPaso = (ej, k, n) => { try { const rd = rutinaDeHoy(); const tx = [rd.fecha, rd.hora, ej, k].join('|'); if (tx === PASOTX) return; PASOTX = tx;
+  vivoCh().send({ type: 'broadcast', event: 'paso', payload: { a: codigo, f: rd.fecha || today(), h: rd.hora || '', ej, k, n } }); } catch (_) {} };
 let RESTEJ = '';
 function iniciarDescanso(seg, ej) { finDescanso(true); RESTEJ = ej || ''; const el = document.createElement('div'); el.id = 'rest'; let fin = Date.now() + seg * 1000; beep(660, 60); avisarDescanso(seg, RESTEJ);
   const pintar = () => { const q = (fin - Date.now()) / 1000;
@@ -1029,6 +1032,7 @@ V.rutina = () => {
   const pasos = []; bloques.forEach((b, bi) => { const inf = info(b); if (inf.isB) (b.ejercicios || []).forEach((e, ei) => pasos.push({ t: 'ej', b, bi, e, ei, inf })); else if ((b.ejercicios || []).length) pasos.push({ t: 'circ', b, bi, inf }); });
   if (S.foco != null && !rd.futuro && pasos.length) {
     const k = Math.max(0, Math.min(S.foco, pasos.length)); const fin = k === pasos.length; const st = pasos[k];
+    if (!rd.otroDia && rd.hora !== 'libre') queueMicrotask(() => avisarPaso(fin ? '' : st.t === 'ej' ? st.e.nombre : 'Bloque ' + st.inf.letra + ' · ' + st.inf.nomB, fin ? pasos.length : k + 1, pasos.length));
     const head = `<div class="foco-top"><button class="chip" data-focox="1">‹ Ver todo</button>${asHTML()}<b class="small">${fin ? 'Final' : (k + 1) + ' / ' + pasos.length}</b></div>
     <div class="bar foco-bar"><i style="width:${Math.round(k / pasos.length * 100)}%"></i></div>`;
     const nav = `<div class="grid2"><button class="btn" data-fnav="-1" ${k === 0 ? 'disabled' : ''}>‹ Anterior</button><button class="btn pri" data-fnav="1">${k === pasos.length - 1 ? 'Terminar ›' : 'Siguiente ›'}</button></div>`;
