@@ -35,7 +35,7 @@
       comp.threshold.value = -14; comp.knee.value = 6; comp.ratio.value = 10; comp.attack.value = 0.002; comp.release.value = 0.15;
       OUT = AC.createGain(); OUT.connect(comp); comp.connect(AC.destination);
     }
-    if (AC.state === 'suspended') AC.resume();
+    if (AC.state !== 'running') { try { const pr = AC.resume(); pr && pr.catch && pr.catch(() => {}); } catch (_) {} }
     OUT.gain.value = Math.pow(Math.max(0, Math.min(100, cfg.vol)) / 100, 1.5) * 2.4; // 100% ≈ casi 10 veces lo de antes
     return AC;
   }
@@ -259,5 +259,14 @@
   }
   function cerrarPanel() { if (REC) detener(); document.getElementById('sndp')?.remove(); }
 
-  window.SND = { play, tone, unlock, abrirPanel, cerrarPanel, probar, get cfg() { return Object.assign({}, cfg); } };
+  /* al bloquear el teléfono (o cambiar de app) el iPhone interrumpe el audio y a veces no lo devuelve:
+     al volver se reanuda y, si no revive, se crea un motor de audio nuevo; un toque en la pantalla lo termina de activar */
+  function revivir(nuevo) { if (!AC) return;
+    if (nuevo || AC.state === 'closed') { try { AC.close(); } catch (_) {} AC = null; OUT = null; Object.keys(DEC).forEach(k => delete DEC[k]); ctx(); return; }
+    if (AC.state !== 'running') { try { const pr = AC.resume(); pr && pr.catch && pr.catch(() => {}); } catch (_) {} } }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') revivir(); });
+  window.addEventListener('pageshow', () => revivir());
+  ['pointerdown', 'touchend', 'keydown'].forEach(e => document.addEventListener(e, () => { if (AC && AC.state !== 'running') { revivir(); setTimeout(() => { if (AC && AC.state !== 'running') revivir(true); if (AC) unlock(); }, 250); } }, { passive: true, capture: true }));
+  const activo = () => !AC || AC.state === 'running';
+  window.SND = { play, tone, unlock, activo, abrirPanel, cerrarPanel, probar, get cfg() { return Object.assign({}, cfg); } };
 })();

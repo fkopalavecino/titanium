@@ -172,6 +172,7 @@ details.ses summary::-webkit-details-marker{display:none}
 #tmr .tbig{font:800 min(34vw,150px)/1 'Barlow Condensed',Barlow,sans-serif;font-variant-numeric:tabular-nums}
 #tmr .r .tbig{color:#6fd39a}
 #tmr .tsub{font-size:20px;font-weight:700;min-height:26px}
+#tmr .tmute{background:#3a1d22;color:#ffb3bc;border-radius:12px;padding:10px;font-weight:700;font-size:16px}
 #tmr .tronda{font:800 30px/1 'Barlow Condensed',Barlow,sans-serif;letter-spacing:.04em}#tmr .tronda b{font-size:44px;color:#ff5a6a}#tmr .r .tronda b{color:#6fd39a}
 #tmr .tbar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}#tmr .tbar i{display:block;height:100%;background:var(--red)}
 #tmr .tbtns{display:grid;grid-auto-flow:column;gap:10px}
@@ -879,7 +880,7 @@ function abrirTimer(b, o = {}) { cerrarTimer(); const c = detectarTimer(b); if (
     else { if (T && e >= T) return terminar(); if (st.last === -1) { st.last = 0; snd('inicio'); } else if (T && T - e <= 3.05 && Math.ceil(T - e) !== st.lb) { st.lb = Math.ceil(T - e); snd('cuenta', st.lb); } big = mmss(Math.floor(e)); fase = T ? `Tope ${mmss(T)}` : 'Cronómetro'; cls = 'w'; sub = c.vueltas || st.vuelta ? `Vuelta ${st.vuelta}${c.vueltas ? ' de ' + c.vueltas : ''}` : ''; }
     avisarTmr({ n: c.nombre, fase: (st.fase === 'pausa' ? '⏸ ' : '') + fase, big, sub, ronda });
     el.innerHTML = `<div class="tin ${cls}"><div class="trow"><button data-tsnd="1" aria-label="Sonidos y volumen">🔊</button><b class="tname">${esc(c.nombre)}</b><button data-tx="1" aria-label="Cerrar">✕</button></div>
-      ${ronda ? `<div class="tronda">RONDA <b>${ronda.split('/')[0]}</b> / ${ronda.split('/')[1]}</div>` : ''}<div class="tfase">${esc(fase)}</div><div class="tbig" aria-live="off">${big}</div><div class="tsub">${esc(sub)}</div>
+      ${st.fase === 'run' && window.SND && SND.activo && !SND.activo() ? '<div class="tmute">🔇 Toca la pantalla para reactivar el sonido</div>' : ''}${ronda ? `<div class="tronda">RONDA <b>${ronda.split('/')[0]}</b> / ${ronda.split('/')[1]}</div>` : ''}<div class="tfase">${esc(fase)}</div><div class="tbig" aria-live="off">${big}</div><div class="tsub">${esc(sub)}</div>
       <div class="tbar"><i style="width:${T ? Math.min(100, e / T * 100) : 0}%"></i></div>
       <div class="tbtns">${c.modo === 'crono' ? '<button class="btn" data-tv="1">+1 vuelta</button>' : ''}<button class="btn" data-tp="1">${st.fase === 'pausa' ? '▶ Seguir' : '⏸ Pausa'}</button><button class="btn pri" data-tf="1">${c.modo === 'crono' ? '■ Terminé' : '■ Terminar'}</button></div></div>`; };
   const auto = x => !String(x || '').trim() || /rondas?\b|^\d{1,2}:\d\d(\s·.*)?$/i.test(String(x).trim());
@@ -988,7 +989,7 @@ async function guardarYa() { clearTimeout(AS); if (!ASpend) return; if (ASvuelo)
 let WL = null;
 async function wakeOn() { try { if (!WL && navigator.wakeLock && document.visibilityState === 'visible') { WL = await navigator.wakeLock.request('screen'); WL.addEventListener('release', () => { WL = null; }); } } catch (_) {} }
 function wakeOff() { try { WL && WL.release(); } catch (_) {} WL = null; }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { if (ASpend) guardarYa(); } else if (S.v === 'rutina' && document.querySelector('.ej,#guardar')) wakeOn(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { if (ASpend) guardarYa(); } else if (document.getElementById('tmr') || (S.v === 'rutina' && document.querySelector('.ej,#guardar'))) wakeOn(); });
 window.addEventListener('pagehide', () => { if (ASpend) guardarYa(); });
 
 /* ---------- tour de la app: se ilumina una parte a la vez con una tarjeta que explica ---------- */
