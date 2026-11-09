@@ -775,7 +775,7 @@ const avisarDescanso = (rem, ej) => { try { const rd = rutinaDeHoy(); vivoCh().s
 let RESTEJ = '';
 function iniciarDescanso(seg, ej) { finDescanso(true); RESTEJ = ej || ''; const el = document.createElement('div'); el.id = 'rest'; let fin = Date.now() + seg * 1000; beep(660, 60); avisarDescanso(seg, RESTEJ);
   const pintar = () => { const q = (fin - Date.now()) / 1000;
-    if (q <= 0) { el.classList.add('go'); el.innerHTML = '<span>💪 ¡Siguiente serie!</span><button data-rx="1" aria-label="Cerrar">✕</button>'; if (!el.dataset.b) { el.dataset.b = 1; snd('inicio'); setTimeout(finDescanso, 4000); } return; }
+    if (q <= 0) { el.classList.add('go'); el.innerHTML = '<span>💪 ¡Siguiente serie!</span><button data-rx="1" aria-label="Cerrar">✕</button>'; if (!el.dataset.b) { el.dataset.b = 1; snd('inicio'); setTimeout(() => { if (document.getElementById('rest') === el) finDescanso(); }, 4000); } return; }
     if (q <= 3.05 && q > 0 && Math.ceil(q) !== Number(el.dataset.l)) { el.dataset.l = Math.ceil(q); snd('cuenta', el.dataset.l); }
     el.innerHTML = `<span>⏱ Descanso <b>${mmss(Math.ceil(q))}</b></span><button data-rm="-15" aria-label="Quitar 15 segundos">−15</button><button data-rm="15" aria-label="Sumar 15 segundos">+15</button><button data-rx="1" aria-label="Saltar descanso">✕</button>`; };
   el.addEventListener('click', ev => { const b = ev.target.closest('button'); if (!b) return; ev.stopPropagation(); if (b.dataset.rx) return finDescanso(); fin += Number(b.dataset.rm) * 1000; pintar(); avisarDescanso((fin - Date.now()) / 1000, RESTEJ); });
