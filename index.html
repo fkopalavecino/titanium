@@ -1136,7 +1136,7 @@ function rutinaCompacta(rut, key, r) {
   const actN = pa?.ej || (ty && Date.now() - ty.at < 60000 ? ty.n : '') || [...(r.ej || [])].map(x => x.n).pop() || '';
   let cur = bl.findIndex(b => (b.ejercicios || []).some(e => e.nombre === actN) || b.titulo === actN); if (cur < 0) cur = 0;
   const ab = (S.ui.rutBlq || {})[key];
-  return `<div class="rut rut-c">${bl.map((b, i) => { const open = ab ? ab.includes(i) : i === cur;
+  return `<div class="rut rut-c">${bl.map((b, i) => { const open = ab ? ab.includes(i) : false;
     return `<div class="rb${open ? ' on' : ''}"><button type="button" class="rb-h" data-act="rut-blq" data-k="${esc(key)}" data-i="${i}" aria-expanded="${open}"><b>${esc(b.titulo)}</b><span class="muted small">${(b.ejercicios || []).length} ej.${i === cur && actN ? ' · va aquí' : ''}</span><span class="chev" aria-hidden="true">›</span></button>${open ? `${b.nota ? `<div class="d" style="margin:2px 0 6px">${esc(b.nota)}</div>` : ''}<ol>${(b.ejercicios||[]).map(e => `<li><button type="button" class="ej-link" data-act="ver-tec" data-n="${esc(e.nombre)}" title="Ver cómo se hace">${esc(e.nombre)}</button> <span class="d">· ${esc(e.dosis)}</span></li>`).join('')}</ol>` : ''}</div>`; }).join('')}</div>`;
 }
 function rutinaBody(r) {
