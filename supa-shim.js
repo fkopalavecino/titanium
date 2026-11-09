@@ -596,6 +596,20 @@
   }
   new MutationObserver(() => document.querySelectorAll('[data-tl-acceso]:not([data-done])').forEach(pintarAcceso)).observe(document.documentElement, { childList: true, subtree: true });
 
+  /* ---------- agenda libre (alumnos por turnos): sin horario fijo, agendan ellos mismos sus clases del plan ---------- */
+  async function pintarFlex(el) {
+    const code = el.dataset.tlFlex; el.dataset.done = '1';
+    const { data: a } = await sb.from('alumnos').select('flex,bloques').eq('codigo', code).maybeSingle(); if (!a) return;
+    const on = !!a.flex;
+    el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;border:1px solid ${on ? '#f2b44f' : 'var(--line,#2f2a2e)'};border-radius:10px;font-size:14px"><span>${on ? '📅 <b>Agenda libre</b> · agenda sus clases desde su app' : '🗓 Horario fijo'}</span><button type="button" data-tl-fx="${on ? 'off' : 'on'}" style="min-height:36px;padding:0 12px;border-radius:8px;border:1px solid ${on ? 'var(--line,#2f2a2e)' : '#f2b44f'};background:transparent;color:${on ? 'inherit' : '#f2b44f'};font:600 14px Barlow,sans-serif;cursor:pointer">${on ? 'Volver a horario fijo' : 'Activar agenda libre (por turnos)'}</button></div>`;
+    el.querySelector('[data-tl-fx]').onclick = async ev => { const btn = ev.currentTarget, v = btn.dataset.tlFx === 'on';
+      if (v && !confirm('¿Activar agenda libre?\n\nSe quita su horario fijo y ella agenda sus clases desde la app hasta completar las clases de su plan. Las clases ya agendadas o registradas se mantienen.')) return;
+      if (!v && !confirm('¿Volver a horario fijo? Después asígnale sus bloques en la ficha. Las clases que ya agendó se mantienen.')) return;
+      btn.disabled = true; const { error } = await sb.from('alumnos').update(v ? { flex: true, bloques: [] } : { flex: false }).eq('codigo', code);
+      if (error) { alert('No se pudo cambiar: ' + error.message); btn.disabled = false; return; } pintarFlex(el); };
+  }
+  new MutationObserver(() => document.querySelectorAll('[data-tl-flex]:not([data-done])').forEach(pintarFlex)).observe(document.documentElement, { childList: true, subtree: true });
+
   /* ---------- respaldo: descarga todos los datos en un archivo ---------- */
   const BK = 'tl-respaldo';
   const bkDias = () => { try { const t = Number(localStorage.getItem(BK)); return t ? (Date.now() - t) / 864e5 : Infinity; } catch (e) { return Infinity; } };

@@ -187,7 +187,7 @@ tr.click:hover td{background:var(--sunk)}
 .sc-top .grow{flex:1;min-width:0;display:grid;gap:2px}
 .sc-l1{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sc-l1 .st-name{font-size:16px}
 .sc-l2{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sc-ej{color:var(--fg);font-weight:700}.sc-rec{font-size:13px;padding:2px 8px;background:var(--info-soft,#16283a);color:var(--info,#7cc0ff);border-color:transparent;font-weight:700}.sc-circ{font-size:13px}.sc-dosis{font-size:12px;color:var(--muted)}.sc-edit{color:var(--red,#ea203a);font-weight:600;white-space:nowrap}.sc-blq{color:var(--red,#ea203a);font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.02em}.sc-live{display:grid;gap:4px;cursor:pointer;margin-top:-4px}.sc-live:empty{display:none}.sc-rest{display:inline-flex;gap:6px;align-items:center;font-size:14px;padding:4px 10px;border-radius:999px;background:var(--warn-soft);color:var(--warn);font-weight:600}.sc-rest.go{background:var(--ok-soft);color:var(--ok)}.sc-tmr{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:14px;padding:4px 10px;border-radius:10px;background:var(--crit-soft);color:var(--fg);font-weight:600}.sc-tmr b{color:var(--crit);font-size:16px}.sc-tmr.fin{background:var(--ok-soft);color:var(--ok)}[data-tmr-k]:empty,[data-rest-k]:empty{display:none}.sc-l3{font-size:14px;font-variant-numeric:tabular-nums;line-height:1.35}
+.sc-ej{color:var(--fg);font-weight:700}.sc-flex{font-size:13px;padding:2px 8px;background:var(--warn-soft);color:var(--warn);border-color:transparent;font-weight:700}.sc-rec{font-size:13px;padding:2px 8px;background:var(--info-soft,#16283a);color:var(--info,#7cc0ff);border-color:transparent;font-weight:700}.sc-circ{font-size:13px}.sc-dosis{font-size:12px;color:var(--muted)}.sc-edit{color:var(--red,#ea203a);font-weight:600;white-space:nowrap}.sc-blq{color:var(--red,#ea203a);font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.02em}.sc-live{display:grid;gap:4px;cursor:pointer;margin-top:-4px}.sc-live:empty{display:none}.sc-rest{display:inline-flex;gap:6px;align-items:center;font-size:14px;padding:4px 10px;border-radius:999px;background:var(--warn-soft);color:var(--warn);font-weight:600}.sc-rest.go{background:var(--ok-soft);color:var(--ok)}.sc-tmr{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:14px;padding:4px 10px;border-radius:10px;background:var(--crit-soft);color:var(--fg);font-weight:600}.sc-tmr b{color:var(--crit);font-size:16px}.sc-tmr.fin{background:var(--ok-soft);color:var(--ok)}[data-tmr-k]:empty,[data-rest-k]:empty{display:none}.sc-l3{font-size:14px;font-variant-numeric:tabular-nums;line-height:1.35}
 .sc-l3 .dot{display:inline-block;vertical-align:middle;margin-right:6px;width:7px;height:7px;border-radius:50%;background:var(--red);animation:livepulse 1.6s ease-in-out infinite}
 .sc-al{font-size:12px;color:var(--crit);font-weight:600}
 .sc-ic{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}.sc-ic.crit{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 40%,transparent)}
@@ -844,7 +844,7 @@ VIEWS.inicio = () => {
     ${(() => { // clases reagendadas y recuperaciones que vienen (hoy en adelante)
       const items = []; const hasta = addDays(t, 21);
       for (const [f, d] of S.dias) { if (f < t || f > hasta) continue; for (const h in d.bloques || {}) for (const code in d.bloques[h]) { const r = d.bloques[h][code];
-        if (!r || r.quitado || !r.reagDe || r.asis) continue; if (f === t && hmToMin(h) + 60 < now) continue;
+        if (!r || r.quitado || !r.reagDe || r.reagDe.flex || r.asis) continue; if (f === t && hmToMin(h) + 60 < now) continue;
         const rd = r.reagDe; items.push({ f, h, code, tipo: rd.recup ? 'rec' : 'mov', de: !rd.recup && rd.f ? rd : null }); } }
       items.sort((a, b) => (a.f + a.h).localeCompare(b.f + b.h));
       return `<section class="card pad">
@@ -937,7 +937,7 @@ function studentCard(f, hora, code, ruts) {
   // íconos discretos: solo lo que el profe necesita ver de un vistazo
   const debe = ['vencido','hoy'].includes(ve.k) || ['pendiente','parcial'].includes(pe.k);
   const les = lesionCorta(a); const cu = cumple(a, f);
-  const marcas = [r.reagDe && r.reagDe.recup ? '<span class="sc-ic sc-rec" title="Viene a recuperar una clase">🔁 Recuperación</span>' : r.extra ? '<span title="Agendado solo para esta fecha">↻</span>' : '',
+  const marcas = [r.reagDe && r.reagDe.flex ? '<span class="sc-ic sc-flex" title="Alumna de agenda libre: agendó esta clase desde su app">📅 Agenda libre</span>' : r.reagDe && r.reagDe.recup ? '<span class="sc-ic sc-rec" title="Viene a recuperar una clase">🔁 Recuperación</span>' : r.extra ? '<span title="Agendado solo para esta fecha">↻</span>' : '',
     les.length ? `<span class="sc-ic" title="Lesiones: ${esc(les.join(', '))}">⚠ ${esc(les[0])}${les.length > 1 ? ' +' + (les.length - 1) : ''}</span>` : '',
     a.ingreso?.parq?.length ? '<span class="sc-ic crit" title="Respondió sí en el PAR-Q">PAR-Q</span>' : '',
     debe ? '<span class="sc-ic crit" title="Tiene un pago pendiente">$ debe</span>' : '',
@@ -1517,6 +1517,7 @@ function fichaAlumno(code) {
       const cu = cumple(a, today()); if (cu && cu.dias <= 14) al.push(`<span class="pill warn">🎂 ${cu.dias === 0 ? 'Cumple hoy' : 'Cumple en ' + cu.dias + ' d'}</span>`);
       return al.length ? `<div class="chips">${al.join('')}</div>` : ''; })()}
     <div data-tl-acceso="${esc(code)}"></div>
+    <div data-tl-flex="${esc(code)}"></div>
     <div class="card pad" style="display:grid;gap:6px;box-shadow:none;background:var(--sunk)">
       <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>Plan actual</b><div class="chips">${pill(vigencia(a,p))}${p ? pill(pagoEstado(p)) : ''}</div></div>
       ${p ? `<div class="small num">${clp(p.monto)} · abonado ${clp(abonado(p))} · ${fmtDY(p.inicio)} → ${fmtDY(p.fin)} · ${p.clases || '—'} clases</div>` : '<div class="small muted">Sin plan registrado.</div>'}
