@@ -841,6 +841,21 @@ VIEWS.inicio = () => {
       <div><b class="small">De qué trata</b><p class="small" style="margin:2px 0 0">${esc(fr.t)}</p></div>
       <div style="background:var(--red-soft);border-radius:8px;padding:10px 12px"><b class="small" style="color:var(--red)">Cómo se relaciona contigo</b><p class="small" style="margin:2px 0 0">${esc(fr.r)}</p></div>
     </section>
+    ${(() => { // clases reagendadas y recuperaciones que vienen (hoy en adelante)
+      const items = []; const hasta = addDays(t, 21);
+      for (const [f, d] of S.dias) { if (f < t || f > hasta) continue; for (const h in d.bloques || {}) for (const code in d.bloques[h]) { const r = d.bloques[h][code];
+        if (!r || r.quitado || !r.reagDe || r.asis) continue; if (f === t && hmToMin(h) + 60 < now) continue;
+        const rd = r.reagDe; items.push({ f, h, code, tipo: rd.recup ? 'rec' : 'mov', de: !rd.recup && rd.f ? rd : null }); } }
+      items.sort((a, b) => (a.f + a.h).localeCompare(b.f + b.h));
+      return `<section class="card pad">
+      <h2 style="font-size:22px;margin-bottom:2px">Clases reagendadas</h2>
+      <div class="small muted" style="margin-bottom:6px">Recuperaciones y clases movidas de las próximas 3 semanas</div>
+      ${items.length ? `<div class="list">${items.map(x => `<a class="li" href="#clase" data-act="abrir-bloque" data-fecha="${esc(x.f)}" data-hora="${esc(x.h)}" style="text-decoration:none;color:inherit">
+        <span class="num" style="min-width:92px"><b>${x.f === t ? 'Hoy' : x.f === addDays(t, 1) ? 'Mañana' : esc(DNAME[dayKey(x.f)].slice(0, 3) + ' ' + fmtD(x.f))}</b> ${esc(x.h)}</span>
+        <span class="grow"><b>${esc(nombre(x.code))}</b></span>
+        ${x.tipo === 'rec' ? '<span class="sc-ic sc-rec">🔁 Recuperación</span>' : `<span class="sc-ic">↻ Movida${x.de ? ' desde ' + esc(fmtD(x.de.f)) + ' ' + esc(x.de.h || '') : ''}</span>`}<span class="muted">›</span></a>`).join('')}</div>`
+        : '<div class="small muted">No hay clases reagendadas por ahora.</div>'}
+    </section>`; })()}
     <section class="card pad">
       <h2 style="font-size:22px;margin-bottom:6px">Lo que necesita tu atención</h2>
       <div class="list">
