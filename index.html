@@ -79,6 +79,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--red);outline:none}
 .search{width:220px;max-width:100%}
 label.f{display:grid;gap:5px;font-size:13px;font-weight:600;color:var(--muted)}
 label.f input,label.f select,label.f textarea{color:var(--fg);font-weight:400}
+.frow3{display:grid;grid-template-columns:minmax(0,1.2fr) 64px minmax(0,1.4fr);gap:8px;align-items:end}.frow3 textarea{min-height:0;resize:vertical}.res-vac{padding:6px 0 2px;line-height:1.35}.sc-prog{line-height:1.35}
 .frow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 
 /* surfaces */
@@ -940,8 +941,7 @@ function studentCard(f, hora, code, ruts) {
     <div class="seg" role="group" aria-label="Asistencia">${seg('presente', 'Presente')}${seg('ausente', 'Ausente')}${seg('aviso', 'Avisó', 'No vino pero te avisó: decides si le das la recuperación')}</div>
     ${det ? `<div class="sc-det"><div class="sc-c">
     <div class="st-row small"><button class="btn sm ghost" data-act="ficha" data-id="${esc(code)}">Ficha</button><button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button><button class="btn sm ghost" data-act="reag" data-k="${esc(key)}">↻ Reagendar</button>${r.extra ? `<button class="btn sm ghost" data-act="quitar-extra" data-k="${esc(key)}">Quitar del bloque</button>` : ''}${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}</div>
-    ${pg ? `<div class="small muted num">${esc(progTexto(pg))} · semana ${Math.min(pg.semana, pg.total)} de ${pg.total} · sesión ${pg.idx + 1} de ${pg.ses.length}${pg.terminado ? ' · programa terminado' : ''}${sug ? ` · <b style="color:var(--fg)">le toca ${esc(S.rutinas.get(sug)?.tipo || '')}</b>` : ''}</div>` : ''}
-    ${pg && rut && !pg.terminado && progLinea(rut, pg.semana) ? `<div class="small muted">📈 ${esc(progLinea(rut, pg.semana))}</div>` : ''}
+    ${pg ? `<div class="small muted num sc-prog" title="${esc(rut && !pg.terminado ? progLinea(rut, pg.semana) || '' : '')}">Sem ${Math.min(pg.semana, pg.total)}/${pg.total} · sesión ${pg.idx + 1}/${pg.ses.length}${pg.terminado ? ' · programa terminado' : ''}${sug ? ` · <b style="color:var(--fg)">le toca ${esc(S.rutinas.get(sug)?.tipo || '')}</b>` : ''}${rut && !pg.terminado && progLinea(rut, pg.semana) ? ` · 📈 ${esc(String(progLinea(rut, pg.semana)).replace(/^Semana \d+\s*·\s*/, ''))}` : ''}</div>` : ''}
     <div class="st-row">
       <select id="rut-${esc(key)}" data-act="rutina" data-k="${esc(key)}" aria-label="Rutina">
         <option value="">Sin rutina asignada</option>
@@ -953,11 +953,11 @@ function studentCard(f, hora, code, ruts) {
       <button class="btn sm ghost" data-act="editar-ses" data-k="${esc(key)}" data-r="${esc(rid)}">${r.sesion ? 'Ajustada ✎' : 'Editar sesión'}</button>` : ''}
     </div>
     ${rut && open ? rutinaBody(rut) : ''}
-    <div class="frow">
-      <label class="f">Resultado del bloque C<input type="text" id="carga-${esc(key)}" data-act="campo" data-field="carga" data-k="${esc(key)}" value="${esc(r.carga||'')}" placeholder="Ej: 5 rondas + 8 · 14:32"></label>
+    <div class="frow3">
+      <label class="f">Bloque C<input type="text" id="carga-${esc(key)}" data-act="campo" data-field="carga" data-k="${esc(key)}" value="${esc(r.carga||'')}" placeholder="5 rondas + 8 · 14:32"></label>
       <label class="f">RPE<input type="number" min="1" max="10" id="rpe-${esc(key)}" data-act="campo" data-field="rpe" data-k="${esc(key)}" value="${esc(r.rpe||'')}"></label>
+      <label class="f">Notas<textarea rows="1" id="nota-${esc(key)}" data-act="campo" data-field="notas" data-k="${esc(key)}" placeholder="Molestias, ajustes…">${esc(r.notas||'')}</textarea></label>
     </div>
-    <label class="f">Notas · molestias, ajustes y sensaciones<textarea rows="2" id="nota-${esc(key)}" data-act="campo" data-field="notas" data-k="${esc(key)}">${esc(r.notas||'')}</textarea></label>
     </div><div class="sc-c">${rut ? cargasHTML(f, hora, code, key, rut, r) : '<div class="small muted">Sin rutina asignada.</div>'}</div></div>` : ''}
   </article>`;
 }
@@ -1026,9 +1026,12 @@ function cargasHTML(f, hora, code, key, rut, r) {
   const hechos = ejs.filter(e => cur.some(x => x.n === e.n && setsOf(x).some(z => z.kg != null || z.r != null || z.t != null))).length;
   const open = !!S.ui.openCar[key];
   const btn = `<button class="btn sm ${open ? 'on-ok' : 'car'}" data-act="ver-car" data-k="${esc(key)}">${open ? '✓ Listo' : hechos ? '✎ Corregir series' : '✎ Anotar kg y reps'}</button>`;
-  if (!open) return `<div class="res">${ejs.map(e => { const c = cur.find(x => x.n === e.n); const ss = c ? setsOf(c).filter(z => z.kg != null || z.r != null || z.t != null) : []; const ap = (c?.ap || []).filter(z => z && (z.kg != null || z.r != null));
+  if (!open) { const conD = e => { const c = cur.find(x => x.n === e.n); return c && (setsOf(c).some(z => z.kg != null || z.r != null || z.t != null) || c.c || (c.ap || []).some(z => z && (z.kg != null || z.r != null))); };
+    const vac = ejs.filter(e => !conD(e));
+    return `<div class="res">${ejs.filter(conD).map(e => { const c = cur.find(x => x.n === e.n); const ss = c ? setsOf(c).filter(z => z.kg != null || z.r != null || z.t != null) : []; const ap = (c?.ap || []).filter(z => z && (z.kg != null || z.r != null));
       return `<div class="res-r${ss.length ? '' : ' vac'}"><span class="res-n">${esc(limpiarEj(e.n))}</span><span class="res-s num">${ap.length ? `<span class="muted">aprox ${ap.map(fmtSetC).map(esc).join(' · ')} →</span> ` : ''}${ss.length ? ss.map(fmtSetC).map(esc).join(' · ') : '—'}</span>${c?.c ? `<span class="res-c">💬 ${esc(c.c)}</span>` : ''}</div>`; }).join('')}
-    <div class="st-row"><span class="small muted grow">${hechos}/${ejs.length} ejercicios anotados</span>${btn}</div></div>`;
+    ${vac.length ? `<div class="res-vac small muted">Sin anotar: ${vac.map(e => esc(limpiarEj(e.n))).join(' · ')}</div>` : ''}
+    <div class="st-row"><span class="small muted grow">${hechos}/${ejs.length} ejercicios anotados</span>${btn}</div></div>`; }
   const last = {}, best = {}; cargasDe(code).forEach(x => { if (x.f + '|' + x.h < f + '|' + hora) { if (!last[x.n]) last[x.n] = x; if (x.kg != null && (!best[x.n] || x.kg > best[x.n].kg || (x.kg === best[x.n].kg && (x.r || 0) > (best[x.n].r || 0)))) best[x.n] = x; } });
   const nSer = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? m[1] : ''; };
   const kid = key.replace(/[^A-Za-z0-9]/g, '_');
@@ -2119,7 +2122,7 @@ document.addEventListener('click', e => {
     case 'ses-del': el.closest('.ses-row').remove(); break;
     case 'ses-up': { const row = el.closest('.ses-row'); if (row.previousElementSibling) row.parentNode.insertBefore(row, row.previousElementSibling); break; }
     case 'ses-reset': { const {f,h,code} = toggleOne(el.dataset.k); patchDia(f, h, code, {sesion: null}); closeModal(); toast('Sesión devuelta a la plantilla.'); break; }
-    case 'st-open': S.ui.stOpen = S.ui.stOpen || {}; S.ui.stOpen[el.dataset.k] = !S.ui.stOpen[el.dataset.k]; render(); break;
+    case 'st-open': { const k = el.dataset.k, was = !!(S.ui.stOpen || {})[k]; S.ui.stOpen = was ? {} : {[k]: true}; render(); if (!was) requestAnimationFrame(() => document.querySelector('.sc.open')?.scrollIntoView({block: 'nearest', behavior: 'smooth'})); break; }
     case 'ver-car': S.ui.openCar[el.dataset.k] = !S.ui.openCar[el.dataset.k]; render(); break;
     case 'ser-igual': setSerie(el.dataset.k, el.dataset.n, +el.dataset.i, {kg: el.dataset.kg === '' ? null : Number(el.dataset.kg), r: el.dataset.r === '' ? null : Number(el.dataset.r)}); break;
     case 'ser-add': S.ui.extraSer = S.ui.extraSer || {}; S.ui.extraSer[el.dataset.k + '|' + el.dataset.n] = +el.dataset.c + 1; render(); break;
