@@ -198,7 +198,7 @@ tr.click:hover td{background:var(--sunk)}
 .seg{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .seg-b{border:0;background:none;color:var(--muted);font:600 13px/1 inherit;padding:10px 4px;cursor:pointer;font-family:inherit}.seg-b+.seg-b{border-left:1px solid var(--line)}
 .seg-b.on.presente{background:var(--ok-soft);color:var(--ok)}.seg-b.on.ausente{background:var(--crit-soft);color:var(--crit)}.seg-b.on.aviso{background:var(--warn-soft);color:var(--warn)}
-.student{grid-template-columns:minmax(0,1fr)}.sc.open{grid-column:1/-1}
+.student{grid-template-columns:minmax(0,1fr)}.sc.open .sc-det{grid-template-columns:minmax(0,1fr);gap:10px}.sc-tabs{display:flex;gap:4px;flex-wrap:wrap}.sc-tab{border:1px solid var(--line);background:none;color:var(--muted);font:inherit;font-size:14px;font-weight:600;padding:7px 12px;border-radius:999px;cursor:pointer;min-height:36px}.sc-tab.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}.rut-c{display:grid;gap:4px}.rb{border:1px solid var(--line);border-radius:8px;padding:0 10px}.rb.on{padding-bottom:8px}.rb-h{display:flex;gap:8px;align-items:center;width:100%;border:0;background:none;color:inherit;font:inherit;padding:8px 0;text-align:left;cursor:pointer}.rb-h b{flex:1;font-size:14px}.rb.on .rb-h .chev{transform:rotate(90deg)}.rb ol{margin:0;padding-left:20px}
 .sc-det{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:14px;border-top:1px solid var(--line);padding-top:12px;align-items:start}.sc-c{display:grid;gap:10px;min-width:0}
 .res{display:grid;gap:2px;background:var(--sunk);border-radius:8px;padding:8px 12px}
 .res-r{display:grid;gap:1px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}.res-r:last-of-type{border-bottom:0}
@@ -956,8 +956,13 @@ function studentCard(f, hora, code, ruts) {
     </button>
     <div class="seg seg-sm" role="group" aria-label="Asistencia">${seg('presente', '✓')}${seg('ausente', '✗')}${seg('aviso', 'Avisó', 'No vino pero te avisó: decides si le das la recuperación')}</div></div>
     <div class="sc-live" data-act="st-edit" data-k="${esc(key)}">${(S.vivoCtx = S.vivoCtx || {})[key] = {f, hora, code, rut}, ''}${estado ? `<span class="sc-l3" data-vivo-k="${esc(key)}">${estado}</span>` : ''}<span data-rest-k="${esc(key)}">${restHTML(key)}</span><span data-tmr-k="${esc(key)}">${tmrHTML(key)}</span>${v && v.al.length ? `<span class="sc-al">⚠ ${v.al.map(esc).join(' · ')}</span>` : ''}</div>
-    ${det ? `<div class="sc-det"><div class="sc-c">
-    <div class="st-row small"><button class="btn sm ghost" data-act="ficha" data-id="${esc(code)}">Ficha</button><button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button><button class="btn sm ghost" data-act="reag" data-k="${esc(key)}">↻ Reagendar</button><button class="btn sm ghost crit-t" data-act="quitar-hoy" data-k="${esc(key)}">✕ Quitar de esta clase</button>${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}</div>
+    ${det ? (() => { const tab = (S.ui.stTab || {})[key] || 'series';
+      const tb = (id, txt) => `<button type="button" class="sc-tab${tab === id ? ' on' : ''}" data-act="st-tab" data-t="${id}" data-k="${esc(key)}" aria-pressed="${tab === id}">${txt}</button>`;
+      const avisoPago = (ve.k !== 'vigente' && ['vencido','hoy','pronto'].includes(ve.k)) || ['pendiente','parcial'].includes(pe.k);
+      const cierreN = (r.carga ? 1 : 0) + (r.rpe != null && r.rpe !== '' ? 1 : 0) + (r.notas ? 1 : 0);
+      let body = '';
+      if (tab === 'series') body = rut ? cargasHTML(f, hora, code, key, rut, r) : `<div class="small muted">Sin rutina asignada. Elígela en la pestaña Rutina.</div>`;
+      else if (tab === 'rutina') body = `
     ${pg ? `<div class="small muted num sc-prog" title="${esc(rut && !pg.terminado ? progLinea(rut, pg.semana) || '' : '')}">Sem ${Math.min(pg.semana, pg.total)}/${pg.total} · sesión ${pg.idx + 1}/${pg.ses.length}${pg.terminado ? ' · programa terminado' : ''}${sug ? ` · <b style="color:var(--fg)">le toca ${esc(S.rutinas.get(sug)?.tipo || '')}</b>` : ''}${rut && !pg.terminado && progLinea(rut, pg.semana) ? ` · 📈 ${esc(String(progLinea(rut, pg.semana)).replace(/^Semana \d+\s*·\s*/, ''))}` : ''}</div>` : ''}
     <div class="st-row">
       <select id="rut-${esc(key)}" data-act="rutina" data-k="${esc(key)}" aria-label="Rutina">
@@ -966,16 +971,17 @@ function studentCard(f, hora, code, ruts) {
           return g.map(grp => `<optgroup label="${esc(grp.fam)}">${grp.items.map(([id, x]) => `<option value="${esc(id)}" ${id === rid ? 'selected' : ''}>${x.tipo && x.tipo !== 'Sesión FKO' ? esc(x.tipo) + ' · ' : ''}${esc(x.nivel)}</option>`).join('')}</optgroup>`).join(''); })()}
       </select>
       ${rid ? `<button class="btn sm ${r.aprobada ? 'on-ok' : ''}" data-act="aprobar" data-k="${esc(key)}" ${sug ? `data-r="${esc(sug)}"` : ''}>${r.aprobada ? 'Aprobada ✓' : 'Aprobar'}</button>
-      <button class="btn sm ghost" data-act="ver-rut" data-k="${esc(key)}">${open ? 'Ocultar' : 'Ver rutina'}</button>
       <button class="btn sm ghost" data-act="editar-ses" data-k="${esc(key)}" data-r="${esc(rid)}">${r.sesion ? 'Ajustada ✎' : 'Editar sesión'}</button>` : ''}
     </div>
-    ${rut && open ? rutinaBody(rut) : ''}
+    ${rut ? rutinaCompacta(rut, key, r) : ''}`;
+      else if (tab === 'cierre') body = `
     <div class="frow3">
       <label class="f">Bloque C<input type="text" id="carga-${esc(key)}" data-act="campo" data-field="carga" data-k="${esc(key)}" value="${esc(r.carga||'')}" placeholder="5 rondas + 8 · 14:32"></label>
       <label class="f">RPE<input type="number" min="1" max="10" id="rpe-${esc(key)}" data-act="campo" data-field="rpe" data-k="${esc(key)}" value="${esc(r.rpe||'')}"></label>
       <label class="f">Notas<textarea rows="1" id="nota-${esc(key)}" data-act="campo" data-field="notas" data-k="${esc(key)}" placeholder="Molestias, ajustes…">${esc(r.notas||'')}</textarea></label>
-    </div>
-    </div><div class="sc-c">${rut ? cargasHTML(f, hora, code, key, rut, r) : '<div class="small muted">Sin rutina asignada.</div>'}</div></div>` : ''}
+    </div>`;
+      else body = `<div class="st-row small"><button class="btn sm ghost" data-act="ficha" data-id="${esc(code)}">Ficha</button><button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button><button class="btn sm ghost" data-act="reag" data-k="${esc(key)}">↻ Reagendar</button><button class="btn sm ghost crit-t" data-act="quitar-hoy" data-k="${esc(key)}">✕ Quitar de esta clase</button>${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}</div>`;
+      return `<div class="sc-det"><div class="sc-tabs" role="group" aria-label="Detalle">${tb('series', 'Series')}${tb('rutina', 'Rutina' + (rid && !r.aprobada ? ' •' : ''))}${tb('cierre', 'Cierre' + (cierreN ? ' ✓' : ''))}${tb('mas', 'Más' + (avisoPago ? ' $' : ''))}</div><div class="sc-c">${body}</div></div>`; })() : ''}
   </article>`;
 }
 // lo que el alumno va anotando desde su app durante la clase (se actualiza solo)
@@ -1122,6 +1128,15 @@ function setEj(k, n, patch) {
   for (const fld in patch) { if (patch[fld] == null || patch[fld] === '' || isNaN(patch[fld])) delete x[fld]; else x[fld] = Number(patch[fld]); }
   const ej2 = ej.filter(o => o.kg != null || o.r != null || o.c);
   patchDia(f, h, code, {ej: ej2.length ? ej2 : null});
+}
+function rutinaCompacta(rut, key, r) {
+  const bl = rut.bloques || []; const [f, h, code] = key.split('|');
+  const pa = (S.paso || {})[key]; const ty = (S.typ || {})[key];
+  const actN = pa?.ej || (ty && Date.now() - ty.at < 60000 ? ty.n : '') || [...(r.ej || [])].map(x => x.n).pop() || '';
+  let cur = bl.findIndex(b => (b.ejercicios || []).some(e => e.nombre === actN) || b.titulo === actN); if (cur < 0) cur = 0;
+  const ab = (S.ui.rutBlq || {})[key];
+  return `<div class="rut rut-c">${bl.map((b, i) => { const open = ab ? ab.includes(i) : i === cur;
+    return `<div class="rb${open ? ' on' : ''}"><button type="button" class="rb-h" data-act="rut-blq" data-k="${esc(key)}" data-i="${i}" aria-expanded="${open}"><b>${esc(b.titulo)}</b><span class="muted small">${(b.ejercicios || []).length} ej.${i === cur && actN ? ' · va aquí' : ''}</span><span class="chev" aria-hidden="true">›</span></button>${open ? `${b.nota ? `<div class="d" style="margin:2px 0 6px">${esc(b.nota)}</div>` : ''}<ol>${(b.ejercicios||[]).map(e => `<li><button type="button" class="ej-link" data-act="ver-tec" data-n="${esc(e.nombre)}" title="Ver cómo se hace">${esc(e.nombre)}</button> <span class="d">· ${esc(e.dosis)}</span></li>`).join('')}</ol>` : ''}</div>`; }).join('')}</div>`;
 }
 function rutinaBody(r) {
   return `<div class="rut">${(r.bloques||[]).map(b => `
@@ -2196,12 +2211,15 @@ document.addEventListener('click', e => {
     case 'aprobar': { const {f,h,code} = toggleOne(el.dataset.k); patchDia(f, h, code, Object.assign({aprobada: rec(f,h,code).aprobada ? null : true}, el.dataset.r ? {rutina: el.dataset.r} : {})); break; }
     case 'asig-prog': asignarProgModal(el.dataset.fam); break;
     case 'ver-rut': S.ui.openRut[el.dataset.k] = !S.ui.openRut[el.dataset.k]; render(); break;
+    case 'st-tab': { S.ui.stTab = Object.assign(S.ui.stTab || {}, {[el.dataset.k]: el.dataset.t}); render(); break; }
+    case 'rut-blq': { const k = el.dataset.k, i = Number(el.dataset.i); S.ui.rutBlq = S.ui.rutBlq || {}; const cur = S.ui.rutBlq[k] || [...document.querySelectorAll(`.rb-h[data-k="${CSS.escape(k)}"]`)].map((b, j) => b.getAttribute('aria-expanded') === 'true' ? j : -1).filter(j => j >= 0);
+      S.ui.rutBlq[k] = cur.includes(i) ? cur.filter(j => j !== i) : [...cur, i]; render(); break; }
     case 'editar-ses': sesionModal(el.dataset.k, el.dataset.r); break;
     case 'ses-add': { const l = el.closest('.ses-blq').querySelector('.ses-list'); l.insertAdjacentHTML('beforeend', sesRow()); l.lastElementChild.querySelector('input').focus(); break; }
     case 'ses-del': el.closest('.ses-row').remove(); break;
     case 'ses-up': { const row = el.closest('.ses-row'); if (row.previousElementSibling) row.parentNode.insertBefore(row, row.previousElementSibling); break; }
     case 'ses-reset': { const {f,h,code} = toggleOne(el.dataset.k); patchDia(f, h, code, {sesion: null}); closeModal(); toast('Sesión devuelta a la plantilla.'); break; }
-    case 'st-edit': { const k = el.dataset.k; S.ui.stOpen = {[k]: true}; S.ui.openCar[k] = true; render(); requestAnimationFrame(() => (document.querySelector('.sc.open .car-ed, .sc.open .res, .sc.open') || document.body).scrollIntoView({block: 'center', behavior: 'smooth'})); break; }
+    case 'st-edit': { const k = el.dataset.k; S.ui.stOpen = {[k]: true}; S.ui.openCar[k] = true; S.ui.stTab = Object.assign(S.ui.stTab || {}, {[k]: 'series'}); render(); requestAnimationFrame(() => (document.querySelector('.sc.open .car-ed, .sc.open .res, .sc.open') || document.body).scrollIntoView({block: 'center', behavior: 'smooth'})); break; }
     case 'st-open': { const k = el.dataset.k, was = !!(S.ui.stOpen || {})[k]; S.ui.stOpen = was ? {} : {[k]: true}; render(); if (!was) requestAnimationFrame(() => document.querySelector('.sc.open')?.scrollIntoView({block: 'nearest', behavior: 'smooth'})); break; }
     case 'ver-car': S.ui.openCar[el.dataset.k] = !S.ui.openCar[el.dataset.k]; render(); break;
     case 'ser-igual': setSerie(el.dataset.k, el.dataset.n, +el.dataset.i, {kg: el.dataset.kg === '' ? null : Number(el.dataset.kg), r: el.dataset.r === '' ? null : Number(el.dataset.r)}); break;
