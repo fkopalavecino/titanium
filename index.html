@@ -1000,11 +1000,7 @@ function vivoInfo(f, hora, code, rut, r) {
         const ss = usaTy ? ty.sets.filter(lleno).map(fmtSetC) : act ? llenos(act).map(fmtSetC) : []; const aps = (usaTy ? ty.ap : act ? (act.ap || []) : []).filter(z => z && (z.kg != null || z.r != null)).map(fmtSetC);
         const esBlq = /^Bloque /.test(actN); const bq = actN && !esBlq ? blqDe(rut, actN) : null;
         const ahora = actN ? `${bq ? `<span class="sc-blq">${esc(bq.txt)} ›</span> ` : ''}<b class="sc-ej">${esc(esBlq ? actN : ejCorto(actN))}</b>${bq ? `<span class="muted">${esc(bq.pos)}</span>` : ''}${aps.length || ss.length ? ': ' + (aps.length ? `<span class="muted">aprox ${aps.map(esc).join(' · ')} →</span> ` : '') + `<b class="sc-ej">${ss.map(esc).join(' · ') || '—'}</b>` : pa ? ' <span class="muted">· empezando</span>' : ''}` : '';
-        let dz = ''; if (actN && !esBlq) { const eR = ((rut && rut.bloques) || []).flatMap(b => b.ejercicios || []).find(e => e.nombre === actN);
-          const ant = cargasDe(code).find(c => c.n === actN && c.f + '|' + c.h < f + '|' + hora);
-          const partes = [eR?.dosis ? String(eR.dosis) : '', ant ? 'la vez anterior ' + fmtSetC(ant) : ''].filter(Boolean);
-          if (partes.length) dz = `<br><span class="sc-dosis">${partes.map(esc).join(' · ')} <span class="sc-edit">✎ toca para corregir</span></span>`; }
-        return `${vivo ? '<span class="dot" aria-hidden="true"></span><b>En vivo</b> · ' : ''}${hechas}${plan ? '/' + plan : ''} series${pa && pa.n ? ` · paso ${pa.k}/${pa.n}` : ''}${ahora ? '<br>' + ahora : ''}${dz}`; })();
+        return `${vivo ? '<span class="dot" aria-hidden="true"></span><b>En vivo</b> · ' : ''}${hechas}${plan ? '/' + plan : ''} series${pa && pa.n ? ` · paso ${pa.k}/${pa.n}` : ''}${ahora ? '<br>' + ahora : ''}`; })();
   return {txt, al};
 }
 const valE = x => x.kg != null ? x.kg : x.t != null ? x.t : null;
