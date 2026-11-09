@@ -1004,7 +1004,7 @@ function vivoInfo(f, hora, code, rut, r) {
   return {txt, al};
 }
 const valE = x => x.kg != null ? x.kg : x.t != null ? x.t : null;
-const fmtSetC = x => x.t != null ? x.t + ' s' : (x.kg != null ? String(x.kg).replace('.', ',') : '') + (x.r != null ? (x.kg != null ? '×' : '') + x.r + (x.kg != null ? '' : ' reps') : '');
+const fmtSetC = x => x.t != null ? x.t + ' s' : (x.kg != null ? String(x.kg).replace('.', ',') + ' kg' : '') + (x.r != null ? (x.kg != null ? ' × ' : '') + x.r + (x.kg != null ? '' : ' reps') : '');
 function ejsDe(rut) {
   const bs = rut?.bloques || [];
   let src = bs.filter(b => /bloque b/i.test(b.titulo || ''));
