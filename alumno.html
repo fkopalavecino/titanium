@@ -369,7 +369,7 @@ async function load() {
   if (pr?.familia) qs.push(sb.from('rutinas').select('id,data').eq('data->>familia', pr.familia));
   if (ids.size) qs.push(sb.from('rutinas').select('id,data').in('id', [...ids]));
   const rs = await Promise.all(qs);
-  rs.forEach(r => (r.data || []).forEach(x => S.rutinas.set(x.id, x.data)));
+  rs.forEach(r => (r.data || []).forEach(x => S.rutinas.set(x.id, mismasSeries(x.data))));
   S.fotos = (Array.isArray(S.a.fotos) ? S.a.fotos : []).filter(x => x && (x.frente || x.perfil || x.espalda)).sort((x, y) => x.f.localeCompare(y.f));
   S.medidas = Array.isArray(S.a.medidas) ? S.a.medidas : [];
   S.inbody = (Array.isArray(S.a.inbody) ? S.a.inbody : []).filter(x => x && (x.img || x.peso)).sort((x, y) => x.f.localeCompare(y.f));
@@ -433,6 +433,9 @@ function historial() { // {nombre: [{f, kg, r}]}
     for (const s of sets) if (conDato(s)) (h[e.n] = h[e.n] || []).push({ f: r.fecha, kg: s.kg, r: s.r, t: s.t }); }
   return h;
 }
+// "mismas series · 8" → "4 × 8": toma las series del ejercicio anterior para que salgan todas las filas
+function mismasSeries(r) { try { (r?.bloques || []).forEach(b => { let ult = null; (b.ejercicios || []).forEach(e => { const d = String(e.dosis || ''); const m = d.match(/^\s*(\d+(?:\s*[–-]\s*\d+)?)\s*[×x]/);
+  if (m) ult = m[1]; else if (ult && /^\s*mismas series/i.test(d)) e.dosis = d.replace(/^\s*mismas series\s*·?\s*/i, ult + ' × '); }); }); } catch (_) {} return r; }
 const nSer = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? Math.min(6, Number(m[1])) : 1; };
 const fmtSet = s => s ? (s.t != null ? s.t + ' s' : (s.kg != null ? String(s.kg).replace('.', ',') + ' kg' : '') + (s.r != null ? (s.kg != null ? ' × ' : '') + s.r + (s.kg != null ? '' : ' reps') : '')) : '';
 const conDato = z => !!z && (z.kg != null || z.r != null || z.t != null);
