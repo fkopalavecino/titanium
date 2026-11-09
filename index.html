@@ -187,7 +187,7 @@ tr.click:hover td{background:var(--sunk)}
 .sc-top .grow{flex:1;min-width:0;display:grid;gap:2px}
 .sc-l1{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sc-l1 .st-name{font-size:16px}
 .sc-l2{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sc-ej{color:var(--fg);font-weight:700}.sc-live{display:grid;gap:4px;cursor:pointer;margin-top:-4px}.sc-live:empty{display:none}.sc-rest{display:inline-flex;gap:6px;align-items:center;font-size:14px;padding:4px 10px;border-radius:999px;background:var(--warn-soft);color:var(--warn);font-weight:600}.sc-rest.go{background:var(--ok-soft);color:var(--ok)}.sc-tmr{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:14px;padding:4px 10px;border-radius:10px;background:var(--crit-soft);color:var(--fg);font-weight:600}.sc-tmr b{color:var(--crit);font-size:16px}.sc-tmr.fin{background:var(--ok-soft);color:var(--ok)}[data-tmr-k]:empty,[data-rest-k]:empty{display:none}.sc-l3{font-size:14px;font-variant-numeric:tabular-nums;line-height:1.35}
+.sc-ej{color:var(--fg);font-weight:700}.sc-blq{color:var(--red,#ea203a);font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.02em}.sc-live{display:grid;gap:4px;cursor:pointer;margin-top:-4px}.sc-live:empty{display:none}.sc-rest{display:inline-flex;gap:6px;align-items:center;font-size:14px;padding:4px 10px;border-radius:999px;background:var(--warn-soft);color:var(--warn);font-weight:600}.sc-rest.go{background:var(--ok-soft);color:var(--ok)}.sc-tmr{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:14px;padding:4px 10px;border-radius:10px;background:var(--crit-soft);color:var(--fg);font-weight:600}.sc-tmr b{color:var(--crit);font-size:16px}.sc-tmr.fin{background:var(--ok-soft);color:var(--ok)}[data-tmr-k]:empty,[data-rest-k]:empty{display:none}.sc-l3{font-size:14px;font-variant-numeric:tabular-nums;line-height:1.35}
 .sc-l3 .dot{display:inline-block;vertical-align:middle;margin-right:6px;width:7px;height:7px;border-radius:50%;background:var(--red);animation:livepulse 1.6s ease-in-out infinite}
 .sc-al{font-size:12px;color:var(--crit);font-weight:600}
 .sc-ic{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}.sc-ic.crit{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 40%,transparent)}
@@ -976,6 +976,10 @@ function tmrHTML(key) { const x = (S.tmr || {})[key]; if (!x) return ''; const v
   return `<span class="sc-tmr">⏱ ${esc(x.n)} · ${esc(x.fase || '')} · <b class="num">${esc(x.big || '')}</b>${x.sub ? ' · ' + esc(x.sub) : ''}</span>`; }
 function pintarRest() { document.querySelectorAll('[data-tmr-k]').forEach(el => { const h = tmrHTML(el.dataset.tmrK); if (el.innerHTML !== h) el.innerHTML = h; }); document.querySelectorAll('[data-rest-k]').forEach(el => { const h = restHTML(el.dataset.restK); if (el.innerHTML !== h) el.innerHTML = h; });
   Object.keys(S.rest || {}).forEach(k => { if (S.rest[k].fin < Date.now() - 4000) delete S.rest[k]; }); }
+// "Bloque B · Fuerza" + posición del ejercicio dentro del bloque, sacado de la rutina del alumno
+function blqDe(rut, n) { const bl = (rut && rut.bloques) || []; for (let bi = 0; bi < bl.length; bi++) { const ejs = bl[bi].ejercicios || []; const ei = ejs.findIndex(e => e.nombre === n); if (ei < 0) continue;
+    const m = String(bl[bi].titulo || '').match(/^bloque\s+([a-z])\s*[·:-]?\s*(.*)$/i); const letra = m ? m[1].toUpperCase() : String.fromCharCode(65 + bi); const nom = String((m ? m[2] : bl[bi].titulo) || '').split('·')[0].trim();
+    return { txt: 'Bloque ' + letra + (nom ? ' · ' + nom : ''), pos: ejs.length > 1 ? ` (${ei + 1}/${ejs.length})` : '' }; } return null; }
 function vivoInfo(f, hora, code, rut, r) {
   if (!rut) return null;
   const llenos = x => setsOf(x).filter(z => z.kg != null || z.r != null || z.t != null); const cur = r.ej || []; const hechas = cur.reduce((n, x) => n + llenos(x).length, 0);
@@ -990,7 +994,8 @@ function vivoInfo(f, hora, code, rut, r) {
   const txt = terminado ? `<span class="ok-t">✓ Terminó</span> · ${hechas}${plan ? '/' + plan : ''} series · RPE ${esc(r.rpe)}`
     : (() => { const actN = pa ? pa.ej : ult ? ult.n : ''; const act = actN ? cur.find(x => x.n === actN) : null;
         const ss = act ? llenos(act).map(fmtSetC) : []; const aps = act ? (act.ap || []).filter(z => z && (z.kg != null || z.r != null)).map(fmtSetC) : [];
-        const ahora = actN ? `<b class="sc-ej">${esc(pa && /^Bloque /.test(actN) ? actN : ejCorto(actN))}</b>${aps.length || ss.length ? ': ' + (aps.length ? `<span class="muted">aprox ${aps.map(esc).join(' · ')} →</span> ` : '') + `<b class="sc-ej">${ss.map(esc).join(' · ') || '—'}</b>` : pa ? ' <span class="muted">· empezando</span>' : ''}` : '';
+        const esBlq = /^Bloque /.test(actN); const bq = actN && !esBlq ? blqDe(rut, actN) : null;
+        const ahora = actN ? `${bq ? `<span class="sc-blq">${esc(bq.txt)} ›</span> ` : ''}<b class="sc-ej">${esc(esBlq ? actN : ejCorto(actN))}</b>${bq ? `<span class="muted">${esc(bq.pos)}</span>` : ''}${aps.length || ss.length ? ': ' + (aps.length ? `<span class="muted">aprox ${aps.map(esc).join(' · ')} →</span> ` : '') + `<b class="sc-ej">${ss.map(esc).join(' · ') || '—'}</b>` : pa ? ' <span class="muted">· empezando</span>' : ''}` : '';
         return `${vivo ? '<span class="dot" aria-hidden="true"></span><b>En vivo</b> · ' : ''}${hechas}${plan ? '/' + plan : ''} series${pa && pa.n ? ` · paso ${pa.k}/${pa.n}` : ''}${ahora ? '<br>' + ahora : ''}`; })();
   return {txt, al};
 }
