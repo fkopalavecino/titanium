@@ -804,7 +804,10 @@ function detectarTimer(b) { const t = (b.titulo || '') + ' ' + (b.nota || ''); c
   return { modo: 'crono', nombre: 'Cronómetro', tope: 0, vueltas: 0, ejs }; }
 const segTxt = x => x >= 60 ? mmss(x) : x + 's';
 const timerTxt = c => c.modo === 'emom' ? `${c.nombre} · ${c.n} × ${mmss(c.w)}` : c.modo === 'int' ? `${c.nombre} · ${c.n} × ${segTxt(c.w)} / ${segTxt(c.r)}` : c.modo === 'amrap' ? `${c.nombre} · ${Math.round(c.total / 60)} min` : `${c.nombre}${c.tope ? ' · tope ' + Math.round(c.tope / 60) + ' min' : ''}${c.vueltas ? ' · ' + c.vueltas + ' vueltas' : ''}`;
-let TM = null;
+let TM = null, TMTX = '', TMAT = 0;
+// el panel del profe ve el cronómetro del circuito del alumno (EMOM, AMRAP, por tiempo…), en vivo y sin guardar nada
+const avisarTmr = (x, forzar) => { try { const tx = JSON.stringify(x); if (!forzar && (tx === TMTX || Date.now() - TMAT < 900)) return; TMTX = tx; TMAT = Date.now(); const rd = rutinaDeHoy();
+  vivoCh().send({ type: 'broadcast', event: 'tmr', payload: Object.assign({ a: codigo, f: rd.fecha || today(), h: rd.hora || '' }, x) }); } catch (_) {} };
 function abrirTimer(b) { cerrarTimer(); const c = detectarTimer(b); const el = document.createElement('div'); el.id = 'tmr';
   const st = { c, fase: 'cfg', t0: 0, pausa: 0, pausedAt: 0, vuelta: 0, last: -1 }; let wake = null;
   const campos = () => c.modo === 'emom' ? [['n', 'Rondas', 1], ['w', 'Cada (seg)', 15]] : c.modo === 'int' ? [['n', 'Rondas', 1], ['w', 'Trabajo (seg)', 5], ['r', 'Descanso (seg)', 5]] : c.modo === 'amrap' ? [['total', 'Minutos', 60]] : [['tope', 'Tope (min, 0 = sin tope)', 60]];
@@ -828,6 +831,7 @@ function abrirTimer(b) { cerrarTimer(); const c = detectarTimer(b); const el = d
       const key = r * 2 + (trab ? 0 : 1); if (key !== st.last) { st.last = key; snd(trab ? 'inicio' : 'fin'); } else if (q <= 3.05 && Math.ceil(q) !== st.lb) { st.lb = Math.ceil(q); snd('cuenta', st.lb); } }
     else if (c.modo === 'amrap') { const q = T - e; if (q <= 0) return terminar(); big = mmss(Math.ceil(q)); fase = 'Tiempo restante'; cls = 'w'; if (st.last === -1) { st.last = 0; snd('inicio'); } else if (q <= 3.05 && Math.ceil(q) !== st.lb) { st.lb = Math.ceil(q); snd('cuenta', st.lb); } }
     else { if (T && e >= T) return terminar(); if (st.last === -1) { st.last = 0; snd('inicio'); } else if (T && T - e <= 3.05 && Math.ceil(T - e) !== st.lb) { st.lb = Math.ceil(T - e); snd('cuenta', st.lb); } big = mmss(Math.floor(e)); fase = T ? `Tope ${mmss(T)}` : 'Cronómetro'; cls = 'w'; sub = c.vueltas || st.vuelta ? `Vuelta ${st.vuelta}${c.vueltas ? ' de ' + c.vueltas : ''}` : ''; }
+    avisarTmr({ n: c.nombre, fase: (st.fase === 'pausa' ? '⏸ ' : '') + fase, big, sub });
     el.innerHTML = `<div class="tin ${cls}"><div class="trow"><button data-tsnd="1" aria-label="Sonidos y volumen">🔊</button><b class="tname">${esc(c.nombre)}</b><button data-tx="1" aria-label="Cerrar">✕</button></div>
       <div class="tfase">${esc(fase)}</div><div class="tbig" aria-live="off">${big}</div><div class="tsub">${esc(sub)}</div>
       <div class="tbar"><i style="width:${T ? Math.min(100, e / T * 100) : 0}%"></i></div>
@@ -840,6 +844,7 @@ function abrirTimer(b) { cerrarTimer(); const c = detectarTimer(b); const el = d
     else if (c.modo === 'emom') { const r = Math.min(c.n, Math.floor(e / c.w)); res = r >= c.n ? `${c.nombre} completo · ${c.n} rondas` : `${c.nombre} · ${r} de ${c.n} rondas`; }
     else if (c.modo === 'int') { const r = Math.min(c.n, Math.ceil(e / (c.w + c.r))); res = r >= c.n && e >= total() - 0.5 ? `${c.nombre} completo · ${c.n} rondas` : `${c.nombre} · hasta la ronda ${r} de ${c.n}`; }
     if (e < 5) res = ''; // lo detuvo al tiro: no se anota nada
+    avisarTmr({ n: c.nombre, fin: 1, big: mmss(Math.floor(e)), res }, true);
     const pide = c.modo === 'amrap' && e >= 5;
     if (!pide) ponerRes(res);
     el.innerHTML = `<div class="tin"><div class="trow"><b class="tname">${esc(c.nombre)}</b><button data-tx="1" aria-label="Cerrar">✕</button></div><div class="tbig">✓</div>
@@ -859,7 +864,7 @@ function abrirTimer(b) { cerrarTimer(); const c = detectarTimer(b); const el = d
     if (b.dataset.tv) { st.vuelta++; beep(880, 80); return pintar(); }
     if (b.dataset.tf) return terminar(); });
   document.body.appendChild(el); pintar(); }
-function cerrarTimer() { clearInterval(TM); TM = null; document.getElementById('tmr')?.remove(); try { window.SND && SND.cerrarPanel(); } catch (_) {} }
+function cerrarTimer() { const habia = !!document.getElementById('tmr'); clearInterval(TM); TM = null; document.getElementById('tmr')?.remove(); if (habia) avisarTmr({ off: 1 }, true); try { window.SND && SND.cerrarPanel(); } catch (_) {} }
 
 /* ---------- en el gimnasio: técnica, carga sugerida, guardado en vivo, pantalla encendida ---------- */
 const normEj = n => String(n || '').toLowerCase().replace(/^(min(uto)?\s*\d+|\d+[ab]?|par \d+|min (par|impar)|test \d+|intervalo[^·]*)\s*·\s*/i, '').replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
