@@ -1368,9 +1368,10 @@ async function recupAccion(k, cancelar) { const [f, h] = k.split('_');
     avisos: cancelar ? ['🔁 La clase vuelve a quedar disponible para que la recuperes en otro bloque.', '⚠️ Recuerda que solo puedes cancelar hasta 2 horas antes.']
       : ['⚠️ Elige bien: tienes <b>solo 1 oportunidad</b>. Al aceptar, la clase queda agendada y <b>no se puede cambiar</b>.', '❌ Si no asistes, pierdes esa clase.', `Si surge algo importante, <b>contáctate con ${prof}</b>.`],
     ok: cancelar ? 'Sí, cancelar' : 'Aceptar', no: cancelar ? 'Volver' : 'Rechazar' }))) return;
+  toast(cancelar ? 'Cancelando…' : 'Agendando tu recuperación…');
   const { data, error } = await sb.rpc(cancelar ? 'cancelar_recuperacion' : 'recuperar_clase', { p_fecha: f, p_hora: h });
   if (error) { toast(String(error.message || 'No se pudo').replace(/^.*?: /, '')); try { const { data: rc } = await sb.rpc('mis_recuperaciones'); if (rc) S.recup = rc; } catch (_) {} render(); return; }
-  S.recup = data; toast(cancelar ? 'Recuperación cancelada.' : '¡Listo! Te esperamos ' + txt + ' 💪'); await load(); render(); }
+  S.recup = data; document.querySelectorAll('.toast').forEach(t => t.remove()); toast(cancelar ? 'Recuperación cancelada.' : '✅ Recuperación agendada · te esperamos ' + txt + ' 💪'); render(true); await load(); render(true); }
 function noVoyBtn(i, f, h) { const n = waNum(); const nom = String(S.a.nombre || '').split(' ')[0];
   const msg = `Hola Franco, soy ${nom}. No puedo ir a mi clase del ${longD(f).toLowerCase()} a las ${h}.`;
   return n ? `<a class="btn" data-novoy="${i}" href="https://wa.me/${n}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">No puedo ir · avisar por WhatsApp</a>`
