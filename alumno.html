@@ -83,6 +83,7 @@ h2{font-size:22px}
 .set .n{text-align:center;font-weight:700}.set input.raro{border-color:#f0b35a;color:#f0b35a}
 .set-h .t2,.set input.t2{grid-column:span 2}.set.ap{background:transparent;border-style:dashed}.set.ap .n{color:var(--muted)}.set.ap input{font-weight:600;color:var(--muted)}.set.ap.done{border-style:solid}
 .ap-del{border:0;background:none;color:var(--red,#ea203a);font:700 15px Barlow,sans-serif;min-width:28px;min-height:32px;padding:0 6px 0 0;cursor:pointer;vertical-align:middle}
+.tset-b{border:1px solid var(--line);background:transparent;color:var(--fg);border-radius:999px;font:700 13px Barlow,sans-serif;min-height:32px;padding:0 10px;cursor:pointer}
 .ap-add{justify-self:start;border:0;background:none;color:var(--muted);font:600 14px Barlow,sans-serif;min-height:44px;padding:0 6px;cursor:pointer}
 .set .prev{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .set input{width:100%;height:42px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:700 18px Barlow,sans-serif;text-align:center;padding:0}
@@ -773,6 +774,8 @@ let REST = null, VIVO = null;
 const vivoCh = () => { if (!VIVO) { VIVO = sb.channel('tl-vivo', { config: { broadcast: { self: false } } }); VIVO.subscribe(); } return VIVO; };
 const avisarDescanso = (rem, ej) => { try { const rd = rutinaDeHoy(); vivoCh().send({ type: 'broadcast', event: 'rest', payload: { a: codigo, f: rd.fecha || today(), h: rd.hora || '', rem: Math.max(0, Math.round(rem)), ej: ej || '' } }); } catch (_) {} };
 let PASOTX = '', TYPT = null;
+const avisarCirc = bi => { try { const rd = rutinaDeHoy(); const b = rd.r?.bloques?.[bi]; if (!b) return; const ck = S.cck || new Set();
+  vivoCh().send({ type: 'broadcast', event: 'circ', payload: { a: codigo, f: rd.fecha || today(), h: rd.hora || '', bi, v: (S.vta && S.vta[bi]) || 1, it: (b.ejercicios || []).map((e, ei) => [e.nombre, ck.has(bi + '-' + ei) ? 1 : 0]) } }); } catch (_) {} };
 // lo que el alumno va escribiendo en un ejercicio llega al panel al instante (antes del guardado)
 const avisarTipeo = n => { clearTimeout(TYPT); TYPT = setTimeout(() => { try { const rd = rutinaDeHoy(); const sets = [], ap = [];
   document.querySelectorAll('.set input').forEach(i => { if (i.dataset.n !== n) return; const g = i.dataset.ap ? ap : sets; const k = Number(i.dataset.i); const v = String(i.value || '').trim().replace(',', '.'); g[k] = g[k] || {}; if (v !== '' && !isNaN(v)) g[k][i.dataset.f] = Number(v); });
@@ -787,6 +790,20 @@ function iniciarDescanso(seg, ej) { finDescanso(true); RESTEJ = ej || ''; const 
     el.innerHTML = `<span>⏱ Descanso <b>${mmss(Math.ceil(q))}</b></span><button data-rm="-15" aria-label="Quitar 15 segundos">−15</button><button data-rm="15" aria-label="Sumar 15 segundos">+15</button><button data-rx="1" aria-label="Saltar descanso">✕</button>`; };
   el.addEventListener('click', ev => { const b = ev.target.closest('button'); if (!b) return; ev.stopPropagation(); if (b.dataset.rx) return finDescanso(); fin += Number(b.dataset.rm) * 1000; pintar(); avisarDescanso((fin - Date.now()) / 1000, RESTEJ); });
   document.body.appendChild(el); pintar(); REST = setInterval(pintar, 250); }
+function cuentaSerie(n, i, seg) { finDescanso(true); const el = document.createElement('div'); el.id = 'rest'; let fin = Date.now() + seg * 1000, pre = 3; beep(660, 60);
+  const fila = () => [...document.querySelectorAll('.set input[data-f="t"]')].find(x => x.dataset.n === n && Number(x.dataset.i) === i);
+  const pintar = () => { if (pre > 0) return;
+    const q = (fin - Date.now()) / 1000;
+    if (q <= 0) { clearInterval(REST); REST = null; el.remove(); snd('final'); avisarTmr({ off: 1 }, true);
+      const inp = fila(); if (inp) { inp.value = String(seg); inp.dispatchEvent(new Event('input', { bubbles: true })); inp.closest('.set')?.querySelector('[data-chk]')?.click(); } return; }
+    if (q <= 3.05 && Math.ceil(q) !== Number(el.dataset.l)) { el.dataset.l = Math.ceil(q); snd('cuenta', el.dataset.l); }
+    el.innerHTML = `<span>⏱ ${esc(String(n).slice(0, 22))} · serie ${i + 1} <b>${mmss(Math.ceil(q))}</b></span><button data-rx="1" aria-label="Detener">■</button>`;
+    avisarTmr({ n, fase: 'Serie ' + (i + 1), big: mmss(Math.ceil(q)) }); };
+  el.addEventListener('click', ev => { const b = ev.target.closest('button'); if (!b) return; ev.stopPropagation();
+    const hecho = Math.max(0, Math.round(seg - (fin - Date.now()) / 1000)); clearInterval(REST); REST = null; el.remove(); avisarTmr({ off: 1 }, true);
+    const inp = fila(); if (inp && hecho >= 3) { inp.value = String(hecho); inp.dispatchEvent(new Event('input', { bubbles: true })); } });
+  document.body.appendChild(el);
+  const cd = () => { if (pre > 0) { el.innerHTML = `<span>Prepárate… <b>${pre}</b></span>`; snd('prep', pre); pre--; setTimeout(cd, 1000); } else { fin = Date.now() + seg * 1000; snd('inicio'); pintar(); REST = setInterval(pintar, 250); } }; cd(); }
 function finDescanso(silencio) { const habia = !!REST; clearInterval(REST); REST = null; document.getElementById('rest')?.remove(); if (habia && !silencio) avisarDescanso(0, RESTEJ); }
 
 /* ---------- temporizador del bloque C (EMOM, AMRAP, Tabata, intervalos, por tiempo…) ---------- */
@@ -900,8 +917,8 @@ function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nS
       const head = tp === 'tiempo' ? '<span>Serie</span><span>Anterior</span><span class="t2">Segundos</span><span></span>' : `<span>Serie</span><span>Anterior</span><span>${tp === 'corporal' ? '+Kg' : 'Kg'}</span><span>Reps</span><span></span>`;
       return `<div class="sets"><div class="set-h">${head}</div>${Array.from({ length: ap }, (_, i) => apRow(i)).join('')}${Array.from({ length: n }, (_, i) => { const s0 = sets[i] || {}; const done = conDato(s0); const p = pv[i] || pv[pv.length - 1];
       const prev = `<span class="prev">${conDato(p) ? esc(fmtSet(p)) : '—'}</span>`;
-      if (tp === 'tiempo') { const phT = sg?.t ?? (p && p.t != null ? p.t : segObj(e) || 'seg');
-        return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span>${prev}<input class="t2" inputmode="numeric" placeholder="${esc(phT)}" aria-label="segundos serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="t" value="${s0.t != null ? esc(s0.t) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }
+      if (tp === 'tiempo') { const phT = sg?.t ?? (p && p.t != null ? p.t : segObj(e) || 'seg'); const segC = Number(phT) || segObj(e) || 30;
+        return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span><span class="prev"><button type="button" class="tset-b" data-tset="${esc(e.nombre)}" data-i="${i}" data-seg="${segC}" aria-label="Cuenta regresiva ${segC} segundos serie ${i + 1}">▶ ${segC}s</button></span><input class="t2" inputmode="numeric" placeholder="${esc(phT)}" aria-label="segundos serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="t" value="${s0.t != null ? esc(s0.t) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }
       const phKg = tp === 'corporal' ? (p && p.kg ? String(p.kg).replace('.', ',') : '+kg') : sg ? fmtKg(sg.kg) : p && p.kg != null ? String(p.kg).replace('.', ',') : 'kg';
       return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span>${prev}<input inputmode="decimal" placeholder="${esc(phKg)}" aria-label="${tp === 'corporal' ? 'lastre en kg (opcional)' : 'kg'} serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s0.kg != null ? esc(String(s0.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${p && p.r != null ? esc(p.r) : 'reps'}" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s0.r != null ? esc(s0.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }).join('')}
       ${tp === 'kg' ? `<button type="button" class="ap-add" data-apx="${esc(e.nombre)}">+ Serie de aproximación</button>` : ''}</div>`; })() + `
@@ -1475,9 +1492,10 @@ document.addEventListener('click', async ev => {
   const cmb = ev.target.closest('[data-com]'); if (cmb) { const w = document.querySelector(`[data-comw="${CSS.escape(cmb.dataset.com)}"]`); if (!w) return;
     cmb.hidden = true; w.hidden = false; w.querySelector('input').focus(); return; }
   if (ev.target.closest('[data-foco]')) { const g = getFoco(); S.foco = g ? g.k : 0; S.cck = new Set(g ? g.cck : []); S.vta = g ? g.vta : {}; render(); window.scrollTo(0, 0); if (g && g.k > 0) toast('Seguimos donde ibas 💪'); return; }
+  const tsb = ev.target.closest('[data-tset]'); if (tsb) { cuentaSerie(tsb.dataset.tset, Number(tsb.dataset.i), Number(tsb.dataset.seg) || 30); return; }
   const cck = ev.target.closest('[data-cck]'); if (cck) { S.cck = S.cck || new Set(); const k = cck.dataset.cck; const on = !S.cck.has(k); on ? S.cck.add(k) : S.cck.delete(k);
-    cck.setAttribute('aria-pressed', on); cck.closest('.circ-it')?.classList.toggle('ok', on); if (on && navigator.vibrate) try { navigator.vibrate(15); } catch (_) {} return; }
-  const vta = ev.target.closest('[data-vuelta]'); if (vta) { const bi = vta.dataset.vuelta; S.vta = S.vta || {}; S.vta[bi] = (S.vta[bi] || 1) + 1; [...(S.cck || [])].filter(k => k.startsWith(bi + '-')).forEach(k => S.cck.delete(k)); render(); window.scrollTo(0, 0); return; }
+    cck.setAttribute('aria-pressed', on); cck.closest('.circ-it')?.classList.toggle('ok', on); if (on && navigator.vibrate) try { navigator.vibrate(15); } catch (_) {} avisarCirc(Number(k.split('-')[0])); return; }
+  const vta = ev.target.closest('[data-vuelta]'); if (vta) { const bi = vta.dataset.vuelta; S.vta = S.vta || {}; S.vta[bi] = (S.vta[bi] || 1) + 1; [...(S.cck || [])].filter(k => k.startsWith(bi + '-')).forEach(k => S.cck.delete(k)); render(); window.scrollTo(0, 0); avisarCirc(Number(bi)); return; }
   if (ev.target.closest('[data-focox]')) { S.foco = null; render(); return; }
   const fnv = ev.target.closest('[data-fnav]'); if (fnv) { finDescanso(); S.foco = Math.max(0, (S.foco || 0) + Number(fnv.dataset.fnav)); render(); window.scrollTo(0, 0); return; }
   const tmb = ev.target.closest('[data-timer]'); if (tmb) { const r = rutinaDeHoy().r; if (r) abrirTimer(r.bloques[Number(tmb.dataset.timer)], { sinRes: !!tmb.dataset.sinres, vueltas: Number(tmb.dataset.vtas) || 0 }); return; }
