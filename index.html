@@ -940,7 +940,7 @@ function studentCard(f, hora, code, ruts) {
       <span class="chev" aria-hidden="true">›</span>
     </button>
     <div class="seg seg-sm" role="group" aria-label="Asistencia">${seg('presente', '✓')}${seg('ausente', '✗')}${seg('aviso', 'Avisó', 'No vino pero te avisó: decides si le das la recuperación')}</div></div>
-    <div class="sc-live" data-act="st-edit" data-k="${esc(key)}">${estado ? `<span class="sc-l3">${estado}</span>` : ''}<span data-rest-k="${esc(key)}">${restHTML(key)}</span><span data-tmr-k="${esc(key)}">${tmrHTML(key)}</span>${v && v.al.length ? `<span class="sc-al">⚠ ${v.al.map(esc).join(' · ')}</span>` : ''}</div>
+    <div class="sc-live" data-act="st-edit" data-k="${esc(key)}">${(S.vivoCtx = S.vivoCtx || {})[key] = {f, hora, code, rut}, ''}${estado ? `<span class="sc-l3" data-vivo-k="${esc(key)}">${estado}</span>` : ''}<span data-rest-k="${esc(key)}">${restHTML(key)}</span><span data-tmr-k="${esc(key)}">${tmrHTML(key)}</span>${v && v.al.length ? `<span class="sc-al">⚠ ${v.al.map(esc).join(' · ')}</span>` : ''}</div>
     ${det ? `<div class="sc-det"><div class="sc-c">
     <div class="st-row small"><button class="btn sm ghost" data-act="ficha" data-id="${esc(code)}">Ficha</button><button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button><button class="btn sm ghost" data-act="reag" data-k="${esc(key)}">↻ Reagendar</button>${r.extra ? `<button class="btn sm ghost" data-act="quitar-extra" data-k="${esc(key)}">Quitar del bloque</button>` : ''}${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}</div>
     ${pg ? `<div class="small muted num sc-prog" title="${esc(rut && !pg.terminado ? progLinea(rut, pg.semana) || '' : '')}">Sem ${Math.min(pg.semana, pg.total)}/${pg.total} · sesión ${pg.idx + 1}/${pg.ses.length}${pg.terminado ? ' · programa terminado' : ''}${sug ? ` · <b style="color:var(--fg)">le toca ${esc(S.rutinas.get(sug)?.tipo || '')}</b>` : ''}${rut && !pg.terminado && progLinea(rut, pg.semana) ? ` · 📈 ${esc(String(progLinea(rut, pg.semana)).replace(/^Semana \d+\s*·\s*/, ''))}` : ''}</div>` : ''}
@@ -974,6 +974,8 @@ function restHTML(key) { const x = (S.rest || {})[key]; if (!x) return ''; const
 function tmrHTML(key) { const x = (S.tmr || {})[key]; if (!x) return ''; const viejo = Date.now() - x.at > (x.fin ? 60000 : 8000); if (viejo) return '';
   if (x.fin) return `<span class="sc-tmr fin">✓ ${esc(x.n)} terminado · ${esc(x.big || '')}${x.res ? ' · ' + esc(x.res) : ''}</span>`;
   return `<span class="sc-tmr">⏱ ${esc(x.n)} · ${esc(x.fase || '')} · <b class="num">${esc(x.big || '')}</b>${x.sub ? ' · ' + esc(x.sub) : ''}</span>`; }
+function pintarVivo(k) { const c = (S.vivoCtx || {})[k]; const el = document.querySelector(`[data-vivo-k="${CSS.escape(k)}"]`); if (!c || !el) return schedule();
+  const v = vivoInfo(c.f, c.hora, c.code, c.rut, rec(c.f, c.hora, c.code)); if (v && el.innerHTML !== v.txt) el.innerHTML = v.txt; }
 function pintarRest() { document.querySelectorAll('[data-tmr-k]').forEach(el => { const h = tmrHTML(el.dataset.tmrK); if (el.innerHTML !== h) el.innerHTML = h; }); document.querySelectorAll('[data-rest-k]').forEach(el => { const h = restHTML(el.dataset.restK); if (el.innerHTML !== h) el.innerHTML = h; });
   Object.keys(S.rest || {}).forEach(k => { if (S.rest[k].fin < Date.now() - 4000) delete S.rest[k]; }); }
 // "Bloque B · Fuerza" + posición del ejercicio dentro del bloque, sacado de la rutina del alumno
@@ -984,7 +986,7 @@ function vivoInfo(f, hora, code, rut, r) {
   if (!rut) return null;
   const llenos = x => setsOf(x).filter(z => z.kg != null || z.r != null || z.t != null); const cur = r.ej || []; const hechas = cur.reduce((n, x) => n + llenos(x).length, 0);
   const pa = (S.paso || {})[f + '|' + hora + '|' + code];
-  if (!hechas && r.rpe == null && !pa) return null;
+  if (!hechas && r.rpe == null && !pa && !(S.typ || {})[f + '|' + hora + '|' + code]) return null;
   const ejs = ejsDe(rut); const plan = ejs.reduce((n, x) => n + nSerieD(x.d), 0); const orden = ejs.map(x => x.n);
   const ult = [...cur].filter(x => llenos(x).length).sort((a, b) => orden.indexOf(b.n) - orden.indexOf(a.n))[0]; const ls = ult ? llenos(ult).slice(-1)[0] : null;
   const prev = cargasDe(code).filter(c => c.f < f); const al = [];
@@ -992,8 +994,10 @@ function vivoInfo(f, hora, code, rut, r) {
   cur.forEach(x => { const pv = prev.find(c => c.n === x.n); if (pv && pv.kg > 0 && x.kg > pv.kg * 1.15) al.push(`${ejCorto(x.n)} +${Math.round((x.kg / pv.kg - 1) * 100)}%`); });
   const terminado = r.rpe != null; const vivo = f === today() && !terminado;
   const txt = terminado ? `<span class="ok-t">✓ Terminó</span> · ${hechas}${plan ? '/' + plan : ''} series · RPE ${esc(r.rpe)}`
-    : (() => { const actN = pa ? pa.ej : ult ? ult.n : ''; const act = actN ? cur.find(x => x.n === actN) : null;
-        const ss = act ? llenos(act).map(fmtSetC) : []; const aps = act ? (act.ap || []).filter(z => z && (z.kg != null || z.r != null)).map(fmtSetC) : [];
+    : (() => { const ty = (S.typ || {})[f + '|' + hora + '|' + code]; const tyOk = ty && Date.now() - ty.at < 60000;
+        const actN = pa ? pa.ej : tyOk ? ty.n : ult ? ult.n : ''; const act = actN ? cur.find(x => x.n === actN) : null; const usaTy = tyOk && ty.n === actN;
+        const lleno = z => z && (z.kg != null || z.r != null || z.t != null);
+        const ss = usaTy ? ty.sets.filter(lleno).map(fmtSetC) : act ? llenos(act).map(fmtSetC) : []; const aps = (usaTy ? ty.ap : act ? (act.ap || []) : []).filter(z => z && (z.kg != null || z.r != null)).map(fmtSetC);
         const esBlq = /^Bloque /.test(actN); const bq = actN && !esBlq ? blqDe(rut, actN) : null;
         const ahora = actN ? `${bq ? `<span class="sc-blq">${esc(bq.txt)} ›</span> ` : ''}<b class="sc-ej">${esc(esBlq ? actN : ejCorto(actN))}</b>${bq ? `<span class="muted">${esc(bq.pos)}</span>` : ''}${aps.length || ss.length ? ': ' + (aps.length ? `<span class="muted">aprox ${aps.map(esc).join(' · ')} →</span> ` : '') + `<b class="sc-ej">${ss.map(esc).join(' · ') || '—'}</b>` : pa ? ' <span class="muted">· empezando</span>' : ''}` : '';
         let dz = ''; if (actN && !esBlq) { const eR = ((rut && rut.bloques) || []).flatMap(b => b.ejercicios || []).find(e => e.nombre === actN);
@@ -2448,6 +2452,8 @@ route();
       const k = p.f + '|' + p.h + '|' + p.a; if (p.rem > 0) S.rest[k] = { fin: Date.now() + p.rem * 1000, ej: p.ej || '' }; else delete S.rest[k]; pintarRest(); })
       .on('broadcast', { event: 'tmr' }, ({ payload: p }) => { if (!p || !p.a) return; S.tmr = S.tmr || {}; const k = p.f + '|' + p.h + '|' + p.a;
         if (p.off) delete S.tmr[k]; else S.tmr[k] = Object.assign({}, p, { at: Date.now() }); pintarRest(); })
+      .on('broadcast', { event: 'typ' }, ({ payload: p }) => { if (!p || !p.a || !p.n) return; S.typ = S.typ || {}; const k = p.f + '|' + p.h + '|' + p.a;
+        S.typ[k] = { n: p.n, sets: p.sets || [], ap: p.ap || [], at: Date.now() }; pintarVivo(k); })
       .on('broadcast', { event: 'paso' }, ({ payload: p }) => { if (!p || !p.a) return; S.paso = S.paso || {}; S.paso[p.f + '|' + p.h + '|' + p.a] = { ej: p.ej || '', k: p.k, n: p.n }; schedule(); }).subscribe();
     setInterval(pintarRest, 500); }
   db.doc('config/general').onSnapshot(d => { S.cfg = d.exists ? clone(d.data()) : null; S.loaded.cfg = true; schedule(); maybeMigrateLib(); }, fail);

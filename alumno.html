@@ -463,7 +463,7 @@ function applyDraft() { if (S.v !== 'rutina') return; const d = getDraft();
 document.addEventListener('focusout', ev => { const i = ev.target; if (!i.matches || !i.matches('.com-i') || i.value.trim()) return;
   const w = i.closest('.com-w'), b = document.querySelector(`[data-com="${CSS.escape(i.dataset.comn)}"]`); if (w && b) { w.hidden = true; b.hidden = false; } });
 document.addEventListener('input', ev => { const i = ev.target; const d = getDraft();
-  if (i.matches('.set input')) { const n = i.dataset.n; const g = i.dataset.ap ? (d.ap = d.ap || {}) : (d.sets = d.sets || {}); ((g[n] = g[n] || {})[i.dataset.i] = g[n][i.dataset.i] || {})[i.dataset.f] = i.value; i.closest('.set')?.classList.toggle('done', [...i.closest('.set').querySelectorAll('input')].some(x => x.value.trim() !== '')); putDraft(d); autoGuardar(2500); }
+  if (i.matches('.set input')) { const n = i.dataset.n; const g = i.dataset.ap ? (d.ap = d.ap || {}) : (d.sets = d.sets || {}); ((g[n] = g[n] || {})[i.dataset.i] = g[n][i.dataset.i] || {})[i.dataset.f] = i.value; i.closest('.set')?.classList.toggle('done', [...i.closest('.set').querySelectorAll('input')].some(x => x.value.trim() !== '')); putDraft(d); autoGuardar(2500); avisarTipeo(n); }
   else if (i.matches('.com-i')) { (d.com = d.com || {})[i.dataset.comn] = i.value; putDraft(d); autoGuardar(2500); }
   else if (i.id === 'carga') { d.carga = i.value; putDraft(d); autoGuardar(2500); } });
 
@@ -772,7 +772,11 @@ let REST = null, VIVO = null;
 // el panel del profe ve en la tarjeta del alumno el reloj de descanso (sin guardar nada en la base)
 const vivoCh = () => { if (!VIVO) { VIVO = sb.channel('tl-vivo', { config: { broadcast: { self: false } } }); VIVO.subscribe(); } return VIVO; };
 const avisarDescanso = (rem, ej) => { try { const rd = rutinaDeHoy(); vivoCh().send({ type: 'broadcast', event: 'rest', payload: { a: codigo, f: rd.fecha || today(), h: rd.hora || '', rem: Math.max(0, Math.round(rem)), ej: ej || '' } }); } catch (_) {} };
-let PASOTX = '';
+let PASOTX = '', TYPT = null;
+// lo que el alumno va escribiendo en un ejercicio llega al panel al instante (antes del guardado)
+const avisarTipeo = n => { clearTimeout(TYPT); TYPT = setTimeout(() => { try { const rd = rutinaDeHoy(); const sets = [], ap = [];
+  document.querySelectorAll('.set input').forEach(i => { if (i.dataset.n !== n) return; const g = i.dataset.ap ? ap : sets; const k = Number(i.dataset.i); const v = String(i.value || '').trim().replace(',', '.'); g[k] = g[k] || {}; if (v !== '' && !isNaN(v)) g[k][i.dataset.f] = Number(v); });
+  vivoCh().send({ type: 'broadcast', event: 'typ', payload: { a: codigo, f: rd.fecha || today(), h: rd.hora || '', n, sets: Array.from(sets, z => z || {}), ap: Array.from(ap, z => z || {}) } }); } catch (_) {} }, 250); };
 const avisarPaso = (ej, k, n) => { try { const rd = rutinaDeHoy(); const tx = [rd.fecha, rd.hora, ej, k].join('|'); if (tx === PASOTX) return; PASOTX = tx;
   vivoCh().send({ type: 'broadcast', event: 'paso', payload: { a: codigo, f: rd.fecha || today(), h: rd.hora || '', ej, k, n } }); } catch (_) {} };
 let RESTEJ = '';
