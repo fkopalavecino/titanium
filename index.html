@@ -956,9 +956,8 @@ function studentCard(f, hora, code, ruts) {
     </button>
     <div class="seg seg-sm" role="group" aria-label="Asistencia">${seg('presente', '✓')}${seg('ausente', '✗')}${seg('aviso', 'Avisó', 'No vino pero te avisó: decides si le das la recuperación')}</div></div>
     <div class="sc-live" data-act="st-edit" data-k="${esc(key)}">${(S.vivoCtx = S.vivoCtx || {})[key] = {f, hora, code, rut}, ''}${estado ? `<span class="sc-l3" data-vivo-k="${esc(key)}">${estado}</span>` : ''}<span data-rest-k="${esc(key)}">${restHTML(key)}</span><span data-tmr-k="${esc(key)}">${tmrHTML(key)}</span>${v && v.al.length ? `<span class="sc-al">⚠ ${v.al.map(esc).join(' · ')}</span>` : ''}</div>
-    ${det ? (() => { const tab = (S.ui.stTab || {})[key] || 'series';
+    ${det ? (() => { let tab = (S.ui.stTab || {})[key] || 'series'; if (tab === 'mas') tab = 'series';
       const tb = (id, txt) => `<button type="button" class="sc-tab${tab === id ? ' on' : ''}" data-act="st-tab" data-t="${id}" data-k="${esc(key)}" aria-pressed="${tab === id}">${txt}</button>`;
-      const avisoPago = (ve.k !== 'vigente' && ['vencido','hoy','pronto'].includes(ve.k)) || ['pendiente','parcial'].includes(pe.k);
       const cierreN = (r.carga ? 1 : 0) + (r.rpe != null && r.rpe !== '' ? 1 : 0) + (r.notas ? 1 : 0);
       let body = '';
       if (tab === 'series') body = rut ? cargasHTML(f, hora, code, key, rut, r) : `<div class="small muted">Sin rutina asignada. Elígela en la pestaña Rutina.</div>`;
@@ -974,14 +973,13 @@ function studentCard(f, hora, code, ruts) {
       <button class="btn sm ghost" data-act="editar-ses" data-k="${esc(key)}" data-r="${esc(rid)}">${r.sesion ? 'Ajustada ✎' : 'Editar sesión'}</button>` : ''}
     </div>
     ${rut ? rutinaCompacta(rut, key, r) : ''}`;
-      else if (tab === 'cierre') body = `
+      else body = `
     <div class="frow3">
       <label class="f">Bloque C<input type="text" id="carga-${esc(key)}" data-act="campo" data-field="carga" data-k="${esc(key)}" value="${esc(r.carga||'')}" placeholder="5 rondas + 8 · 14:32"></label>
       <label class="f">RPE<input type="number" min="1" max="10" id="rpe-${esc(key)}" data-act="campo" data-field="rpe" data-k="${esc(key)}" value="${esc(r.rpe||'')}"></label>
       <label class="f">Notas<textarea rows="1" id="nota-${esc(key)}" data-act="campo" data-field="notas" data-k="${esc(key)}" placeholder="Molestias, ajustes…">${esc(r.notas||'')}</textarea></label>
     </div>`;
-      else body = `<div class="st-row small"><button class="btn sm ghost" data-act="ficha" data-id="${esc(code)}">Ficha</button><button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button><button class="btn sm ghost" data-act="reag" data-k="${esc(key)}">↻ Reagendar</button><button class="btn sm ghost crit-t" data-act="quitar-hoy" data-k="${esc(key)}">✕ Quitar de esta clase</button>${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}</div>`;
-      return `<div class="sc-det"><div class="sc-tabs" role="group" aria-label="Detalle">${tb('series', 'Series')}${tb('rutina', 'Rutina' + (rid && !r.aprobada ? ' •' : ''))}${tb('cierre', 'Cierre' + (cierreN ? ' ✓' : ''))}${tb('mas', 'Más' + (avisoPago ? ' $' : ''))}</div><div class="sc-c">${body}</div></div>`; })() : ''}
+      return `<div class="sc-det"><div class="st-row small sc-acc"><button class="btn sm ghost" data-act="ficha" data-id="${esc(code)}">Ficha</button><button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button><button class="btn sm ghost" data-act="reag" data-k="${esc(key)}">↻ Reagendar</button><button class="btn sm ghost crit-t" data-act="quitar-hoy" data-k="${esc(key)}">✕ Quitar de esta clase</button>${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}</div><div class="sc-tabs" role="group" aria-label="Detalle">${tb('series', 'Series')}${tb('rutina', 'Rutina' + (rid && !r.aprobada ? ' •' : ''))}${tb('cierre', 'Cierre' + (cierreN ? ' ✓' : ''))}</div><div class="sc-c">${body}</div></div>`; })() : ''}
   </article>`;
 }
 // lo que el alumno va anotando desde su app durante la clase (se actualiza solo)
