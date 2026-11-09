@@ -1454,6 +1454,26 @@ function openModal(title, body, {submit = 'Guardar', onSubmit = null, extra = ''
 function closeModal() { $('#modal').hidden = true; $('#modal').innerHTML = ''; modalSubmit = null; }
 const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
 
+/* ---------- skills (habilidades) por alumno: mismo orden que en la app de alumnos ---------- */
+const HAB_CAT = [['handstand', 'Parada de manos'], ['pistol', 'Pistol squat'], ['lsit', 'L-sit'], ['dominadas', 'Dominadas'], ['muscleup', 'Muscle-up']];
+async function habPanel(code) {
+  const box = document.getElementById('fa-hab'); if (!box || box.dataset.alumno !== code || !window.__sb) return;
+  const { data, error } = await window.__sb.from('habilidades').select('skill,etapa').eq('alumno', code);
+  if (error) { document.getElementById('fa-hab-n').textContent = '· no se pudo cargar'; return; }
+  const m = new Map((data || []).map(h => [h.skill, h]));
+  box.innerHTML = HAB_CAT.map(([k, l]) => { const h = m.get(k); return `<button type="button" class="chip" data-act="hab-asig" data-id="${esc(code)}" data-sk="${k}" aria-pressed="${!!h}">${h ? '✓ ' : '+ '}${esc(l)}${h ? ' · E' + (Math.min(h.etapa || 0, 4) + 1) : ''}</button>`; }).join('');
+  document.getElementById('fa-hab-n').textContent = '· ' + (m.size ? m.size + ' asignada' + (m.size === 1 ? '' : 's') : 'ninguna');
+}
+async function habAsig(el) {
+  const code = el.dataset.id, sk = el.dataset.sk, on = el.getAttribute('aria-pressed') === 'true', nom = (HAB_CAT.find(x => x[0] === sk) || [, sk])[1];
+  if (on && !confirm(`¿Quitar ${nom}? Se borran su etapa y su historial de esa skill.`)) return;
+  el.disabled = true;
+  const q = on ? window.__sb.from('habilidades').delete().eq('alumno', code).eq('skill', sk)
+               : window.__sb.from('habilidades').insert({ alumno: code, skill: sk, etapa: 0, etapa_desde: today(), logs: [] });
+  const { error } = await q; el.disabled = false;
+  if (error) { toast('No se pudo guardar: ' + error.message, true); return; }
+  toast(on ? nom + ' quitada' : nom + ' asignada ✓'); habPanel(code);
+}
 function fichaAlumno(code) {
   const isNew = !code;
   const a = isNew ? {codigo: nextCode(), nombre:'', estado:'activo', telefono:'', notas:'', clases:8, bloques:[], planes:[]} : clone(S.alumnos.get(code));
@@ -1548,6 +1568,7 @@ function fichaAlumno(code) {
       ${(() => { const pg = progEstado(a); return pg ? `<div class="small muted num">Semana ${Math.min(pg.semana, pg.total)} de ${pg.total} · ${pg.hechas} sesiones hechas · próxima: <b style="color:var(--fg)">${esc(pg.next[1].tipo || '')}</b>${pg.terminado ? ' · <b style="color:var(--warn)">terminado: elige el siguiente programa o sube de nivel</b>' : ''}</div>` : `<div class="small muted">La sesión que le toca aparecerá sola en "Clase de hoy" y rota según su asistencia.</div>`; })()}
     </div>
     </details>
+    ${isNew ? '' : `<details class="sec" id="fa-hab-sec"><summary>Skills <span class="small muted" id="fa-hab-n" style="font-weight:500">· cargando…</span></summary><div class="small muted" style="margin:8px 0 6px">Toca para asignar o quitar. La pestaña Skills solo aparece en la app de quien tenga alguna asignada.</div><div class="chips" id="fa-hab" data-alumno="${esc(a.codigo)}"></div></details>`}
     ${isNew ? '' : '<details class="sec" id="fa-acts-sec" hidden><summary>Actividades hechas en su app <span class="small muted" id="fa-acts-n" style="font-weight:500"></span></summary><div class="list small" id="fa-acts" style="margin-top:8px"></div></details>'}
     <details class="sec"><summary>Últimas clases y cargas <span class="small muted" style="font-weight:500">· ${as.pres} presentes, ${as.aus} ausencias en total</span></summary>
     <div style="display:grid;gap:12px;margin-top:8px">
@@ -1591,6 +1612,7 @@ function fichaAlumno(code) {
     </details>
     <div id="del-zone"></div>
   `;
+  if (!isNew) setTimeout(() => habPanel(a.codigo), 0);
   if (!isNew && window.__sb) setTimeout(async () => { try {
     const { data } = await window.__sb.from('actividades_hechas').select('fecha,minutos,rpe,nota,eventos(titulo,tipo)').eq('alumno', a.codigo).order('fecha', { ascending: false }).limit(20);
     const box = document.getElementById('fa-acts'); if (!box || !data || !data.length) return;
@@ -2109,6 +2131,7 @@ document.addEventListener('click', e => {
   if (act === 'link-grupo') { e.preventDefault(); linkGrupo(); return; }
   if (act === 'reinvitar') { e.preventDefault(); e.stopPropagation(); const al = S.alumnos.get(id);
     if (al && confirm(`¿Mandarle un código nuevo a ${firstName(al.nombre)}? Le llega un código nuevo que vale 24 horas; su sesión anterior se cierra (sus datos y su rutina no se pierden).`)) invitarAlumno(id, el, true); return; }
+  if (act === 'hab-asig') { e.preventDefault(); e.stopPropagation(); habAsig(el); return; }
   if (act === 'invitar') { e.preventDefault(); e.stopPropagation(); invitarAlumno(id, el); return; }
   if (act === 'ag-abrir') { e.preventDefault(); if (window.tlAbrirAgenda) window.tlAbrirAgenda('prox'); else document.getElementById('tl-agb')?.click(); return; }
   if (act === 'cp-on') { cpActivar(el); return; }
