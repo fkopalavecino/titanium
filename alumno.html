@@ -82,6 +82,7 @@ h2{font-size:22px}
 .set.done{border-color:var(--ok);background:rgba(111,211,154,.08)}
 .set .n{text-align:center;font-weight:700}.set input.raro{border-color:#f0b35a;color:#f0b35a}
 .set-h .t2,.set input.t2{grid-column:span 2}.set.ap{background:transparent;border-style:dashed}.set.ap .n{color:var(--muted)}.set.ap input{font-weight:600;color:var(--muted)}.set.ap.done{border-style:solid}
+.ap-del{border:0;background:none;color:var(--red,#ea203a);font:700 15px Barlow,sans-serif;min-width:28px;min-height:32px;padding:0 6px 0 0;cursor:pointer;vertical-align:middle}
 .ap-add{justify-self:start;border:0;background:none;color:var(--muted);font:600 14px Barlow,sans-serif;min-height:44px;padding:0 6px;cursor:pointer}
 .set .prev{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .set input{width:100%;height:42px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:700 18px Barlow,sans-serif;text-align:center;padding:0}
@@ -879,7 +880,7 @@ function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nS
       const base = sg?.kg ?? (pv.length ? Math.max(0, ...pv.map(x => x.kg || 0)) : 0); const inc = /mancuerna|kb|kettlebell|pesa rusa/i.test(e.nombre) ? 1 : 2.5;
       const PCT = [[0.5, 8], [0.75, 3], [0.85, 2], [0.9, 1]];
       const apRow = i => { const s0 = aps[i] || {}; const [pc, rp] = PCT[Math.min(i, PCT.length - 1)]; const kgS = base ? Math.round(base * pc / inc) * inc : null;
-        return `<div class="set ap ${conDato(s0) ? 'done' : ''}"><span class="n">A</span><span class="prev">${kgS ? '~' + Math.round(pc * 100) + '%' : 'aprox.'}</span><input inputmode="decimal" placeholder="${kgS ? esc(fmtKg(kgS)) : 'kg'}" aria-label="kg aproximación ${i + 1} ${esc(e.nombre)}" data-ap="1" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s0.kg != null ? esc(String(s0.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${rp}" aria-label="reps aproximación ${i + 1} ${esc(e.nombre)}" data-ap="1" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s0.r != null ? esc(s0.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="60" aria-label="Marcar aproximación ${i + 1} hecha">✓</button></div>`; };
+        return `<div class="set ap ${conDato(s0) ? 'done' : ''}"><span class="n">A</span><span class="prev"><button type="button" class="ap-del" data-apdel="${esc(e.nombre)}" data-api="${i}" aria-label="Borrar aproximación ${i + 1} ${esc(e.nombre)}">✕</button>${kgS ? '~' + Math.round(pc * 100) + '%' : 'aprox.'}</span><input inputmode="decimal" placeholder="${kgS ? esc(fmtKg(kgS)) : 'kg'}" aria-label="kg aproximación ${i + 1} ${esc(e.nombre)}" data-ap="1" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s0.kg != null ? esc(String(s0.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${rp}" aria-label="reps aproximación ${i + 1} ${esc(e.nombre)}" data-ap="1" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s0.r != null ? esc(s0.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="60" aria-label="Marcar aproximación ${i + 1} hecha">✓</button></div>`; };
       const head = tp === 'tiempo' ? '<span>Serie</span><span>Anterior</span><span class="t2">Segundos</span><span></span>' : `<span>Serie</span><span>Anterior</span><span>${tp === 'corporal' ? '+Kg' : 'Kg'}</span><span>Reps</span><span></span>`;
       return `<div class="sets"><div class="set-h">${head}</div>${Array.from({ length: ap }, (_, i) => apRow(i)).join('')}${Array.from({ length: n }, (_, i) => { const s0 = sets[i] || {}; const done = conDato(s0); const p = pv[i] || pv[pv.length - 1];
       const prev = `<span class="prev">${conDato(p) ? esc(fmtSet(p)) : '—'}</span>`;
@@ -1492,6 +1493,11 @@ document.addEventListener('click', async ev => {
   if (ev.target.closest('[data-sesx]')) { S.evSel = null; S.foco = null; S.ses = null; S.rutSel = null; S.rpe = null; S.v = 'agenda'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
   const go = ev.target.closest('[data-go],[data-v]'); if (go && go.closest('#tabs') && (go.dataset.go || go.dataset.v) === 'rutina' && S.v === 'rutina' && S.foco != null) { window.scrollTo(0, 0); return; }
   if (go && (go.dataset.go || go.closest('#tabs'))) { S.evSel = null; S.foco = null; if ((go.dataset.go || go.dataset.v) === 'rutina') { S.ses = null; S.rutSel = null; } S.v = go.dataset.go || go.dataset.v; S.evalFirst = false; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
+  const apd = ev.target.closest('[data-apdel]'); if (apd) { const n = apd.dataset.apdel, i = Number(apd.dataset.api);
+    const L = ((colectarEj().find(x => x.n === n) || {}).ap || []).map(z => Object.assign({}, z)); if (i < L.length) L.splice(i, 1);
+    const rd = rutinaDeHoy(); const x = (rd.rec?.ej || []).find(z => z.n === n); if (x) { if (L.length) x.ap = L; else delete x.ap; }
+    const d = getDraft(); d.ap = d.ap || {}; d.ap[n] = Object.fromEntries(L.map((z, j) => [j, { kg: z.kg != null ? String(z.kg) : '', r: z.r != null ? String(z.r) : '' }])); putDraft(d);
+    S.apX = S.apX || {}; S.apX[DKEY() + n] = L.length; render(true); autoGuardar(300); toast('Aproximación borrada'); return; }
   const apx = ev.target.closest('[data-apx]'); if (apx) { S.apX = S.apX || {}; const n = apx.dataset.apx; const cur = apx.closest('.sets').querySelectorAll('.set.ap').length; S.apX[DKEY() + n] = Math.min(4, cur + 1); render(true); return; }
   const chk = ev.target.closest('[data-chk]'); if (chk) { const row = chk.closest('.set'); const ins = [...row.querySelectorAll('input')];
     if (row.dataset.ok) { delete row.dataset.ok; finDescanso(); return; }
