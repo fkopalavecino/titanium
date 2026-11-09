@@ -2139,7 +2139,11 @@ document.addEventListener('click', e => {
       else if (!confirm(`¿Quitar a ${nombre(code)} de la clase de las ${h}?\n\nSolo se quita de esta fecha${r.extra ? '' : '; su horario fijo sigue igual'}.`)) break;
       if (S.ui.stOpen) delete S.ui.stOpen[el.dataset.k];
       if (r.extra) patchDia(f, h, code, {extra: null, quitado: null, asis: null, rutina: null, aprobada: null, ej: null, rpe: null, carga: null, sesion: null, reagDe: null});
-      else patchDia(f, h, code, {quitado: true, asis: null, aprobada: null, rutina: null, ej: null, rpe: null, carga: null, sesion: null});
+      else { const dar = confirm(`¿Le das una recuperación a ${nombre(code)}?\n\nAceptar: le aparece "1 clase por recuperar" en su app para agendarla en otro bloque.\nCancelar: solo se quita de esta clase, sin recuperación.`);
+        patchDia(f, h, code, {quitado: true, asis: null, aprobada: null, rutina: null, ej: null, rpe: null, carga: null, sesion: null});
+        if (dar && window.__sb) window.__sb.rpc('otorgar_recuperacion', {p_codigo: code, p_fecha: f, p_hora: h})
+          .then(({error}) => toast(error ? 'Se quitó, pero no se pudo dar la recuperación: ' + error.message : `${nombre(code)} quitado de las ${h} · 🔁 recuperación otorgada`, !!error));
+        else toast(`${nombre(code)} quitado de las ${h}`); break; }
       toast(`${nombre(code)} quitado de las ${h}`); break; }
     case 'quitar-extra': { const {f,h,code} = toggleOne(el.dataset.k); patchDia(f, h, code, {extra: null, quitado: null, asis: null, rutina: null, aprobada: null}); break; }
     case 'todos-presentes': { const f = S.ui.claseFecha || today(), h = S.ui.claseHora; roster(f,h).filter(cd => !rec(f,h,cd).asis).forEach((cd,i) => { const pg = !rec(f,h,cd).rutina ? progEstado(S.alumnos.get(cd), f) : null; patchDia(f, h, cd, Object.assign({asis:'presente'}, pg ? {rutina: pg.next[0]} : {})); }); break; }
