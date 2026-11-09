@@ -187,7 +187,7 @@ tr.click:hover td{background:var(--sunk)}
 .sc-top .grow{flex:1;min-width:0;display:grid;gap:2px}
 .sc-l1{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sc-l1 .st-name{font-size:16px}
 .sc-l2{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sc-l3{font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-ej{color:var(--fg);font-weight:700}.sc-live{display:grid;gap:2px;cursor:pointer;margin-top:-4px}.sc-l3{font-size:14px;font-variant-numeric:tabular-nums;line-height:1.35}
 .sc-l3 .dot{display:inline-block;vertical-align:middle;margin-right:6px;width:7px;height:7px;border-radius:50%;background:var(--red);animation:livepulse 1.6s ease-in-out infinite}
 .sc-al{font-size:12px;color:var(--crit);font-weight:600}
 .sc-ic{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}.sc-ic.crit{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 40%,transparent)}
@@ -936,11 +936,11 @@ function studentCard(f, hora, code, ruts) {
     <div class="sc-head"><button class="sc-top" data-act="st-open" data-k="${esc(key)}" aria-expanded="${det}">
       <span class="grow"><span class="sc-l1"><b class="st-name">${esc(a.nombre)}</b>${marcas}</span>
         <span class="sc-l2">${esc(rutNom)}${r.aprobada ? ' ✓' : ''}${tot ? ` · ${usadas}/${tot} clases` : ''}</span>
-        ${estado ? `<span class="sc-l3">${estado}</span>` : ''}
-        ${v && v.al.length ? `<span class="sc-al">⚠ ${v.al.map(esc).join(' · ')}</span>` : ''}</span>
+</span>
       <span class="chev" aria-hidden="true">›</span>
     </button>
     <div class="seg seg-sm" role="group" aria-label="Asistencia">${seg('presente', '✓')}${seg('ausente', '✗')}${seg('aviso', 'Avisó', 'No vino pero te avisó: decides si le das la recuperación')}</div></div>
+    ${estado || (v && v.al.length) ? `<div class="sc-live" data-act="st-open" data-k="${esc(key)}">${estado ? `<span class="sc-l3">${estado}</span>` : ''}${v && v.al.length ? `<span class="sc-al">⚠ ${v.al.map(esc).join(' · ')}</span>` : ''}</div>` : ''}
     ${det ? `<div class="sc-det"><div class="sc-c">
     <div class="st-row small"><button class="btn sm ghost" data-act="ficha" data-id="${esc(code)}">Ficha</button><button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button><button class="btn sm ghost" data-act="reag" data-k="${esc(key)}">↻ Reagendar</button>${r.extra ? `<button class="btn sm ghost" data-act="quitar-extra" data-k="${esc(key)}">Quitar del bloque</button>` : ''}${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}</div>
     ${pg ? `<div class="small muted num sc-prog" title="${esc(rut && !pg.terminado ? progLinea(rut, pg.semana) || '' : '')}">Sem ${Math.min(pg.semana, pg.total)}/${pg.total} · sesión ${pg.idx + 1}/${pg.ses.length}${pg.terminado ? ' · programa terminado' : ''}${sug ? ` · <b style="color:var(--fg)">le toca ${esc(S.rutinas.get(sug)?.tipo || '')}</b>` : ''}${rut && !pg.terminado && progLinea(rut, pg.semana) ? ` · 📈 ${esc(String(progLinea(rut, pg.semana)).replace(/^Semana \d+\s*·\s*/, ''))}` : ''}</div>` : ''}
@@ -980,7 +980,7 @@ function vivoInfo(f, hora, code, rut, r) {
   cur.forEach(x => { const pv = prev.find(c => c.n === x.n); if (pv && pv.kg > 0 && x.kg > pv.kg * 1.15) al.push(`${ejCorto(x.n)} +${Math.round((x.kg / pv.kg - 1) * 100)}%`); });
   const terminado = r.rpe != null; const vivo = f === today() && !terminado;
   const txt = terminado ? `<span class="ok-t">✓ Terminó</span> · ${hechas}${plan ? '/' + plan : ''} series · RPE ${esc(r.rpe)}`
-    : `${vivo ? '<span class="dot" aria-hidden="true"></span><b>En vivo</b> · ' : ''}${hechas}${plan ? '/' + plan : ''} series${ult ? ' · ' + esc(ejCorto(ult.n)) + (ls ? ' ' + esc(fmtSetC(ls)) : '') : ''}`;
+    : `${vivo ? '<span class="dot" aria-hidden="true"></span><b>En vivo</b> · ' : ''}${hechas}${plan ? '/' + plan : ''} series${ult ? ' · <b class="sc-ej">' + esc(ejCorto(ult.n)) + (ls ? ' ' + esc(fmtSetC(ls)) : '') + '</b>' : ''}`;
   return {txt, al};
 }
 const valE = x => x.kg != null ? x.kg : x.t != null ? x.t : null;
