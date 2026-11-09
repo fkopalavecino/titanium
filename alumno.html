@@ -172,6 +172,7 @@ details.ses summary::-webkit-details-marker{display:none}
 #tmr .tbig{font:800 min(34vw,150px)/1 'Barlow Condensed',Barlow,sans-serif;font-variant-numeric:tabular-nums}
 #tmr .r .tbig{color:#6fd39a}
 #tmr .tsub{font-size:20px;font-weight:700;min-height:26px}
+#tmr .tronda{font:800 30px/1 'Barlow Condensed',Barlow,sans-serif;letter-spacing:.04em}#tmr .tronda b{font-size:44px;color:#ff5a6a}#tmr .r .tronda b{color:#6fd39a}
 #tmr .tbar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}#tmr .tbar i{display:block;height:100%;background:var(--red)}
 #tmr .tbtns{display:grid;grid-auto-flow:column;gap:10px}
 #tmr .tcfg{display:grid;grid-template-columns:1fr 48px 64px 48px;align-items:center;gap:8px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
@@ -846,19 +847,19 @@ function abrirTimer(b, o = {}) { cerrarTimer(); const c = detectarTimer(b); if (
       ${c.ejs.length ? `<div class="small muted">${c.ejs.map(esc).join(' · ')}</div>` : ''}
       <button class="btn tsnd" data-tsnd="1">🔊 Sonidos y volumen</button>
       <button class="btn pri tgo" data-ts="1">▶ Comenzar</button></div>`; return; }
-    const e = transcurrido(); let big = '', fase = '', sub = '', cls = ''; const T = total();
+    const e = transcurrido(); let big = '', fase = '', sub = '', cls = '', ronda = ''; const T = total();
     if (c.modo === 'emom') { const r = Math.floor(e / c.w); const q = c.w - (e % c.w); if (r >= c.n) return terminar();
-      big = mmss(Math.ceil(q)); fase = `Ronda ${r + 1} de ${c.n}`; sub = c.ejs.length ? c.ejs[r % c.ejs.length] : ''; cls = 'w';
+      big = mmss(Math.ceil(q)); fase = `Ronda ${r + 1} de ${c.n}`; ronda = `${r + 1}/${c.n}`; sub = c.ejs.length ? c.ejs[r % c.ejs.length] : ''; cls = 'w';
       if (r !== st.last) { st.last = r; snd('inicio'); } else if (q <= 3.05 && Math.ceil(q) !== st.lb) { st.lb = Math.ceil(q); snd('cuenta', st.lb); } }
     else if (c.modo === 'int') { const cyc = c.w + c.r; const r = Math.floor(e / cyc); const p = e % cyc; if (e >= T) return terminar();
-      const trab = p < c.w; const q = trab ? c.w - p : cyc - p; big = mmss(Math.ceil(q)); fase = (trab ? 'TRABAJO' : 'DESCANSO') + ` · ${r + 1}/${c.n}`; cls = trab ? 'w' : 'r';
+      const trab = p < c.w; const q = trab ? c.w - p : cyc - p; big = mmss(Math.ceil(q)); fase = (trab ? 'TRABAJO' : 'DESCANSO') + ` · ${r + 1}/${c.n}`; ronda = `${r + 1}/${c.n}`; cls = trab ? 'w' : 'r';
       sub = trab && c.ejs.length ? c.ejs[r % c.ejs.length] : trab ? '' : (c.ejs.length ? 'Sigue: ' + c.ejs[(r + 1) % c.ejs.length] : '');
       const key = r * 2 + (trab ? 0 : 1); if (key !== st.last) { st.last = key; snd(trab ? 'inicio' : 'fin'); } else if (q <= 3.05 && Math.ceil(q) !== st.lb) { st.lb = Math.ceil(q); snd('cuenta', st.lb); } }
     else if (c.modo === 'amrap') { const q = T - e; if (q <= 0) return terminar(); big = mmss(Math.ceil(q)); fase = 'Tiempo restante'; cls = 'w'; if (st.last === -1) { st.last = 0; snd('inicio'); } else if (q <= 3.05 && Math.ceil(q) !== st.lb) { st.lb = Math.ceil(q); snd('cuenta', st.lb); } }
     else { if (T && e >= T) return terminar(); if (st.last === -1) { st.last = 0; snd('inicio'); } else if (T && T - e <= 3.05 && Math.ceil(T - e) !== st.lb) { st.lb = Math.ceil(T - e); snd('cuenta', st.lb); } big = mmss(Math.floor(e)); fase = T ? `Tope ${mmss(T)}` : 'Cronómetro'; cls = 'w'; sub = c.vueltas || st.vuelta ? `Vuelta ${st.vuelta}${c.vueltas ? ' de ' + c.vueltas : ''}` : ''; }
-    avisarTmr({ n: c.nombre, fase: (st.fase === 'pausa' ? '⏸ ' : '') + fase, big, sub });
+    avisarTmr({ n: c.nombre, fase: (st.fase === 'pausa' ? '⏸ ' : '') + fase, big, sub, ronda });
     el.innerHTML = `<div class="tin ${cls}"><div class="trow"><button data-tsnd="1" aria-label="Sonidos y volumen">🔊</button><b class="tname">${esc(c.nombre)}</b><button data-tx="1" aria-label="Cerrar">✕</button></div>
-      <div class="tfase">${esc(fase)}</div><div class="tbig" aria-live="off">${big}</div><div class="tsub">${esc(sub)}</div>
+      ${ronda ? `<div class="tronda">RONDA <b>${ronda.split('/')[0]}</b> / ${ronda.split('/')[1]}</div>` : ''}<div class="tfase">${esc(fase)}</div><div class="tbig" aria-live="off">${big}</div><div class="tsub">${esc(sub)}</div>
       <div class="tbar"><i style="width:${T ? Math.min(100, e / T * 100) : 0}%"></i></div>
       <div class="tbtns">${c.modo === 'crono' ? '<button class="btn" data-tv="1">+1 vuelta</button>' : ''}<button class="btn" data-tp="1">${st.fase === 'pausa' ? '▶ Seguir' : '⏸ Pausa'}</button><button class="btn pri" data-tf="1">${c.modo === 'crono' ? '■ Terminé' : '■ Terminar'}</button></div></div>`; };
   const auto = x => !String(x || '').trim() || /rondas?\b|^\d{1,2}:\d\d(\s·.*)?$/i.test(String(x).trim());
