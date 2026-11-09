@@ -1127,6 +1127,9 @@ function setEj(k, n, patch) {
   const ej2 = ej.filter(o => o.kg != null || o.r != null || o.c);
   patchDia(f, h, code, {ej: ej2.length ? ej2 : null});
 }
+// hasta 2 fichas abiertas a la vez (para ver alumnos de a dos en el iPad); al abrir una tercera se cierra la más antigua
+function abrirFicha(k) { const prev = Object.keys(S.ui.stOpen || {}).filter(x => x !== k); S.ui.stOpen = {}; prev.slice(-1).forEach(x => S.ui.stOpen[x] = true); S.ui.stOpen[k] = true; }
+function cardDe(k) { return document.querySelector(`.sc.open [data-act="st-open"][data-k="${CSS.escape(k)}"]`)?.closest('.sc'); }
 function rutinaCompacta(rut, key, r) {
   const bl = rut.bloques || []; const [f, h, code] = key.split('|');
   const pa = (S.paso || {})[key]; const ty = (S.typ || {})[key];
@@ -2217,8 +2220,8 @@ document.addEventListener('click', e => {
     case 'ses-del': el.closest('.ses-row').remove(); break;
     case 'ses-up': { const row = el.closest('.ses-row'); if (row.previousElementSibling) row.parentNode.insertBefore(row, row.previousElementSibling); break; }
     case 'ses-reset': { const {f,h,code} = toggleOne(el.dataset.k); patchDia(f, h, code, {sesion: null}); closeModal(); toast('Sesión devuelta a la plantilla.'); break; }
-    case 'st-edit': { const k = el.dataset.k; S.ui.stOpen = {[k]: true}; S.ui.openCar[k] = true; S.ui.stTab = Object.assign(S.ui.stTab || {}, {[k]: 'series'}); render(); requestAnimationFrame(() => (document.querySelector('.sc.open .car-ed, .sc.open .res, .sc.open') || document.body).scrollIntoView({block: 'center', behavior: 'smooth'})); break; }
-    case 'st-open': { const k = el.dataset.k, was = !!(S.ui.stOpen || {})[k]; S.ui.stOpen = was ? {} : {[k]: true}; render(); if (!was) requestAnimationFrame(() => document.querySelector('.sc.open')?.scrollIntoView({block: 'nearest', behavior: 'smooth'})); break; }
+    case 'st-edit': { const k = el.dataset.k; abrirFicha(k); S.ui.openCar[k] = true; S.ui.stTab = Object.assign(S.ui.stTab || {}, {[k]: 'series'}); render(); requestAnimationFrame(() => { const c = cardDe(k); (c?.querySelector('.car-ed, .res') || c || document.body).scrollIntoView({block: 'center', behavior: 'smooth'}); }); break; }
+    case 'st-open': { const k = el.dataset.k, was = !!(S.ui.stOpen || {})[k]; if (was) delete S.ui.stOpen[k]; else abrirFicha(k); render(); if (!was) requestAnimationFrame(() => cardDe(k)?.scrollIntoView({block: 'nearest', behavior: 'smooth'})); break; }
     case 'ver-car': S.ui.openCar[el.dataset.k] = !S.ui.openCar[el.dataset.k]; render(); break;
     case 'ser-igual': setSerie(el.dataset.k, el.dataset.n, +el.dataset.i, {kg: el.dataset.kg === '' ? null : Number(el.dataset.kg), r: el.dataset.r === '' ? null : Number(el.dataset.r)}); break;
     case 'ser-add': S.ui.extraSer = S.ui.extraSer || {}; S.ui.extraSer[el.dataset.k + '|' + el.dataset.n] = +el.dataset.c + 1; render(); break;
