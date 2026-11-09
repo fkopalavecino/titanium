@@ -193,6 +193,8 @@ tr.click:hover td{background:var(--sunk)}
 .sc-ic{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}.sc-ic.crit{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 40%,transparent)}
 .ok-t{color:var(--ok);font-weight:600}.crit-t{color:var(--crit)}
 .sc .chev{color:var(--muted);font-size:20px;transition:transform .2s}.sc.open .chev{transform:rotate(90deg)}
+.sc-head{display:flex;gap:10px;align-items:center}.sc-head .sc-top{flex:1;min-width:0}
+.seg-sm{display:flex;flex:none}.seg-sm .seg-b{min-width:46px;min-height:40px;padding:0 10px;font-size:16px;font-weight:700}.seg-sm .seg-b:last-child{font-size:13px}
 .seg{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .seg-b{border:0;background:none;color:var(--muted);font:600 13px/1 inherit;padding:10px 4px;cursor:pointer;font-family:inherit}.seg-b+.seg-b{border-left:1px solid var(--line)}
 .seg-b.on.presente{background:var(--ok-soft);color:var(--ok)}.seg-b.on.ausente{background:var(--crit-soft);color:var(--crit)}.seg-b.on.aviso{background:var(--warn-soft);color:var(--warn)}
@@ -928,17 +930,17 @@ function studentCard(f, hora, code, ruts) {
   const rutNom = r.rutina ? String(S.rutinas.get(r.rutina)?.tipo || 'Rutina').split(' · ')[0] : sug ? 'Le toca ' + String(S.rutinas.get(sug)?.tipo || '').split(' · ')[0] : 'Sin rutina';
   const v = vivoInfo(f, hora, code, rut, r);
   const estado = v ? v.txt : (cf === 'no_voy' && !vino ? '<span class="crit-t">Avisó que no viene</span>' : cf === 'voy' ? 'Confirmó que viene' : '');
-  const seg = (val, txt, ttl) => `<button class="seg-b ${r.asis === val ? 'on ' + val : ''}" data-act="asis" data-v="${val}" data-k="${esc(key)}" ${val === 'presente' && sug ? `data-r="${esc(sug)}"` : ''} ${ttl ? `title="${ttl}"` : ''}>${txt}</button>`;
+  const seg = (val, txt, ttl) => `<button class="seg-b ${r.asis === val ? 'on ' + val : ''}" data-act="asis" data-v="${val}" data-k="${esc(key)}" ${val === 'presente' && sug ? `data-r="${esc(sug)}"` : ''} title="${ttl || {presente:'Presente',ausente:'Ausente'}[val] || txt}" aria-label="${ttl || {presente:'Presente',ausente:'Ausente'}[val] || txt}">${txt}</button>`;
   return `
   <article class="card student sc ${r.asis === 'presente' ? 'present' : r.asis === 'ausente' || r.asis === 'aviso' ? 'absent' : ''} ${det ? 'open' : ''}">
-    <button class="sc-top" data-act="st-open" data-k="${esc(key)}" aria-expanded="${det}">
+    <div class="sc-head"><button class="sc-top" data-act="st-open" data-k="${esc(key)}" aria-expanded="${det}">
       <span class="grow"><span class="sc-l1"><b class="st-name">${esc(a.nombre)}</b>${marcas}</span>
         <span class="sc-l2">${esc(rutNom)}${r.aprobada ? ' ✓' : ''}${tot ? ` · ${usadas}/${tot} clases` : ''}</span>
         ${estado ? `<span class="sc-l3">${estado}</span>` : ''}
         ${v && v.al.length ? `<span class="sc-al">⚠ ${v.al.map(esc).join(' · ')}</span>` : ''}</span>
       <span class="chev" aria-hidden="true">›</span>
     </button>
-    <div class="seg" role="group" aria-label="Asistencia">${seg('presente', 'Presente')}${seg('ausente', 'Ausente')}${seg('aviso', 'Avisó', 'No vino pero te avisó: decides si le das la recuperación')}</div>
+    <div class="seg seg-sm" role="group" aria-label="Asistencia">${seg('presente', '✓')}${seg('ausente', '✗')}${seg('aviso', 'Avisó', 'No vino pero te avisó: decides si le das la recuperación')}</div></div>
     ${det ? `<div class="sc-det"><div class="sc-c">
     <div class="st-row small"><button class="btn sm ghost" data-act="ficha" data-id="${esc(code)}">Ficha</button><button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button><button class="btn sm ghost" data-act="reag" data-k="${esc(key)}">↻ Reagendar</button>${r.extra ? `<button class="btn sm ghost" data-act="quitar-extra" data-k="${esc(key)}">Quitar del bloque</button>` : ''}${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}</div>
     ${pg ? `<div class="small muted num sc-prog" title="${esc(rut && !pg.terminado ? progLinea(rut, pg.semana) || '' : '')}">Sem ${Math.min(pg.semana, pg.total)}/${pg.total} · sesión ${pg.idx + 1}/${pg.ses.length}${pg.terminado ? ' · programa terminado' : ''}${sug ? ` · <b style="color:var(--fg)">le toca ${esc(S.rutinas.get(sug)?.tipo || '')}</b>` : ''}${rut && !pg.terminado && progLinea(rut, pg.semana) ? ` · 📈 ${esc(String(progLinea(rut, pg.semana)).replace(/^Semana \d+\s*·\s*/, ''))}` : ''}</div>` : ''}
