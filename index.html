@@ -187,7 +187,7 @@ tr.click:hover td{background:var(--sunk)}
 .sc-top .grow{flex:1;min-width:0;display:grid;gap:2px}
 .sc-l1{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sc-l1 .st-name{font-size:16px}
 .sc-l2{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sc-ej{color:var(--fg);font-weight:700}.sc-live{display:grid;gap:2px;cursor:pointer;margin-top:-4px}.sc-l3{font-size:14px;font-variant-numeric:tabular-nums;line-height:1.35}
+.sc-ej{color:var(--fg);font-weight:700}.sc-live{display:grid;gap:4px;cursor:pointer;margin-top:-4px}.sc-live:empty{display:none}.sc-rest{display:inline-flex;gap:6px;align-items:center;font-size:14px;padding:4px 10px;border-radius:999px;background:var(--warn-soft);color:var(--warn);font-weight:600}.sc-rest.go{background:var(--ok-soft);color:var(--ok)}.sc-l3{font-size:14px;font-variant-numeric:tabular-nums;line-height:1.35}
 .sc-l3 .dot{display:inline-block;vertical-align:middle;margin-right:6px;width:7px;height:7px;border-radius:50%;background:var(--red);animation:livepulse 1.6s ease-in-out infinite}
 .sc-al{font-size:12px;color:var(--crit);font-weight:600}
 .sc-ic{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}.sc-ic.crit{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 40%,transparent)}
@@ -291,7 +291,7 @@ details.sec[open] summary{margin-bottom:10px}
 .rut h4{margin:0;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
 .rut ol{margin:0;padding-left:20px;display:grid;gap:3px}
 .rut .d{color:var(--muted);font-size:13px}
-.students{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:10px;align-items:start}
+.students{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,460px),1fr));gap:10px;align-items:start}
 .students>*{min-width:0}
 
 /* timer */
@@ -940,7 +940,7 @@ function studentCard(f, hora, code, ruts) {
       <span class="chev" aria-hidden="true">›</span>
     </button>
     <div class="seg seg-sm" role="group" aria-label="Asistencia">${seg('presente', '✓')}${seg('ausente', '✗')}${seg('aviso', 'Avisó', 'No vino pero te avisó: decides si le das la recuperación')}</div></div>
-    ${estado || (v && v.al.length) ? `<div class="sc-live" data-act="st-open" data-k="${esc(key)}">${estado ? `<span class="sc-l3">${estado}</span>` : ''}${v && v.al.length ? `<span class="sc-al">⚠ ${v.al.map(esc).join(' · ')}</span>` : ''}</div>` : ''}
+    <div class="sc-live" data-act="st-open" data-k="${esc(key)}">${estado ? `<span class="sc-l3">${estado}</span>` : ''}<span data-rest-k="${esc(key)}">${restHTML(key)}</span>${v && v.al.length ? `<span class="sc-al">⚠ ${v.al.map(esc).join(' · ')}</span>` : ''}</div>
     ${det ? `<div class="sc-det"><div class="sc-c">
     <div class="st-row small"><button class="btn sm ghost" data-act="ficha" data-id="${esc(code)}">Ficha</button><button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button><button class="btn sm ghost" data-act="reag" data-k="${esc(key)}">↻ Reagendar</button>${r.extra ? `<button class="btn sm ghost" data-act="quitar-extra" data-k="${esc(key)}">Quitar del bloque</button>` : ''}${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}</div>
     ${pg ? `<div class="small muted num sc-prog" title="${esc(rut && !pg.terminado ? progLinea(rut, pg.semana) || '' : '')}">Sem ${Math.min(pg.semana, pg.total)}/${pg.total} · sesión ${pg.idx + 1}/${pg.ses.length}${pg.terminado ? ' · programa terminado' : ''}${sug ? ` · <b style="color:var(--fg)">le toca ${esc(S.rutinas.get(sug)?.tipo || '')}</b>` : ''}${rut && !pg.terminado && progLinea(rut, pg.semana) ? ` · 📈 ${esc(String(progLinea(rut, pg.semana)).replace(/^Semana \d+\s*·\s*/, ''))}` : ''}</div>` : ''}
@@ -969,6 +969,10 @@ const sinDescE = d => String(d || '').replace(/desc(?:anso)?\.?\s*\d+\s*(?:s|seg
 const esTiempo = (n, d) => { d = sinDescE(d); if (/×\s*\d+(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i.test(d)) return true; if (/×\s*\d+|\breps?\b|repeticiones|\d+\s*\/\s*(lado|pierna|brazo)/i.test(d)) return false; if (/\d+(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i.test(d)) return true; return /plancha(?!.*copenhag)|plank|hollow|isom[eé]tric|wall ?sit|sentadilla en (la )?pared|colgad|dead ?hang|l-?sit/i.test(n || ''); };
 const ejCorto = n => limpiarEj(n).split(/,|\s+—\s+/)[0].trim();
 const nSerieD = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? Math.min(6, Number(m[1])) : 1; };
+function restHTML(key) { const x = (S.rest || {})[key]; if (!x) return ''; const q = Math.ceil((x.fin - Date.now()) / 1000); if (q < -3) return '';
+  return `<span class="sc-rest${q <= 0 ? ' go' : ''}">${q > 0 ? `⏱ Descanso <b class="num">${Math.floor(q / 60)}:${String(q % 60).padStart(2, '0')}</b>` : '💪 Le toca la siguiente serie'}${x.ej ? ` · ${esc(ejCorto(x.ej))}` : ''}</span>`; }
+function pintarRest() { document.querySelectorAll('[data-rest-k]').forEach(el => { const h = restHTML(el.dataset.restK); if (el.innerHTML !== h) el.innerHTML = h; });
+  Object.keys(S.rest || {}).forEach(k => { if (S.rest[k].fin < Date.now() - 4000) delete S.rest[k]; }); }
 function vivoInfo(f, hora, code, rut, r) {
   if (!rut) return null;
   const llenos = x => setsOf(x).filter(z => z.kg != null || z.r != null || z.t != null); const cur = r.ej || []; const hechas = cur.reduce((n, x) => n + llenos(x).length, 0);
@@ -2421,7 +2425,11 @@ route();
       if (S.conf) nuevo.forEach((est, k) => { if (S.conf.get(k) !== est) { const [f, h, code] = k.split('|'); if (f >= today()) toast(`${est === 'voy' ? '✅' : '❌'} ${nombre(code)} ${est === 'voy' ? 'viene' : 'no viene'} · ${f === today() ? 'hoy' : fmtD(f)} ${h}`, est !== 'voy'); } });
       S.conf = nuevo; schedule(); };
     cpRevisar(); cargarProxEventos(); sbc.channel('tl-ev-ini').on('postgres_changes', { event: '*', schema: 'public', table: 'eventos' }, cargarProxEventos).subscribe();
-    cargarConf(); sbc.channel('tl-conf').on('postgres_changes', { event: '*', schema: 'public', table: 'confirmaciones' }, cargarConf).subscribe(); }
+    cargarConf(); sbc.channel('tl-conf').on('postgres_changes', { event: '*', schema: 'public', table: 'confirmaciones' }, cargarConf).subscribe();
+    // reloj de descanso en vivo de cada alumno (lo envía su app; no se guarda)
+    S.rest = {}; sbc.channel('tl-vivo').on('broadcast', { event: 'rest' }, ({ payload: p }) => { if (!p || !p.a) return;
+      const k = p.f + '|' + p.h + '|' + p.a; if (p.rem > 0) S.rest[k] = { fin: Date.now() + p.rem * 1000, ej: p.ej || '' }; else delete S.rest[k]; pintarRest(); }).subscribe();
+    setInterval(pintarRest, 500); }
   db.doc('config/general').onSnapshot(d => { S.cfg = d.exists ? clone(d.data()) : null; S.loaded.cfg = true; schedule(); maybeMigrateLib(); }, fail);
 })();
 })();
