@@ -447,6 +447,10 @@ const getDraft = () => { try { const k = DKEY(); let v = localStorage.getItem(k)
   // borradores antiguos (guardados solo con la fecha de hoy)
   if (!v && !S.rutSel) { const old = 'tl-draft-' + codigo + '-' + today(); const ov = localStorage.getItem(old); if (ov && k.startsWith(old + '-')) { v = ov; localStorage.setItem(k, ov); localStorage.removeItem(old); } }
   return JSON.parse(v || 'null') || { sets: {} }; } catch (e) { return { sets: {} }; } };
+const FKEY = () => DKEY() + '-foco';
+const getFoco = () => { try { return JSON.parse(localStorage.getItem(FKEY()) || 'null'); } catch (_) { return null; } };
+const putFoco = () => { if (S.foco == null) return; try { localStorage.setItem(FKEY(), JSON.stringify({ k: S.foco, cck: [...(S.cck || [])], vta: S.vta || {} })); } catch (_) {} };
+const clearFoco = () => { try { localStorage.removeItem(FKEY()); } catch (_) {} };
 const putDraft = d => { try { localStorage.setItem(DKEY(), JSON.stringify(d)); } catch (e) {} };
 const clearDraft = () => { try { localStorage.removeItem(DKEY()); Object.keys(localStorage).filter(k => k.startsWith('tl-draft-' + codigo + '-') && k !== DKEY() && k.slice(('tl-draft-' + codigo + '-').length, ('tl-draft-' + codigo + '-').length + 10) < addDays(today(), -30)).forEach(k => localStorage.removeItem(k)); } catch (e) {} };
 function applyDraft() { if (S.v !== 'rutina') return; const d = getDraft();
@@ -1043,7 +1047,7 @@ V.rutina = () => {
   return `${otro}${tambien}${okCard}
   <div style="display:grid;gap:6px"><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total : ''}</div><h1 style="font-size:30px;line-height:1.05">${esc(r.tipo || 'Rutina')}</h1>${(() => { const l = rd.pe ? progLinea(r, rd.pe.semana) : ''; return l ? `<div class="small muted">💡 ${esc(l.replace(/^Semana \d+ · /, ''))}</div>` : ''; })()}
     <div class="chips" style="margin-top:2px">${r.minutos ? `<span class="chip">⏱ ~${esc(r.minutos)} min</span>` : ''}<span class="chip">${items.length} ejercicios</span>${rd.hora && rd.hora !== 'libre' ? `<span class="chip">🕒 ${esc(rd.hora)}</span>` : ''}</div>
-    ${(!rd.futuro || S.tourSes) && items.length ? `<div class="row" style="align-items:center"><button class="btn pri foco-go" data-foco="1">▶ Modo clase</button></div>${asHTML()}` : ''}</div>
+    ${(!rd.futuro || S.tourSes) && items.length ? `<div class="row" style="align-items:center"><button class="btn pri foco-go" data-foco="1">${(() => { const g = getFoco(); return g && g.k > 0 ? '▶ Seguir modo clase · paso ' + (g.k + 1) : '▶ Modo clase'; })()}</button></div>${asHTML()}` : ''}</div>
   ${bloques.map((b, bi) => { const { letra, nomB, isB, isC } = info(b);
     const nEj = (b.ejercicios || []).length; const cerrado = !blkAbiertos.has(bi); const det = isB ? 'anota tus series' : isC ? '⏱ con temporizador' : '';
     return `<details class="card blk" data-blk="${bi}" ${cerrado ? '' : 'open'}><summary><span class="blk-l ${isB ? 'b' : ''}">${esc(letra)}</span><div style="flex:1;min-width:0"><div class="blk-t">${esc(nomB)}</div><div class="small muted">${nEj} ejercicio${nEj === 1 ? '' : 's'}${det ? ' · ' + esc(det) : ''}</div>${cerrado ? `<div class="blk-p">${esc((b.ejercicios || []).map(e => String(e.nombre || '').replace(/^(min(uto)?\s*\d+|\d+[ab]?)\s*·\s*/i, '')).join(' · '))}</div>` : ''}</div><span class="chev" aria-hidden="true">›</span></summary>${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}${isC ? `<button class="btn tbtn" data-timer="${bi}">⏱ Abrir temporizador · ${esc(timerTxt(detectarTimer(b)))}</button>` : ''}
@@ -1371,7 +1375,7 @@ V.clases = () => {
 
 let diaRender = '';
 function render(mantener) {
-  diaRender = today(); const y = window.scrollY;
+  diaRender = today(); const y = window.scrollY; putFoco();
   if (!mantener) window.scrollTo(0, 0);
   const lock = appBloqueada(); const onb = lock ? '' : onboardingHTML();
   $('#app').innerHTML = lock ? bloqueoHTML() : onb || V[S.v]();
@@ -1451,7 +1455,7 @@ document.addEventListener('click', async ev => {
   const tcb = ev.target.closest('[data-tec]'); if (tcb) { abrirTec(tcb.dataset.tec); return; }
   const cmb = ev.target.closest('[data-com]'); if (cmb) { const w = document.querySelector(`[data-comw="${CSS.escape(cmb.dataset.com)}"]`); if (!w) return;
     cmb.hidden = true; w.hidden = false; w.querySelector('input').focus(); return; }
-  if (ev.target.closest('[data-foco]')) { S.foco = 0; S.cck = new Set(); S.vta = {}; render(); window.scrollTo(0, 0); return; }
+  if (ev.target.closest('[data-foco]')) { const g = getFoco(); S.foco = g ? g.k : 0; S.cck = new Set(g ? g.cck : []); S.vta = g ? g.vta : {}; render(); window.scrollTo(0, 0); if (g && g.k > 0) toast('Seguimos donde ibas 💪'); return; }
   const cck = ev.target.closest('[data-cck]'); if (cck) { S.cck = S.cck || new Set(); const k = cck.dataset.cck; const on = !S.cck.has(k); on ? S.cck.add(k) : S.cck.delete(k);
     cck.setAttribute('aria-pressed', on); cck.closest('.circ-it')?.classList.toggle('ok', on); if (on && navigator.vibrate) try { navigator.vibrate(15); } catch (_) {} return; }
   const vta = ev.target.closest('[data-vuelta]'); if (vta) { const bi = vta.dataset.vuelta; S.vta = S.vta || {}; S.vta[bi] = (S.vta[bi] || 1) + 1; [...(S.cck || [])].filter(k => k.startsWith(bi + '-')).forEach(k => S.cck.delete(k)); render(); window.scrollTo(0, 0); return; }
@@ -1486,7 +1490,8 @@ document.addEventListener('click', async ev => {
   const abr = ev.target.closest('[data-abrses]'); if (abr) { const [f, h, id] = abr.dataset.abrses.split('|'); S.ses = { f, h, id }; S.rutSel = null; S.evSel = null; S.foco = null; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
   const rsel = ev.target.closest('[data-rsel]'); if (rsel) { if (rsel.dataset.rsel === rutinaDeHoy().id) return; S.rutSel = rsel.dataset.rsel; S.rpe = null; blkAbiertos.clear(); render(); return; }
   if (ev.target.closest('[data-sesx]')) { S.evSel = null; S.foco = null; S.ses = null; S.rutSel = null; S.rpe = null; S.v = 'agenda'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
-  const go = ev.target.closest('[data-go],[data-v]'); if (go && (go.dataset.go || go.closest('#tabs'))) { S.evSel = null; S.foco = null; if ((go.dataset.go || go.dataset.v) === 'rutina') { S.ses = null; S.rutSel = null; } S.v = go.dataset.go || go.dataset.v; S.evalFirst = false; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
+  const go = ev.target.closest('[data-go],[data-v]'); if (go && go.closest('#tabs') && (go.dataset.go || go.dataset.v) === 'rutina' && S.v === 'rutina' && S.foco != null) { window.scrollTo(0, 0); return; }
+  if (go && (go.dataset.go || go.closest('#tabs'))) { S.evSel = null; S.foco = null; if ((go.dataset.go || go.dataset.v) === 'rutina') { S.ses = null; S.rutSel = null; } S.v = go.dataset.go || go.dataset.v; S.evalFirst = false; if (S.v === 'rutina') blkAbiertos.clear(); render(); return; }
   const apx = ev.target.closest('[data-apx]'); if (apx) { S.apX = S.apX || {}; const n = apx.dataset.apx; const cur = apx.closest('.sets').querySelectorAll('.set.ap').length; S.apX[DKEY() + n] = Math.min(4, cur + 1); render(true); return; }
   const chk = ev.target.closest('[data-chk]'); if (chk) { const row = chk.closest('.set'); const ins = [...row.querySelectorAll('input')];
     if (row.dataset.ok) { delete row.dataset.ok; finDescanso(); return; }
@@ -1544,7 +1549,7 @@ document.addEventListener('click', async ev => {
     S.miEscritura = Date.now(); const { error } = await sb.rpc('registrar_mi_sesion', { p_fecha: rd.fecha || today(), p_hora: rd.hora, p_ej: ej, p_carga: $('#carga') ? ($('#carga').value.trim() || null) : ((getDraft().carga || '').trim() || rd.rec?.carga || null), p_rpe: rpe, p_rutina: rd.id || null });
     btn.disabled = false;
     if (error) { toast('No se pudo guardar: ' + error.message); return; }
-    clearDraft(); S.foco = null; S.rpe = null; await load(); toast('Entrenamiento guardado 💪'); render();
+    clearFoco(); clearDraft(); S.foco = null; S.rpe = null; await load(); toast('Entrenamiento guardado 💪'); render();
   }
 });
 render();
