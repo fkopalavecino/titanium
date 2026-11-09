@@ -437,14 +437,19 @@ const nSer = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\
 const fmtSet = s => s ? (s.t != null ? s.t + ' s' : (s.kg != null ? String(s.kg).replace('.', ',') + ' kg' : '') + (s.r != null ? (s.kg != null ? ' × ' : '') + s.r + (s.kg != null ? '' : ' reps') : '')) : '';
 const conDato = z => !!z && (z.kg != null || z.r != null || z.t != null);
 // tipo de ejercicio: por tiempo (plancha…), peso corporal (dominadas…) o con kilos
-const sinDesc = d => String(d || '').replace(/desc(?:anso)?\.?\s*\d+\s*(?:s|seg|min|m|')(?![a-z])/gi, '');
+const sinDesc = d => String(d || '').replace(/(desc(?:anso)?\.?|luego|pausa)\s*\d+(?:[:.]\d+)?\s*(?:s|seg|min|m|')(?![a-z])/gi, '').replace(/\d+(?:[:.]\d+)?\s*(?:s|seg|min)\s*de\s*(pausa|descanso)/gi, '');
 const SEG_RE = /×\s*(\d+)(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i;
 const TIEMPO_RE = /plancha(?!.*copenhag)|plank|hollow|isom[eé]tric|wall ?sit|sentadilla en (la )?pared|colgad|dead ?hang|l-?sit/i;
-const CORPORAL_RE = /dominada|pull-?up|chin-?up|fondos|\bdips\b|flexiones|flexi[oó]n de brazos|push-?up|remo invertido|muscle-?up|copenhag/i;
+const CORPORAL_RE = /dominada|pull-?up|chin-?up|fondos|\bdips\b|flexiones|flexi[oó]n de brazos|push-?up|remo invertido|muscle-?up|copenhag|n[oó]rdico|superman|toque de hombro|elevaci[oó]n de piernas/i;
 // orden: tiempo explícito en la dosis > reps explícitas en la dosis > nombre del ejercicio
 const SEG2_RE = /(\d+)(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i;
 function tipoEj(e) { const d = sinDesc(e.dosis), nm = e.nombre || ''; if (SEG_RE.test(d)) return 'tiempo';
-  const reps = /×\s*\d+|\breps?\b|repeticiones|\d+\s*\/\s*(lado|pierna|brazo)/i.test(d); if (!reps && (SEG2_RE.test(d) || TIEMPO_RE.test(nm))) return 'tiempo'; return CORPORAL_RE.test(nm) ? 'corporal' : 'kg'; }
+  // "mismas series · 10 · luego 75 s": lo primero que viene es lo que se hace (10 reps); lo que sigue es el descanso
+  const pri = d.replace(/^\s*mismas series\s*·?\s*/i, '').replace(/^\s*\d+\s*[×x]\s*/i, '').match(/^\s*(m[aá]x|\d+(?:\s*[–-]\s*\d+)?)\s*(s\b|seg|"|min|m\b)?/i);
+  if (pri && /^m$/i.test(pri[2] || '')) return 'kg'; // distancia (paseo del granjero…)
+  if (pri && /^(s|seg|"|min)/i.test(pri[2] || '')) return 'tiempo';
+  if (pri && !pri[2] && /^\s*(mismas series|\d+\s*[×x])/i.test(d)) return CORPORAL_RE.test(nm) ? 'corporal' : 'kg';
+  const reps = /×\s*(\d+|m[aá]x)|\breps?\b|repeticiones|\d+\s*\/\s*(lado|pierna|brazo)/i.test(d); if (!reps && (SEG2_RE.test(d) || TIEMPO_RE.test(nm))) return 'tiempo'; return CORPORAL_RE.test(nm) ? 'corporal' : 'kg'; }
 const segObj = e => { const m = sinDesc(e.dosis).match(SEG_RE) || sinDesc(e.dosis).match(SEG2_RE); return m ? Number(m[1]) * (/min/i.test(m[2]) ? 60 : 1) : 0; };
 const nAprox = e => { const m = String(e.dosis || '').match(/(rir\s*)?(\d)\s*(?:series?\s*(?:de\s*)?)?aprox/i); return m && !m[1] ? Math.min(4, Number(m[2])) : 0; };
 

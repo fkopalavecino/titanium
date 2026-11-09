@@ -980,8 +980,12 @@ function studentCard(f, hora, code, ruts) {
 }
 // lo que el alumno va anotando desde su app durante la clase (se actualiza solo)
 const limpiarEj = n => String(n || '').replace(/^(min(uto)?\s*\d+|\d+[ab]?)\s*·\s*/i, '').replace(/\s*\(.*?\)/g, '');
-const sinDescE = d => String(d || '').replace(/desc(?:anso)?\.?\s*\d+\s*(?:s|seg|min|m|')(?![a-z])/gi, '');
-const esTiempo = (n, d) => { d = sinDescE(d); if (/×\s*\d+(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i.test(d)) return true; if (/×\s*\d+|\breps?\b|repeticiones|\d+\s*\/\s*(lado|pierna|brazo)/i.test(d)) return false; if (/\d+(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i.test(d)) return true; return /plancha(?!.*copenhag)|plank|hollow|isom[eé]tric|wall ?sit|sentadilla en (la )?pared|colgad|dead ?hang|l-?sit/i.test(n || ''); };
+const sinDescE = d => String(d || '').replace(/(desc(?:anso)?\.?|luego|pausa)\s*\d+(?:[:.]\d+)?\s*(?:s|seg|min|m|')(?![a-z])/gi, '').replace(/\d+(?:[:.]\d+)?\s*(?:s|seg|min)\s*de\s*(pausa|descanso)/gi, '');
+// misma regla que la app del alumno: lo primero que viene en la dosis es lo que se hace; lo que sigue es descanso
+const esTiempo = (n, d) => { d = sinDescE(d); if (/×\s*\d+(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i.test(d)) return true;
+  const pri = d.replace(/^\s*mismas series\s*·?\s*/i, '').replace(/^\s*\d+\s*[×x]\s*/i, '').match(/^\s*(m[aá]x|\d+(?:\s*[–-]\s*\d+)?)\s*(s\b|seg|"|min|m\b)?/i);
+  if (pri && /^m$/i.test(pri[2] || '')) return false; if (pri && /^(s|seg|"|min)/i.test(pri[2] || '')) return true; if (pri && !pri[2] && /^\s*(mismas series|\d+\s*[×x])/i.test(d)) return false;
+  if (/×\s*(\d+|m[aá]x)|\breps?\b|repeticiones|\d+\s*\/\s*(lado|pierna|brazo)/i.test(d)) return false; if (/\d+(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i.test(d)) return true; return /plancha(?!.*copenhag)|plank|hollow|isom[eé]tric|wall ?sit|sentadilla en (la )?pared|colgad|dead ?hang|l-?sit/i.test(n || ''); };
 const ejCorto = n => limpiarEj(n).split(/,|\s+—\s+/)[0].trim();
 const nSerieD = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? Math.min(6, Number(m[1])) : 1; };
 function restHTML(key) { const x = (S.rest || {})[key]; if (!x) return ''; const q = Math.ceil((x.fin - Date.now()) / 1000); if (q < -3) return '';
