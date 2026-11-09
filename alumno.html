@@ -501,7 +501,8 @@ document.addEventListener('change', async ev => { const f = ev.target; if (f.id 
   const file = f.files[0]; S.ibNew = { file, estado: 'leyendo', vals: {}, f: today(), prev: URL.createObjectURL(file), sexo: (S.inbody.slice().reverse().find(x => x.sexo) || {}).sexo || '' }; S.v = 'progreso'; render();
   document.getElementById('ib-card')?.scrollIntoView({ block: 'start' });
   try { const r = await window.tlInbodyLeer(file, pct => { const e = document.getElementById('ib-pct'); if (e) e.textContent = pct + ' %'; });
-    S.ibNew.vals = Object.fromEntries(Object.entries(r.vals).map(([k, v]) => [k, String(v).replace('.', ',')])); S.ibNew.leidos = Object.keys(r.vals).length;
+    const { fecha: fIb, talla: _t, ...vl } = r.vals || {}; if (fIb && fIb <= today()) S.ibNew.f = fIb;
+    S.ibNew.vals = Object.fromEntries(Object.entries(vl).map(([k, v]) => [k, String(v).replace('.', ',')])); S.ibNew.leidos = Object.keys(vl).length;
   } catch (e) { S.ibNew.leidos = 0; }
   if (S.ibNew) { S.ibNew.estado = 'confirmar'; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); } });
 document.addEventListener('input', ev => { const i = ev.target; if (i.dataset?.ibk && S.ibNew) S.ibNew.vals[i.dataset.ibk] = i.value; if (i.id === 'ib-f' && S.ibNew) S.ibNew.f = i.value; if (i.id === 'ib-sexo' && S.ibNew) S.ibNew.sexo = i.value; });

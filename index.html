@@ -1865,6 +1865,7 @@ async function subirInbody(code, fecha, file, el) {
   if (!assets) { toast('Las fotos no están disponibles en esta vista.', true); return; }
   el?.closest('.inb-up')?.classList.add('busy');
   try { toast('Leyendo los datos del InBody…'); let vals = {}; try { if (window.tlInbodyLeer) vals = (await window.tlInbodyLeer(file)).vals || {}; } catch (e2) {}
+    if (vals.fecha && vals.fecha <= today() && fecha === today()) fecha = vals.fecha; delete vals.fecha; delete vals.talla;
     const blob = await achicarFoto(file, 2000); const up = await assets.upload(blob);
     const a = clone(S.alumnos.get(code)); a.inbody = [...(a.inbody || []), Object.assign({ f: fecha, img: up.id, por: 'coach' }, vals)].sort((x, y) => x.f.localeCompare(y.f)); saveAlumno(a);
     S.ui.inbOpen = true; toast('InBody guardado.'); progresoModal(code);

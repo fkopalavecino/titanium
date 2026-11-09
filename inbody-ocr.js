@@ -31,6 +31,19 @@
   const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[|]/g, ' ').replace(/[ \t]+/g, ' ');
   const num = s => Number(String(s).replace(',', '.'));
 
+  // Etiquetas parecidas que NO son el dato (Fitdays: «Peso corporal sin grasa», «Peso objetivo», «Control de peso»…)
+  const EXCLUIR = {
+    peso: { despues: /^\s*(corporal\s+)?(sin grasa|libre de grasa|magr|objetivo|ideal|recomendado|actual\s*\/)/, antes: /(control de|proporcion de|objetivo|sin grasa)\s*$/ },
+    pgc: { despues: /^\s*(\(kg\)|kg\b)/, antes: /(control de|masa de)\s*$/ },
+    imc: { despues: /^\s*\(?\s*kg\s*\/\s*m/ },
+  };
+  // Una fila de números que sube con paso parejo es la escala de un gráfico (10 15 20 25…), no un dato.
+  const esEscala = ns => { if (ns.length < 4) return false; const a = ns.slice(0, 5), d = a.slice(1).map((x, i) => x - a[i]);
+    return d.every(x => x > 0) && Math.max(...d) <= Math.min(...d) * 2.5; };
+  const fechaISO = t => { const m = t.match(/(?:prueba|fecha|test|date)[^0-9]{0,15}(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/) || t.match(/(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})/);
+    if (!m) return null; let [, a, b, c] = m; const [y, mo, d] = a.length === 4 ? [a, b, c] : [c, b, a];
+    if (+mo < 1 || +mo > 12 || +d < 1 || +d > 31) return null; return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`; };
+
   function extraer(texto) {
     const t = norm(texto); const out = {}; const colas = {};
     for (const [k, , , syn, [mn, mx]] of CAMPOS) {
@@ -38,19 +51,32 @@
         let from = 0, found = null;
         while (!found) {
           const i = t.indexOf(label, from); if (i < 0) break;
-          const tail = t.slice(i + label.length, i + label.length + 60);
+          const tail = t.slice(i + label.length, i + label.length + 60), ex = EXCLUIR[k];
+          if (/[a-z]/.test(t[i + label.length] || '') || (i > 0 && /[a-z]/.test(t[i - 1])) ||
+            (ex && ((ex.despues && ex.despues.test(tail)) || (ex.antes && ex.antes.test(t.slice(Math.max(0, i - 25), i)))))) { from = i + label.length; continue; }
           const nums = [...tail.matchAll(/(\d{1,4}(?:[.,]\d{1,2})?)/g)].map(m => num(m[1]));
+          if (esEscala(nums)) { from = i + label.length; continue; }
           const v = nums.find(n => n >= mn && n <= mx);
           if (v != null) { found = v; colas[k] = nums; } else from = i + label.length;
         }
         if (found != null) { out[k] = found; break; }
       }
     }
+    // Sin fila de peso: se reconstruye con «peso sin grasa» + kg de grasa de la misma fila del % (Fitdays).
+    const ml = t.match(/(?:peso corporal sin grasa|peso sin grasa|masa libre de grasa|masa magra)\D{0,12}(\d{2,3}(?:[.,]\d)?)/);
+    if (!out.peso && ml && colas.pgc) { const magra = num(ml[1]);
+      for (const kg of colas.pgc) { const p = magra + kg, pct = kg / p * 100;
+        if (p >= 25 && p <= 250 && colas.pgc.some(n => n !== kg && Math.abs(n - pct) <= 0.6)) { out.peso = Math.round(p * 10) / 10; break; } } }
     // BodyGo/InBody: la fila «Grasa corporal» trae primero los kg y después el %. Si el valor leído
     // coincide con kg (≈ % × peso), se usa el número de la misma fila que corresponde al porcentaje.
     if (out.peso && out.pgc && colas.pgc) { const pct = out.pgc / out.peso * 100;
       const alt = colas.pgc.find(n => n !== out.pgc && Math.abs(n - pct) <= 0.6);
       if (alt != null) { out.mgc = out.pgc; out.pgc = alt; } }
+    // Estatura (Alto/Altura/Estatura en cm): con ella el IMC se calcula y no depende del OCR.
+    const mt = t.match(/(?:alto|altura|estatura|talla|height)\s*[:=]?\s*(\d{3})(?:[.,]\d)?\s*cm/);
+    if (mt && +mt[1] >= 120 && +mt[1] <= 225) { out.talla = +mt[1];
+      if (out.peso) { const imc = Math.round(out.peso / (out.talla / 100) ** 2 * 10) / 10; if (out.imc == null || Math.abs(out.imc - imc) > 0.5) out.imc = imc; } }
+    const f = fechaISO(t); if (f) out.fecha = f;
     // coherencia: si hay peso y % grasa pero no masa grasa, se calcula
     if (out.peso && out.pgc && !out.mgc) out.mgc = Math.round(out.peso * out.pgc) / 100;
     if (out.peso && out.mgc && !out.pgc) out.pgc = Math.round(out.mgc / out.peso * 1000) / 10;
