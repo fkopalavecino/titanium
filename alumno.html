@@ -1694,6 +1694,7 @@ document.addEventListener('click', async ev => {
     clearFoco(); clearDraft(); S.foco = null; S.rpe = null; await load(); toast('Entrenamiento guardado 💪'); render();
   }
 });
+await cargarHab(); // las skills se cargan aquí: SKILLS/SKD recién existen en este punto del script
 render();
 /* abrir el evento de un aviso: Evaluación → Progreso (evaluaciones); el resto → Agenda en ese día */
 async function irAEvento(id) {
