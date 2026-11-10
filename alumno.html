@@ -372,7 +372,7 @@ async function load() {
   rs.forEach(r => (r.data || []).forEach(x => S.rutinas.set(x.id, mismasSeries(x.data))));
   S.fotos = (Array.isArray(S.a.fotos) ? S.a.fotos : []).filter(x => x && (x.frente || x.perfil || x.espalda)).sort((x, y) => x.f.localeCompare(y.f));
   S.medidas = Array.isArray(S.a.medidas) ? S.a.medidas : [];
-  S.inbody = (Array.isArray(S.a.inbody) ? S.a.inbody : []).filter(x => x && (x.img || x.peso)).sort((x, y) => x.f.localeCompare(y.f));
+  S.inbody = (Array.isArray(S.a.inbody) ? S.a.inbody : []).filter(x => x && (x.img || x.peso)).map(x => window.TL_INBODY_DERIVAR ? window.TL_INBODY_DERIVAR(x) : x).sort((x, y) => x.f.localeCompare(y.f));
   S.perfil = (S.a.perfil && typeof S.a.perfil === 'object') ? S.a.perfil : {};
   const docs = S.eventos.map(e => e.adjunto).filter(id => id && !S.urls[id]);
   if (docs.length) { const { data: sd } = await sb.storage.from('fotos').createSignedUrls(docs, 3600 * 12); (sd || []).forEach(x => { if (x.signedUrl) S.urls[x.path] = x.signedUrl; }); }
@@ -507,7 +507,7 @@ document.addEventListener('change', async ev => { const f = ev.target; if (f.id 
   if (S.ibNew) { S.ibNew.estado = 'confirmar'; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); } });
 document.addEventListener('input', ev => { const i = ev.target; if (i.dataset?.ibk && S.ibNew) S.ibNew.vals[i.dataset.ibk] = i.value; if (i.id === 'ib-f' && S.ibNew) S.ibNew.f = i.value; if (i.id === 'ib-sexo' && S.ibNew) S.ibNew.sexo = i.value; });
 async function guardarInbody(btn) { const n = S.ibNew; if (!n) return; btn.disabled = true; btn.textContent = 'Guardando…';
-  try { const d = {}; for (const [k] of IBC()) { const v = String(n.vals[k] ?? '').trim().replace(',', '.'); if (v !== '' && !isNaN(v)) d[k] = Number(v); } if (n.sexo) d.sexo = n.sexo;
+  try { const d = {}; for (const [k, , , , , , , calc] of IBC()) { if (calc === 'calc') continue; const v = String(n.vals[k] ?? '').trim().replace(',', '.'); if (v !== '' && !isNaN(v)) d[k] = Number(v); } if (n.sexo) d.sexo = n.sexo;
     const blob = await achicar(n.file, 2000); const id = 'inbody/' + codigo + '/' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()) + '.jpg';
     const { error: e1 } = await sb.storage.from('fotos').upload(id, blob, { contentType: 'image/jpeg' }); if (e1) throw e1;
     const { error: e2 } = await sb.rpc('agregar_mi_inbody', { p_id: id, p_f: n.f || today(), p_datos: d }); if (e2) throw e2;
@@ -1175,15 +1175,15 @@ V.progreso = () => {
     inbCard = `<section class="card" id="ib-card"><h2>Revisa tus datos</h2>
       <div class="small ${n.leidos ? 'muted' : 'warn'}">${n.leidos ? `Leímos ${n.leidos} dato${n.leidos === 1 ? '' : 's'} del informe. Revisa que coincidan y corrige si hace falta.` : 'No pudimos leer los números de la imagen. Escríbelos mirando tu informe.'}</div>
       <div class="row" style="gap:12px;align-items:flex-start"><img src="${n.prev}" data-zoom="1" alt="Tu informe" style="width:84px;height:112px;object-fit:cover;border-radius:8px;cursor:zoom-in"><div style="flex:1;display:grid;gap:8px"><label class="field">Fecha del InBody<input type="date" id="ib-f" value="${esc(n.f)}"></label><label class="field">Sexo (para tus rangos de referencia)<select id="ib-sexo"><option value="">—</option><option value="h" ${n.sexo === 'h' ? 'selected' : ''}>Hombre</option><option value="m" ${n.sexo === 'm' ? 'selected' : ''}>Mujer</option></select></label></div></div>
-      <div class="grid2">${C.map(([k, l, u]) => `<label class="field">${esc(l)}${u ? ` <span class="small">(${esc(u)})</span>` : ''}<input inputmode="decimal" data-ibk="${k}" value="${esc(n.vals[k] ?? '')}" placeholder="—"></label>`).join('')}</div>
+      <div class="grid2">${C.filter(c => c[7] !== 'calc').map(([k, l, u]) => `<label class="field">${esc(l)}${u ? ` <span class="small">(${esc(u)})</span>` : ''}<input inputmode="decimal" data-ibk="${k}" value="${esc(n.vals[k] ?? '')}" placeholder="—"></label>`).join('')}</div>
       <button class="btn pri" id="ib-ok">Guardar InBody</button><button class="btn" id="ib-cancel">Cancelar</button></section>`; }
   else if (!ibL) inbCard = `<section class="card" id="ib-card"><h2>InBody</h2><div class="small muted">Sube la foto o el pantallazo de tu informe InBody o BodyGo. Leemos los datos automáticamente y vas viendo tu evolución.</div>${upBtn('＋ Subir mi InBody', true)}</section>`;
   else { const prevOf = k => { for (let i = ib.length - 2; i >= 0; i--) if (ib[i][k] != null) return ib[i]; return null; };
-    const PRIN = ['peso', 'pgc', 'mme']; const conDato = C.filter(([k]) => ibL[k] != null); const extra = conDato.filter(([k]) => !PRIN.includes(k)).length;
+    const PRIN = ['pgc', 'mgc', 'visceral', 'mme', 'pmm', 'peso']; const conDato = C.filter(([k]) => ibL[k] != null); const extra = conDato.filter(([k]) => !PRIN.includes(k)).length;
     const tiles = conDato.filter(([k]) => S.ibAll || PRIN.includes(k) || S.ibInfo === k).map(([k, l, u, , , dec, mejor]) => { const pv = prevOf(k); const d = pv ? ibL[k] - pv[k] : null;
       const cls = d == null || Math.abs(d) < 0.05 || !mejor ? 'muted' : ((mejor === 'baja') === (d < 0) ? 'ok' : 'warn');
       return `<div class="card kpi ${S.ibInfo === k ? 'sel' : ''}" data-ibi="${k}" role="button" tabindex="0" style="padding:10px;gap:2px;cursor:pointer;min-width:0"><div class="small muted" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l)}</div><div class="v" style="font-size:24px">${fmtN(ibL[k], dec)}<span class="small muted"> ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</span></div>${d != null ? `<div class="small ${cls}">${d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= '}${fmtN(Math.abs(d), dec)} ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</div>` : ''}</div>`; }).join('');
-    const gk = (S.ibInfo && ib.filter(x => x[S.ibInfo] != null).length >= 2) ? S.ibInfo : (['pgc', 'mme', 'peso', 'visceral', 'imc'].find(k => ib.filter(x => x[k] != null).length >= 2) || null);
+    const gk = (S.ibInfo && ib.filter(x => x[S.ibInfo] != null).length >= 2) ? S.ibInfo : (['pgc', 'mme', 'pmm', 'mgc', 'peso', 'visceral', 'cintura'].find(k => ib.filter(x => x[k] != null).length >= 2) || null);
     const gc = gk && C.find(c => c[0] === gk);
     const trend = gk ? (() => { const pts = ib.filter(x => x[gk] != null).map(x => [x.f, x[gk]]); const vs = pts.map(p => p[1]); const mn = Math.min(...vs), mx = Math.max(...vs); const W = 320, Hh = 120, pad = 14;
       const xy = pts.map(([f, v], i) => [pad + i * (W - 2 * pad) / (pts.length - 1), Hh - 22 - (mx === mn ? .5 : (v - mn) / (mx - mn)) * (Hh - 44)]);

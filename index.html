@@ -1865,22 +1865,24 @@ async function subirInbody(code, fecha, file, el) {
   if (!assets) { toast('Las fotos no están disponibles en esta vista.', true); return; }
   el?.closest('.inb-up')?.classList.add('busy');
   try { toast('Leyendo los datos del InBody…'); let vals = {}; try { if (window.tlInbodyLeer) vals = (await window.tlInbodyLeer(file)).vals || {}; } catch (e2) {}
-    if (vals.fecha && vals.fecha <= today() && fecha === today()) fecha = vals.fecha; delete vals.fecha; delete vals.talla;
+    if (vals.fecha && vals.fecha <= today() && fecha === today()) fecha = vals.fecha; delete vals.fecha; delete vals.talla; delete vals.imc; delete vals.pmm;
+    const cint = parseFloat(String($('#inb-cint')?.value || '').replace(',', '.')); if (cint >= 40 && cint <= 200) vals.cintura = cint;
     const blob = await achicarFoto(file, 2000); const up = await assets.upload(blob);
     const a = clone(S.alumnos.get(code)); a.inbody = [...(a.inbody || []), Object.assign({ f: fecha, img: up.id, por: 'coach' }, vals)].sort((x, y) => x.f.localeCompare(y.f)); saveAlumno(a);
     S.ui.inbOpen = true; toast('InBody guardado.'); progresoModal(code);
   } catch(e) { el?.closest('.inb-up')?.classList.remove('busy'); toast('No se pudo subir el InBody. Intenta de nuevo.', true); }
 }
 function inbodyHTML(a) {
-  const code = a.codigo, ls = (a.inbody || []).filter(x => x && (x.img || x.peso));
+  const code = a.codigo, ls = (a.inbody || []).filter(x => x && (x.img || x.peso)).map(x => window.TL_INBODY_DERIVAR ? window.TL_INBODY_DERIVAR(x) : x);
   return `<details class="sec inb" ${S.ui.inbOpen ? 'open' : ''}>
     <summary>📊 InBody / bioimpedancia <span class="small muted" style="font-weight:500">· ${ls.length ? ls.length + ' informe' + (ls.length === 1 ? '' : 's') + ' · último ' + fmtDY(ls[ls.length - 1].f) : 'sin informes aún'}</span></summary>
     <div style="display:grid;gap:10px;margin-top:10px">
       ${!assets ? '<div class="notice">Para subir el InBody abre el Control con tu cuenta.</div>' : `
       <div class="tools inb-up" style="gap:10px;align-items:end"><label class="f" style="flex-direction:row;align-items:center;gap:6px">Fecha <input type="date" id="inb-fecha" value="${today()}"></label>
+        <label class="f" style="flex-direction:row;align-items:center;gap:6px">Cintura <input type="text" inputmode="decimal" id="inb-cint" placeholder="cm" style="width:70px"></label>
         <label class="btn sm" style="position:relative;overflow:hidden;cursor:pointer">＋ Subir pantallazo<input type="file" accept="image/*" class="inb-in" data-id="${esc(code)}" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label></div>`}
-      ${ls.length ? (() => { const C = (window.TL_INBODY_CAMPOS || []).filter(([k]) => ls.some(x => x[k] != null)); const f1 = (v, d) => v == null ? '—' : (d ? (Math.round(v * 10) / 10).toFixed(1) : String(Math.round(v))).replace('.', ',');
-        return `<div class="tbl-wrap"><table><thead><tr><th>Fecha</th>${C.map(([, l, u]) => `<th class="r">${esc(l)}${u && u !== 'nivel' && u !== 'pts' ? ' <span class="muted">' + esc(u) + '</span>' : ''}</th>`).join('')}<th>Informe</th><th></th></tr></thead><tbody>${ls.map((x, i) => ({ x, i })).reverse().map(({ x, i }) => `<tr><td class="num">${fmtDY(x.f)}${x.por === 'alumno' ? ' <span class="pill muted">alumno</span>' : ''}</td>${C.map(([k, , , , , d]) => `<td class="r num">${f1(x[k], d)}</td>`).join('')}<td>${x.img ? `<img src="${fotoURL(x.img)}" alt="InBody ${fmtD(x.f)}" data-act="foto-zoom" style="width:36px;height:48px;object-fit:cover;border-radius:6px;cursor:zoom-in">` : ''}</td><td><button type="button" class="btn sm ghost" data-act="inb-del" data-id="${esc(code)}" data-i="${i}" aria-label="Borrar InBody ${fmtD(x.f)}">✕</button></td></tr>`).join('')}</tbody></table></div><div class="small muted">Los datos se leen solos de la imagen. Si alguno no calza, revísalo en el informe original.</div>`; })() : '<div class="small muted">Sube la foto o pantallazo del informe InBody. El alumno también puede subirlo desde su app.</div>'}
+      ${ls.length ? (() => { const C = (window.TL_INBODY_CAMPOS || []).filter(([k]) => k === 'cintura' || ls.some(x => x[k] != null)); const f1 = (v, d) => v == null ? '—' : (d ? (Math.round(v * 10) / 10).toFixed(1) : String(Math.round(v))).replace('.', ',');
+        return `<div class="tbl-wrap"><table><thead><tr><th>Fecha</th>${C.map(([, l, u]) => `<th class="r">${esc(l)}${u && u !== 'nivel' && u !== 'pts' ? ' <span class="muted">' + esc(u) + '</span>' : ''}</th>`).join('')}<th>Informe</th><th></th></tr></thead><tbody>${ls.map((x, i) => ({ x, i })).reverse().map(({ x, i }) => `<tr><td class="num">${fmtDY(x.f)}${x.por === 'alumno' ? ' <span class="pill muted">alumno</span>' : ''}</td>${C.map(([k, , , , , d]) => k === 'cintura' ? `<td class="r"><input type="text" inputmode="decimal" class="inb-cint-ed" data-id="${esc(code)}" data-i="${i}" value="${x.cintura != null ? f1(x.cintura, 1) : ''}" placeholder="cm" aria-label="Cintura ${fmtD(x.f)}" style="width:62px;text-align:right"></td>` : `<td class="r num">${f1(x[k], d)}</td>`).join('')}<td>${x.img ? `<img src="${fotoURL(x.img)}" alt="InBody ${fmtD(x.f)}" data-act="foto-zoom" style="width:36px;height:48px;object-fit:cover;border-radius:6px;cursor:zoom-in">` : ''}</td><td><button type="button" class="btn sm ghost" data-act="inb-del" data-id="${esc(code)}" data-i="${i}" aria-label="Borrar InBody ${fmtD(x.f)}">✕</button></td></tr>`).join('')}</tbody></table></div><div class="small muted">Los datos se leen solos de la imagen. Si alguno no calza, revísalo en el informe original.</div>`; })() : '<div class="small muted">Sube la foto o pantallazo del informe InBody. El alumno también puede subirlo desde su app.</div>'}
     </div>
   </details>`;
 }
@@ -2331,7 +2333,10 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('mess
   const hash = go.includes('#') ? go.slice(go.indexOf('#')) : ''; if (!hash) return; if (location.hash === hash) route(); else location.hash = hash; });
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.classList?.contains('inb-in') && t.files?.[0]) { subirInbody(t.dataset.id, $('#inb-fecha')?.value || today(), t.files[0], t); }
+  if (t.classList?.contains('inb-cint-ed')) { const a = clone(S.alumnos.get(t.dataset.id)); const it = (a.inbody || [])[+t.dataset.i]; if (!it) return;
+    const v = parseFloat(String(t.value).replace(',', '.')); if (t.value.trim() === '') delete it.cintura; else if (v >= 40 && v <= 200) it.cintura = v; else { toast('Cintura fuera de rango (40–200 cm).', true); return; }
+    saveAlumno(a); toast('Cintura guardada.'); }
+  else if (t.classList?.contains('inb-in') && t.files?.[0]) { subirInbody(t.dataset.id, $('#inb-fecha')?.value || today(), t.files[0], t); }
   else if (t.classList?.contains('foto-in') && t.files?.[0]) { const f = $('#foto-fecha')?.value || today(); subirFoto(t.dataset.id, f, t.dataset.ang, t.files[0], t.closest('.f-slot')); }
   else if (t.id === 'foto-fecha') { S.ui.fotoFecha = t.value || today(); S.ui.fotosOpen = true; const code = t.closest('.fotos')?.querySelector('.foto-in')?.dataset.id; if (code) progresoModal(code); }
   else if (t.id === 'foto-a' || t.id === 'foto-b') { const id = t.dataset.id; S.ui.fotoCmp = Object.assign({}, S.ui.fotoCmp?.code === id ? S.ui.fotoCmp : {code: id}, {[t.id === 'foto-a' ? 'a' : 'b']: t.value}); S.ui.fotosOpen = true; progresoModal(id); }

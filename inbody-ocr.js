@@ -3,12 +3,15 @@
    los datos principales. Los valores se muestran para confirmar antes de guardar. */
 (function () {
   const CAMPOS = [
-    // clave, etiqueta visible, unidad, [sinónimos], [mín, máx], decimales, mejor ('sube' | 'baja' | null)
+    // clave, etiqueta visible, unidad, [sinónimos], [mín, máx], decimales, mejor ('sube' | 'baja' | null), 'calc' = se calcula (no se escribe)
     ['peso', 'Peso', 'kg', ['peso corporal', 'peso', 'weight'], [25, 250], 1, null],
-    ['pgc', '% Grasa', '%', ['porcentaje de grasa corporal', 'porcentaje de grasa', 'pgc', 'percent body fat', 'pbf', 'grasa corporal %', 'grasa corporal'], [3, 70], 1, 'baja'],
-    ['mme', 'Masa muscular', 'kg', ['masa muscular esqueletica', 'musculo esqueletico', 'skeletal muscle mass', 'smm', 'masa muscular'], [8, 90], 1, 'sube'],
+    ['pgc', '% Grasa', '%', ['porcentaje de grasa corporal', 'porcentaje de grasa', 'tasa de grasa corporal', 'pgc', 'percent body fat', 'pbf', 'grasa corporal %', 'grasa corporal'], [3, 70], 1, 'baja'],
+    ['mgc', 'Masa grasa', 'kg', [], [1, 200], 1, 'baja', 'calc'],
+    ['mme', 'Músculo esquelético', 'kg', ['masa muscular esqueletica', 'musculo esqueletico', 'skeletal muscle mass', 'smm', 'masa muscular'], [8, 90], 1, 'sube'],
+    ['pmm', '% Músculo', '%', [], [5, 80], 1, 'sube', 'calc'],
     ['visceral', 'Grasa visceral', 'nivel', ['nivel de grasa visceral', 'grasa visceral', 'visceral fat level', 'visceral'], [1, 30], 0, 'baja'],
-    ['imc', 'IMC', '', ['indice de masa corporal', 'imc', 'bmi'], [12, 60], 1, null],
+    ['tmb', 'Metabolismo basal', 'kcal', ['tasa metabolica basal', 'metabolismo basal', 'basal metabolic rate', 'bmr', 'tmb'], [800, 4500], 0, null],
+    ['cintura', 'Cintura', 'cm', ['perimetro de cintura', 'circunferencia de cintura', 'cintura', 'waist circumference'], [50, 200], 1, 'baja'],
   ];
   /* Explicación y zonas de referencia (ACE para % grasa, OMS para IMC, InBody para visceral). */
   const Z = (lo, hi, zonas) => ({ lo, hi, zonas }); // zonas: [hasta, etiqueta, tono]
@@ -23,10 +26,23 @@
     visceral: { que: 'Grasa que rodea los órganos del abdomen. Es la más ligada a la salud (presión, azúcar, corazón), por eso bajarla es prioridad.',
       zona: () => Z(1, 20, [[9, 'Saludable', 'ok'], [14, 'Elevado', 'mid'], [99, 'Alto', 'warn']]),
       tip: 'Responde muy bien al ejercicio regular, dormir bien y reducir alcohol y azúcar.' },
-    imc: { que: 'Relación entre tu peso y tu estatura. Sirve como referencia general, pero no distingue músculo de grasa: con mucho músculo puede salir alto.',
-      zona: () => Z(15, 40, [[18.5, 'Bajo', 'warn'], [25, 'Normal', 'ok'], [30, 'Sobrepeso', 'mid'], [99, 'Obesidad', 'warn']]) },
+    mgc: { que: 'Los kilos de grasa que tienes. Junto al músculo te dice si lo que bajas es grasa (bien) o músculo (mal).', zona: () => null,
+      tip: 'La meta es que baje mes a mes mientras el músculo se mantiene o sube.' },
+    pmm: { que: 'Qué parte de tu peso es músculo esquelético. Sube cuando ganas músculo o cuando bajas grasa: las dos cosas son avance.', zona: () => null },
+    tmb: { que: 'Las calorías que tu cuerpo gasta en reposo solo para funcionar. Es la base para calcular cuánto comer.', zona: () => null,
+      tip: 'Más músculo = metabolismo basal más alto.' },
+    cintura: { que: 'Perímetro de cintura medido con huincha a la altura del ombligo. Es el mejor reflejo de la grasa abdominal.',
+      zona: (v, sexo) => sexo === 'm' ? Z(55, 120, [[80, 'Saludable', 'ok'], [88, 'Elevado', 'mid'], [999, 'Alto', 'warn']])
+        : sexo === 'h' ? Z(65, 130, [[94, 'Saludable', 'ok'], [102, 'Elevado', 'mid'], [999, 'Alto', 'warn']]) : null,
+      tip: 'Mídela siempre en el mismo punto, en ayunas y sin apretar la huincha.' },
   };
   window.TL_INBODY_CAMPOS = CAMPOS;
+  // Datos que se calculan (no se leen ni se escriben): masa grasa = peso × % grasa, % músculo = músculo esquelético / peso.
+  // El IMC ya no se usa: se quita de los informes antiguos al mostrarlos.
+  window.TL_INBODY_DERIVAR = x => { if (!x) return x; const y = Object.assign({}, x); delete y.imc;
+    if (y.peso && y.pgc && y.mgc == null) y.mgc = Math.round(y.peso * y.pgc) / 100;
+    if (y.peso && y.mme) y.pmm = Math.round(y.mme / y.peso * 1000) / 10;
+    return y; };
 
   const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[|]/g, ' ').replace(/[ \t]+/g, ' ');
   const num = s => Number(String(s).replace(',', '.'));
@@ -72,10 +88,6 @@
     if (out.peso && out.pgc && colas.pgc) { const pct = out.pgc / out.peso * 100;
       const alt = colas.pgc.find(n => n !== out.pgc && Math.abs(n - pct) <= 0.6);
       if (alt != null) { out.mgc = out.pgc; out.pgc = alt; } }
-    // Estatura (Alto/Altura/Estatura en cm): con ella el IMC se calcula y no depende del OCR.
-    const mt = t.match(/(?:alto|altura|estatura|talla|height)\s*[:=]?\s*(\d{3})(?:[.,]\d)?\s*cm/);
-    if (mt && +mt[1] >= 120 && +mt[1] <= 225) { out.talla = +mt[1];
-      if (out.peso) { const imc = Math.round(out.peso / (out.talla / 100) ** 2 * 10) / 10; if (out.imc == null || Math.abs(out.imc - imc) > 0.5) out.imc = imc; } }
     const f = fechaISO(t); if (f) out.fecha = f;
     // coherencia: si hay peso y % grasa pero no masa grasa, se calcula
     if (out.peso && out.pgc && !out.mgc) out.mgc = Math.round(out.peso * out.pgc) / 100;
