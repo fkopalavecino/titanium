@@ -1678,7 +1678,10 @@ document.addEventListener('click', async ev => {
     S.apX = S.apX || {}; S.apX[DKEY() + n] = L.length; render(true); autoGuardar(300); toast('Aproximación borrada'); return; }
   const apx = ev.target.closest('[data-apx]'); if (apx) { S.apX = S.apX || {}; const n = apx.dataset.apx; const cur = apx.closest('.sets').querySelectorAll('.set.ap').length; S.apX[DKEY() + n] = Math.min(4, cur + 1); render(true); return; }
   const chk = ev.target.closest('[data-chk]'); if (chk) { const row = chk.closest('.set'); const ins = [...row.querySelectorAll('input')];
-    if (row.dataset.ok) { delete row.dataset.ok; finDescanso(); return; }
+    // desmarcar (si lo marcó por error): se vacía la serie, pero los números quedan de sugerencia para volver a marcar con un toque
+    if (row.dataset.ok || row.classList.contains('done')) { delete row.dataset.ok; row.classList.remove('done');
+      ins.forEach(i => { if (i.value.trim() !== '') { i.placeholder = i.value.trim(); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); } });
+      finDescanso(); autoGuardar(400); toast('Serie desmarcada'); return; }
     ins.forEach(i => { if (i.value.trim() === '' && !/kg|reps|seg/.test(i.placeholder)) { i.value = i.placeholder; i.dispatchEvent(new Event('input', { bubbles: true })); } });
     if (ins.some(i => i.value.trim() !== '')) { row.classList.add('done'); row.dataset.ok = '1'; iniciarDescanso(Number(chk.dataset.rest) || 90, row.querySelector('input')?.dataset.n || ''); autoGuardar(400); } else toast(row.querySelector('[data-f="t"]') ? 'Anota los segundos.' : 'Anota los kilos y las repeticiones.'); return; }
   const dp = ev.target.closest('[data-dep]'); if (dp) { S.pfDeps = S.pfDeps || [...(S.perfil.deportes || [])]; const d = dp.dataset.dep; S.pfDeps = S.pfDeps.includes(d) ? S.pfDeps.filter(x => x !== d) : [...S.pfDeps, d]; dp.setAttribute('aria-pressed', S.pfDeps.includes(d)); return; }

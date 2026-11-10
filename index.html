@@ -187,7 +187,7 @@ tr.click:hover td{background:var(--sunk)}
 .sc-top .grow{flex:1;min-width:0;display:grid;gap:2px}
 .sc-l1{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sc-l1 .st-name{font-size:16px}
 .sc-l2{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sc-ej{color:var(--fg);font-weight:700}.sc-flex{font-size:13px;padding:2px 8px;background:var(--warn-soft);color:var(--warn);border-color:transparent;font-weight:700}.sc-rec{font-size:13px;padding:2px 8px;background:var(--info-soft,#16283a);color:var(--info,#7cc0ff);border-color:transparent;font-weight:700}.sc-circ{font-size:13px}.sc-dosis{font-size:12px;color:var(--muted)}.sc-edit{color:var(--red,#ea203a);font-weight:600;white-space:nowrap}.sc-blq{color:var(--red,#ea203a);font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.02em}.sc-live{display:grid;gap:4px;cursor:pointer;margin-top:-4px}.sc-live:empty{display:none}.sc-rest{display:inline-flex;gap:6px;align-items:center;font-size:14px;padding:4px 10px;border-radius:999px;background:var(--warn-soft);color:var(--warn);font-weight:600}.sc-rest.go{background:var(--ok-soft);color:var(--ok)}.sc-tmr{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:14px;padding:4px 10px;border-radius:10px;background:var(--crit-soft);color:var(--fg);font-weight:600}.sc-tmr b{color:var(--crit);font-size:16px}.sc-tmr.fin{background:var(--ok-soft);color:var(--ok)}[data-tmr-k]:empty,[data-rest-k]:empty{display:none}.sc-l3{font-size:14px;font-variant-numeric:tabular-nums;line-height:1.35}
+.sc-com{color:var(--warn,#f5c26b);font-style:italic}.sc-ej{color:var(--fg);font-weight:700}.sc-flex{font-size:13px;padding:2px 8px;background:var(--warn-soft);color:var(--warn);border-color:transparent;font-weight:700}.sc-rec{font-size:13px;padding:2px 8px;background:var(--info-soft,#16283a);color:var(--info,#7cc0ff);border-color:transparent;font-weight:700}.sc-circ{font-size:13px}.sc-dosis{font-size:12px;color:var(--muted)}.sc-edit{color:var(--red,#ea203a);font-weight:600;white-space:nowrap}.sc-blq{color:var(--red,#ea203a);font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.02em}.sc-live{display:grid;gap:4px;cursor:pointer;margin-top:-4px}.sc-live:empty{display:none}.sc-rest{display:inline-flex;gap:6px;align-items:center;font-size:14px;padding:4px 10px;border-radius:999px;background:var(--warn-soft);color:var(--warn);font-weight:600}.sc-rest.go{background:var(--ok-soft);color:var(--ok)}.sc-tmr{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:14px;padding:4px 10px;border-radius:10px;background:var(--crit-soft);color:var(--fg);font-weight:600}.sc-tmr b{color:var(--crit);font-size:16px}.sc-tmr.fin{background:var(--ok-soft);color:var(--ok)}[data-tmr-k]:empty,[data-rest-k]:empty{display:none}.sc-l3{font-size:14px;font-variant-numeric:tabular-nums;line-height:1.35}
 .sc-l3 .dot{display:inline-block;vertical-align:middle;margin-right:6px;width:7px;height:7px;border-radius:50%;background:var(--red);animation:livepulse 1.6s ease-in-out infinite}
 .sc-al{font-size:12px;color:var(--crit);font-weight:600}
 .sc-ic{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}.sc-ic.crit{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 40%,transparent)}
@@ -1019,14 +1019,15 @@ function vivoInfo(f, hora, code, rut, r) {
   const llenos = x => setsOf(x).filter(z => z.kg != null || z.r != null || z.t != null); const cur = r.ej || []; const hechas = cur.reduce((n, x) => n + llenos(x).length, 0);
   const pa = (S.paso || {})[f + '|' + hora + '|' + code];
   const ci0 = (S.circ || {})[f + '|' + hora + '|' + code]; const ciOk = ci0 && Date.now() - ci0.at < 15 * 60000;
-  if (!hechas && r.rpe == null && !pa && !ciOk && !(S.typ || {})[f + '|' + hora + '|' + code]) return null;
+  const coms = cur.filter(x => x.c && String(x.c).trim()); const comTx = coms.length ? '<br>' + coms.map(x => `<span class="sc-com">💬 <b>${esc(ejCorto(x.n))}:</b> ${esc(x.c)}</span>`).join('<br>') : '';
+  if (!hechas && r.rpe == null && !pa && !ciOk && !coms.length && !(S.typ || {})[f + '|' + hora + '|' + code]) return null;
   const ejs = ejsDe(rut); const plan = ejs.reduce((n, x) => n + nSerieD(x.d), 0); const orden = ejs.map(x => x.n);
   const ult = [...cur].filter(x => llenos(x).length).sort((a, b) => orden.indexOf(b.n) - orden.indexOf(a.n))[0]; const ls = ult ? llenos(ult).slice(-1)[0] : null;
   const prev = cargasDe(code).filter(c => c.f < f); const al = [];
   if (r.rpe != null && Number(r.rpe) >= 9) al.push('RPE ' + r.rpe);
   cur.forEach(x => { const pv = prev.find(c => c.n === x.n); if (pv && pv.kg > 0 && x.kg > pv.kg * 1.15) al.push(`${ejCorto(x.n)} +${Math.round((x.kg / pv.kg - 1) * 100)}%`); });
   const terminado = r.rpe != null; const vivo = f === today() && !terminado;
-  const txt = terminado ? `<span class="ok-t">✓ Terminó</span> · ${hechas}${plan ? '/' + plan : ''} series · RPE ${esc(r.rpe)}`
+  const txt = (terminado ? `<span class="ok-t">✓ Terminó</span> · ${hechas}${plan ? '/' + plan : ''} series · RPE ${esc(r.rpe)}`
     : (() => { const ty = (S.typ || {})[f + '|' + hora + '|' + code]; const tyOk = ty && Date.now() - ty.at < 60000;
         const actN = pa ? pa.ej : tyOk ? ty.n : ciOk && !hechas && blqNom(rut, ci0.bi) ? blqNom(rut, ci0.bi) : ult ? ult.n : ''; const act = actN ? cur.find(x => x.n === actN) : null; const usaTy = tyOk && ty.n === actN;
         const lleno = z => z && (z.kg != null || z.r != null || z.t != null);
@@ -1034,7 +1035,7 @@ function vivoInfo(f, hora, code, rut, r) {
         const esBlq = /^Bloque /.test(actN); const ci = esBlq ? (S.circ || {})[f + '|' + hora + '|' + code] : null;
         const circTx = ci && Date.now() - ci.at < 15 * 60000 ? ` <span class="muted">· vuelta ${ci.v}</span><br><span class="sc-circ">${ci.it.map(([n, ok]) => ok ? `<b class="sc-ej">✓ ${esc(limpiarEj(n))}</b>` : `<span class="muted">${esc(limpiarEj(n))}</span>`).join(' · ')}</span>` : ''; const bq = actN && !esBlq ? blqDe(rut, actN) : null;
         const ahora = esBlq ? `<span class="sc-blq">${esc(actN)}</span>${circTx}` : actN ? `${bq ? `<span class="sc-blq">${esc(bq.txt)} ›</span> ` : ''}<b class="sc-ej">${esc(esBlq ? actN : ejCorto(actN))}</b>${bq ? `<span class="muted">${esc(bq.pos)}</span>` : ''}${aps.length || ss.length ? ': ' + (aps.length ? `<span class="muted">aprox ${aps.map(esc).join(' · ')} →</span> ` : '') + `<b class="sc-ej">${ss.map(esc).join(' · ') || '—'}</b>` : pa ? ' <span class="muted">· empezando</span>' : ''}` : '';
-        return `${vivo ? '<span class="dot" aria-hidden="true"></span><b>En vivo</b> · ' : ''}${hechas}${plan ? '/' + plan : ''} series${pa && pa.n ? ` · paso ${pa.k}/${pa.n}` : ''}${ahora ? '<br>' + ahora : ''}`; })();
+        return `${vivo ? '<span class="dot" aria-hidden="true"></span><b>En vivo</b> · ' : ''}${hechas}${plan ? '/' + plan : ''} series${pa && pa.n ? ` · paso ${pa.k}/${pa.n}` : ''}${ahora ? '<br>' + ahora : ''}`; })()) + comTx;
   return {txt, al};
 }
 const valE = x => x.kg != null ? x.kg : x.t != null ? x.t : null;
