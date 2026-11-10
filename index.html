@@ -198,7 +198,7 @@ tr.click:hover td{background:var(--sunk)}
 .seg{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .seg-b{border:0;background:none;color:var(--muted);font:600 13px/1 inherit;padding:10px 4px;cursor:pointer;font-family:inherit}.seg-b+.seg-b{border-left:1px solid var(--line)}
 .seg-b.on.presente{background:var(--ok-soft);color:var(--ok)}.seg-b.on.ausente{background:var(--crit-soft);color:var(--crit)}.seg-b.on.aviso{background:var(--warn-soft);color:var(--warn)}
-.student{grid-template-columns:minmax(0,1fr)}.sc.open .sc-det{grid-template-columns:minmax(0,1fr);gap:10px}.sc-tabs{display:flex;gap:4px;flex-wrap:wrap}.sc-tab{border:1px solid var(--line);background:none;color:var(--muted);font:inherit;font-size:14px;font-weight:600;padding:7px 12px;border-radius:999px;cursor:pointer;min-height:36px}.sc-tab.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}.rut-c{display:grid;gap:4px}.rb{border:1px solid var(--line);border-radius:8px;padding:0 10px}.rb.on{padding-bottom:8px}.rb-h{display:flex;gap:8px;align-items:center;width:100%;border:0;background:none;color:inherit;font:inherit;padding:8px 0;text-align:left;cursor:pointer}.rb-h b{flex:1;font-size:14px}.rb.on .rb-h .chev{transform:rotate(90deg)}.rb ol{margin:0;padding-left:20px}
+.student{grid-template-columns:minmax(0,1fr)}.ojo-m{background:none;border:0;color:var(--muted);font-size:16px;padding:2px 6px;cursor:pointer;min-height:28px;vertical-align:middle}.sc.open .sc-det{grid-template-columns:minmax(0,1fr);gap:10px}.sc-tabs{display:flex;gap:4px;flex-wrap:wrap}.sc-tab{border:1px solid var(--line);background:none;color:var(--muted);font:inherit;font-size:14px;font-weight:600;padding:7px 12px;border-radius:999px;cursor:pointer;min-height:36px}.sc-tab.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}.rut-c{display:grid;gap:4px}.rb{border:1px solid var(--line);border-radius:8px;padding:0 10px}.rb.on{padding-bottom:8px}.rb-h{display:flex;gap:8px;align-items:center;width:100%;border:0;background:none;color:inherit;font:inherit;padding:8px 0;text-align:left;cursor:pointer}.rb-h b{flex:1;font-size:14px}.rb.on .rb-h .chev{transform:rotate(90deg)}.rb ol{margin:0;padding-left:20px}
 .sc-det{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:14px;border-top:1px solid var(--line);padding-top:12px;align-items:start}.sc-c{display:grid;gap:10px;min-width:0}
 .res{display:grid;gap:2px;background:var(--sunk);border-radius:8px;padding:8px 12px}
 .res-r{display:grid;gap:1px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}.res-r:last-of-type{border-bottom:0}
@@ -574,6 +574,10 @@ function roster(fecha, hora) {
   const quit = new Set(Object.entries(S.dias.get(fecha)?.bloques?.[hora] || {}).filter(([c,v]) => v.quitado).map(([c]) => c));
   return [...new Set([...base, ...extra])].filter(c => !quit.has(c));
 }
+// montos ocultos por defecto (el iPad queda a la vista en el gimnasio); se muestran con el ojo y se recuerda en este aparato
+const verMontos = () => { try { return localStorage.getItem('tl-montos') === '1'; } catch (_) { return false; } };
+const mClp = v => verMontos() ? clp(v) : '$ •••••';
+const ojoMontos = () => `<button type="button" class="ojo-m" data-act="ver-montos" aria-pressed="${verMontos()}" aria-label="${verMontos() ? 'Ocultar montos' : 'Mostrar montos'}" title="${verMontos() ? 'Ocultar montos' : 'Mostrar montos'}">${verMontos() ? '🙈' : '👁'}</button>`;
 function rec(fecha, hora, code) { return S.dias.get(fecha)?.bloques?.[hora]?.[code] || {}; }
 function asistencias(code, desde, hasta) {
   let pres = 0, aus = 0;
@@ -820,8 +824,8 @@ VIEWS.inicio = () => {
   <div class="grid2" style="align-items:start">${confirmacionesHTML()}${proximosAgendaHTML()}</div>
   <section class="kpis">
     <div class="card kpi"><div class="l">Alumnos activos</div><div class="v">${al.length}</div><div class="s">${S.alumnos.size - al.length} inactivos</div></div>
-    <div class="card kpi"><div class="l">Recibido · ${esc(fmtMes(mes))}</div><div class="v">${clp(recibido)}</div><div class="s">de ${clp(acordado)} acordado</div></div>
-    <div class="card kpi ${acordado-recibido > 0 ? 'alert' : ''}"><div class="l">Falta por cobrar</div><div class="v">${clp(Math.max(0,acordado-recibido))}</div><div class="s">${saldos.length} alumnos con saldo</div></div>
+    <div class="card kpi"><div class="l">Recibido · ${esc(fmtMes(mes))} ${ojoMontos()}</div><div class="v">${mClp(recibido)}</div><div class="s">de ${mClp(acordado)} acordado</div></div>
+    <div class="card kpi ${acordado-recibido > 0 ? 'alert' : ''}"><div class="l">Falta por cobrar ${ojoMontos()}</div><div class="v">${mClp(Math.max(0,acordado-recibido))}</div><div class="s">${saldos.length} alumnos con saldo</div></div>
     <div class="card kpi"><div class="l">Asistencias hoy</div><div class="v">${presHoy}</div><div class="s">${hoyH.length} bloques con alumnos</div></div>
   </section>
   <div class="grid2">
@@ -1306,9 +1310,9 @@ VIEWS.pagos = () => {
     <div class="tools"><input type="month" id="p-mes" value="${mes}" aria-label="Mes a revisar"><button class="btn pri" data-act="abrir-mes">Abrir ${esc(fmtMes(mes))}</button><button class="btn" data-act="exportar-csv">Exportar CSV</button></div>
   </div>
   <section class="kpis">
-    <div class="card kpi"><div class="l">Monto acordado</div><div class="v">${clp(acordado)}</div><div class="s">${rows.length} planes del mes</div></div>
-    <div class="card kpi"><div class="l">Recibido</div><div class="v">${clp(recibido)}</div><div class="s">Abonos registrados</div></div>
-    <div class="card kpi ${acordado-recibido > 0 ? 'alert' : ''}"><div class="l">Falta por cobrar</div><div class="v">${clp(Math.max(0, acordado-recibido))}</div><div class="s">Saldo pendiente del mes</div></div>
+    <div class="card kpi"><div class="l">Monto acordado ${ojoMontos()}</div><div class="v">${mClp(acordado)}</div><div class="s">${rows.length} planes del mes</div></div>
+    <div class="card kpi"><div class="l">Recibido ${ojoMontos()}</div><div class="v">${mClp(recibido)}</div><div class="s">Abonos registrados</div></div>
+    <div class="card kpi ${acordado-recibido > 0 ? 'alert' : ''}"><div class="l">Falta por cobrar ${ojoMontos()}</div><div class="v">${mClp(Math.max(0, acordado-recibido))}</div><div class="s">Saldo pendiente del mes</div></div>
     <div class="card kpi" data-act="p-f" data-v="renovar" style="cursor:pointer" title="Ver la lista"><div class="l">Por renovar o vencidos ›</div><div class="v">${activos().filter(a => ['vencido','hoy','pronto'].includes(vigencia(a, planActual(a)).k)).length}</div><div class="s">próximos 7 días</div></div>
   </section>
   <div class="tools">
@@ -2241,6 +2245,7 @@ document.addEventListener('click', e => {
     case 'aprobar': { const {f,h,code} = toggleOne(el.dataset.k); patchDia(f, h, code, Object.assign({aprobada: rec(f,h,code).aprobada ? null : true}, el.dataset.r ? {rutina: el.dataset.r} : {})); break; }
     case 'asig-prog': asignarProgModal(el.dataset.fam); break;
     case 'ver-rut': S.ui.openRut[el.dataset.k] = !S.ui.openRut[el.dataset.k]; render(); break;
+    case 'ver-montos': { try { localStorage.setItem('tl-montos', verMontos() ? '0' : '1'); } catch (_) {} render(); break; }
     case 'st-tab': { S.ui.stTab = Object.assign(S.ui.stTab || {}, {[el.dataset.k]: el.dataset.t}); render(); break; }
     case 'rut-blq': { const k = el.dataset.k, i = Number(el.dataset.i); S.ui.rutBlq = S.ui.rutBlq || {}; const cur = S.ui.rutBlq[k] || [...document.querySelectorAll(`.rb-h[data-k="${CSS.escape(k)}"]`)].map((b, j) => b.getAttribute('aria-expanded') === 'true' ? j : -1).filter(j => j >= 0);
       S.ui.rutBlq[k] = cur.includes(i) ? cur.filter(j => j !== i) : [...cur, i]; render(); break; }
