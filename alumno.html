@@ -424,7 +424,9 @@ function rutinaDeHoy() {
   const t = today(); const pe = progEstado();
   if (S.ses) { const { f, h } = S.ses; const rec = recOf(f, h); const id = S.rutSel || rec?.rutina || S.ses.id || (pe ? pe.next[0] : null); const r = id ? S.rutinas.get(id) : null;
     return { id, r: rec?.sesion && !S.rutSel ? Object.assign({}, r || {}, { bloques: rec.sesion }) : r, hora: h, fecha: f, rec, pe, hoy: f === t && h !== 'libre', otroDia: f !== t, futuro: f > t }; }
-  const prox = proximas(1)[0]; const hora = prox && prox.f === t ? prox.h : (bloquesDe(t)[0] || S.clases.find(r => r.fecha === t && !r.quitado && /^\d\d:\d\d$/.test(r.hora))?.hora || 'libre');
+  // si ya empezó a anotar una clase de hoy y no la ha terminado, se queda en esa (no salta al bloque siguiente al cambiar la hora)
+  const enCurso = S.clases.filter(r => r.fecha === t && !r.quitado && /^\d\d:\d\d$/.test(r.hora) && (r.ej || []).length && r.rpe == null).sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))[0];
+  const prox = proximas(1)[0]; const hora = enCurso ? enCurso.hora : prox && prox.f === t ? prox.h : (bloquesDe(t)[0] || S.clases.find(r => r.fecha === t && !r.quitado && /^\d\d:\d\d$/.test(r.hora))?.hora || 'libre');
   const rec = recOf(t, hora);
   let id = S.rutSel || rec?.rutina || (pe ? pe.next[0] : null);
   const r = id ? S.rutinas.get(id) : null;
