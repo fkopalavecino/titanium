@@ -2020,12 +2020,15 @@ function reagModal(key) {
       <label class="f">Nueva fecha<input type="date" id="rg-f" value="${d}" required></label>
       <label class="f">Hora<select id="rg-h">${c.horas.map(x => `<option ${x === hDef ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
     </div>
+    <div id="rg-cupo" class="small" aria-live="polite"></div>
     <label class="f" style="flex-direction:row;gap:8px;align-items:center"><input type="checkbox" id="rg-sin"> No recupera (solo quitarla de hoy)</label>`, {
     submit: 'Reagendar',
     onSubmit: () => {
       const sin = $('#rg-sin').checked, nf = val('rg-f'), nh = val('rg-h');
       if (!sin && (!nf || !nh)) { toast('Elige fecha y hora.', true); return false; }
       if (!sin && nf === f && nh === h) { toast('Elige otra fecha u hora.', true); return false; }
+      // bloque lleno: avisa y pide tocar «Reagendar» otra vez para confirmar
+      if (!sin) { const o = rgOcupacion(nf, nh, code); if (o.lleno && rgAviso !== nf + '|' + nh) { rgAviso = nf + '|' + nh; rgPintar(code, true); return false; } }
       // si era una recuperación o una clase de agenda libre, la nueva fecha mantiene ese tipo (no devuelve el crédito ni cuenta doble)
       const r0 = rec(f, h, code), tipo = r0.extra && r0.reagDe ? (r0.reagDe.recup ? {recup: true, fija: true} : r0.reagDe.flex ? {flex: true} : {}) : {};
       patchDia(f, h, code, {quitado: true, asis: null, aprobada: null, extra: null, reagA: sin ? null : {f: nf, h: nh}});
@@ -2033,7 +2036,17 @@ function reagModal(key) {
       toast(sin ? `${nombre(code)} quitada solo de este bloque.` : `${nombre(code)} reagendada al ${fmtD(nf)} a las ${nh}.`);
     }
   });
+  rgAviso = null; rgPintar(code);
+  ['rg-f', 'rg-h', 'rg-sin'].forEach(id => document.getElementById(id)?.addEventListener('change', () => { rgAviso = null; rgPintar(code); }));
 }
+// ocupación del bloque destino: fijos + agendados, sin contar quitados ni a quienes avisaron que no van
+let rgAviso = null;
+function rgOcupacion(f, h, code) { const n = roster(f, h).filter(c => c !== code && S.conf?.get(f + '|' + h + '|' + c) !== 'no_voy').length; const cup = cfg().cupos || 8; return { n, cup, lleno: n >= cup }; }
+function rgPintar(code, pedir) { const el = document.getElementById('rg-cupo'); if (!el) return; const f = val('rg-f'), h = val('rg-h');
+  if (!f || !h || document.getElementById('rg-sin')?.checked) { el.innerHTML = ''; return; }
+  const o = rgOcupacion(f, h, code);
+  el.innerHTML = o.lleno ? `<div class="notice" style="border-color:var(--crit);color:var(--crit)">⚠️ Bloque lleno: ${o.n} de ${o.cup} cupos ocupados.${pedir ? ' <b>Toca «Reagendar» otra vez para agendarla igual.</b>' : ''}</div>`
+    : `<span class="muted">Cupos: ${o.n} de ${o.cup} ocupados · quedan ${o.cup - o.n}</span>`; }
 function asignarProgModal(fam) {
   const al = activos();
   openModal(`Asignar · ${fam}`, `
