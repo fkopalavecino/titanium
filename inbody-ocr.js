@@ -5,7 +5,7 @@
   const CAMPOS = [
     // clave, etiqueta visible, unidad, [sinónimos], [mín, máx], decimales, mejor ('sube' | 'baja' | null), 'calc' = se calcula (no se escribe)
     ['peso', 'Peso', 'kg', ['peso corporal', 'peso', 'weight'], [25, 250], 1, null],
-    ['pgc', '% Grasa', '%', ['porcentaje de grasa corporal', 'porcentaje de grasa', 'tasa de grasa corporal', 'pgc', 'percent body fat', 'pbf', 'grasa corporal %', 'grasa corporal'], [3, 70], 1, 'baja'],
+    ['pgc', '% Grasa', '%', ['porcentaje de grasa corporal', 'porcentaje de grasa', 'pgc', 'percent body fat', 'pbf', 'grasa corporal %', 'grasa corporal'], [3, 70], 1, 'baja'],
     ['mgc', 'Masa grasa', 'kg', [], [1, 200], 1, 'baja', 'calc'],
     ['mme', 'Músculo esquelético', 'kg', ['masa muscular esqueletica', 'musculo esqueletico', 'skeletal muscle mass', 'smm', 'masa muscular'], [8, 90], 1, 'sube'],
     ['pmm', '% Músculo', '%', [], [5, 80], 1, 'sube', 'calc'],
@@ -88,6 +88,12 @@
     if (out.peso && out.pgc && colas.pgc) { const pct = out.pgc / out.peso * 100;
       const alt = colas.pgc.find(n => n !== out.pgc && Math.abs(n - pct) <= 0.6);
       if (alt != null) { out.mgc = out.pgc; out.pgc = alt; } }
+    // Control cruzado con «peso sin grasa / masa magra»: % grasa = (peso − magra) / peso. Si lo leído no calza
+    // (p. ej. tomó un número de la escala de un gráfico), se usa el número de la fila que sí calza o el cálculo.
+    if (out.peso && ml) { const magra = num(ml[1]);
+      if (magra > 0 && magra < out.peso) { const pct = (out.peso - magra) / out.peso * 100;
+        if (out.pgc == null || Math.abs(out.pgc - pct) > 1.5) { const alt = (colas.pgc || []).find(n => Math.abs(n - pct) <= 0.8);
+          out.pgc = alt != null ? alt : Math.round(pct * 10) / 10; delete out.mgc; } } }
     const f = fechaISO(t); if (f) out.fecha = f;
     // coherencia: si hay peso y % grasa pero no masa grasa, se calcula
     if (out.peso && out.pgc && !out.mgc) out.mgc = Math.round(out.peso * out.pgc) / 100;
