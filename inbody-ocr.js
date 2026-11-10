@@ -88,6 +88,13 @@
     if (out.peso && out.pgc && colas.pgc) { const pct = out.pgc / out.peso * 100;
       const alt = colas.pgc.find(n => n !== out.pgc && Math.abs(n - pct) <= 0.6);
       if (alt != null) { out.mgc = out.pgc; out.pgc = alt; } }
+    // Fila «Grasa corporal  kg (rango)  %»: el par donde kg / peso ≈ % es el dato real, sin importar qué se leyó antes.
+    if (out.peso) { let par = null;
+      for (const ln of t.split('\n')) { if (!/grasa corporal|body fat mass/.test(ln) || /tasa|control|visceral|subcut/.test(ln)) continue;
+        const ns = [...ln.matchAll(/(\d{1,3}(?:[.,]\d{1,2})?)/g)].map(m => num(m[1]));
+        for (const kg of ns) { const pc = ns.find(n => n !== kg && n >= 3 && n <= 70 && Math.abs(kg / out.peso * 100 - n) <= 0.6); if (pc != null) { par = [kg, pc]; break; } }
+        if (par) break; }
+      if (par) { out.mgc = par[0]; out.pgc = par[1]; } }
     // Control cruzado con «peso sin grasa / masa magra»: % grasa = (peso − magra) / peso. Si lo leído no calza
     // (p. ej. tomó un número de la escala de un gráfico), se usa el número de la fila que sí calza o el cálculo.
     if (out.peso && ml) { const magra = num(ml[1]);
