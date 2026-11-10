@@ -485,6 +485,8 @@ document.addEventListener('input', ev => { const i = ev.target; const d = getDra
   else if (i.matches('.com-i')) { (d.com = d.com || {})[i.dataset.comn] = i.value; putDraft(d); autoGuardar(2500); }
   else if (i.id === 'carga') { d.carga = i.value; putDraft(d); autoGuardar(2500); } });
 
+// el alumno puede borrar los InBody que subió él (si se equivocó); los que cargó el profe no
+const ibDelBtn = (x, mini) => x && x.por === 'alumno' ? `<button type="button" class="${mini ? 'chip' : 'btn'}" data-ibdel="${esc(x.img || '')}" data-ibf="${esc(x.f)}" style="${mini ? 'padding:2px 10px;min-height:28px' : ''};color:var(--crit,#e5484d)" aria-label="Borrar InBody del ${esc(fmtD(x.f))}">${mini ? '✕' : '🗑 Borrar este InBody'}</button>` : '';
 /* ---------- subir InBody ---------- */
 function achicar(file, max) { return new Promise((res, rej) => { const u = URL.createObjectURL(file), img = new Image();
   img.onload = () => { const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
@@ -1203,9 +1205,9 @@ V.progreso = () => {
       ${tiles ? `<div class="grid3">${tiles}</div>${extra ? `<button class="chip" data-iball="1" style="justify-self:start">${S.ibAll ? 'Ver menos' : 'Ver todos los datos (+' + extra + ')'}</button>` : ''}${ibInfoHTML(ibL)}` : '<div class="small muted">Este informe no tiene datos anotados.</div>'}
       ${trend}
       ${ib.length > 1 || S.urls[ibL.img] ? `<div class="chips">${ib.length > 1 ? `<button class="chip" data-ibv="hist" aria-pressed="${S.ibVer === 'hist'}">Historial (${ib.length})</button>` : ''}${S.urls[ibL.img] ? `<button class="chip" data-ibv="inf" aria-pressed="${S.ibVer === 'inf'}">Ver informe</button>` : ''}</div>` : ''}
-      ${S.ibVer === 'hist' && ib.length > 1 ? `<div style="display:grid;gap:6px">${ib.slice().reverse().map(x => `<div class="row small"><span>${esc(fmtD(x.f))}</span><span class="muted">${[['peso', 'kg'], ['pgc', '%'], ['mme', 'kg músc.']].filter(([k]) => x[k] != null).map(([k, u]) => fmtN(x[k], 1) + ' ' + u).join(' · ') || 'sin datos'}</span></div>`).join('')}</div>` : ''}
+      ${S.ibVer === 'hist' && ib.length > 1 ? `<div style="display:grid;gap:6px">${ib.slice().reverse().map(x => `<div class="row small"><span>${esc(fmtD(x.f))}</span><span class="muted">${[['peso', 'kg'], ['pgc', '%'], ['mme', 'kg músc.']].filter(([k]) => x[k] != null).map(([k, u]) => fmtN(x[k], 1) + ' ' + u).join(' · ') || 'sin datos'}</span>${ibDelBtn(x, true)}</div>`).join('')}</div>` : ''}
       ${S.ibVer === 'inf' && S.urls[ibL.img] ? `<img src="${esc(S.urls[ibL.img])}" data-zoom="1" alt="Informe InBody ${esc(fmtD(ibL.f))}" style="width:100%;max-height:280px;object-fit:contain;border-radius:10px;background:var(--sunk);cursor:zoom-in">` : ''}
-      ${upBtn('＋ Subir nuevo InBody', false)}</section>`; }
+      ${ibDelBtn(ibL, false)}${upBtn('＋ Subir nuevo InBody', false)}</section>`; }
   const tab = S.ptab || (S.fotoUp ? 'fotos' : S.evalFirst ? 'cuerpo' : 'entreno');
   const TABS = [['entreno', '💪 Entreno'], ['cuerpo', '📊 Cuerpo'], ['fotos', '📸 Fotos']];
   const nom = n => n.replace(/^\d+[ab]? · /, '');
@@ -1687,6 +1689,13 @@ document.addEventListener('click', async ev => {
   const pj = ev.target.closest('[data-pej]'); if (pj) { S.pej = pj.dataset.pej; render(); return; }
   if (ev.target.closest('[data-iball]')) { S.ibAll = !S.ibAll; render(); return; }
   if (ev.target.closest('[data-mall]')) { S.mAll = !S.mAll; render(); return; }
+  const ibd = ev.target.closest('[data-ibdel]'); if (ibd) {
+    if (!ibd.dataset.ok) { ibd.dataset.ok = '1'; const t0 = ibd.textContent; ibd.textContent = ibd.classList.contains('chip') ? '¿Borrar?' : '¿Seguro? Toca de nuevo para borrar'; setTimeout(() => { if (ibd.isConnected) { delete ibd.dataset.ok; ibd.textContent = t0; } }, 4000); return; }
+    ibd.disabled = true; const img = ibd.dataset.ibdel || null;
+    const { error } = await sb.rpc('borrar_mi_inbody', { p_img: img, p_f: ibd.dataset.ibf || null });
+    if (error) { ibd.disabled = false; toast(error.message || 'No se pudo borrar.'); return; }
+    if (img) { try { await sb.storage.from('fotos').remove([img]); } catch (_) {} }
+    S.ibVer = null; await load(); toast('InBody borrado. Puedes subirlo de nuevo.'); render(); return; }
   const ibv = ev.target.closest('[data-ibv]'); if (ibv) { S.ibVer = S.ibVer === ibv.dataset.ibv ? null : ibv.dataset.ibv; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
   const ibi = ev.target.closest('[data-ibi]'); if (ibi) { S.ibInfo = S.ibInfo === ibi.dataset.ibi ? null : ibi.dataset.ibi; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'fup-open') { S.fotoUp = !S.fotoUp; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; }
