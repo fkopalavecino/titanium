@@ -385,6 +385,8 @@ await load();
 /* ---------- lógica ---------- */
 const planActual = () => { const t = today(); return [...S.planes].reverse().find(p => p.inicio && p.fin && p.inicio <= t && t < p.fin) || S.planes[S.planes.length - 1] || null; };
 // clases usadas del plan: las que asistió + las que faltó sin avisar (esas se pierden)
+// clase hecha: el profe la marcó presente o el alumno la terminó en su app (guardó con RPE)
+const terminada = r => !!r && r.asis !== 'ausente' && r.asis !== 'aviso' && !r.quitado && (r.asis === 'presente' || r.rpe != null);
 const presentes = (desde, hasta) => S.clases.filter(r => (r.asis === 'presente' || r.asis === 'ausente') && (!desde || r.fecha >= desde) && (!hasta || r.fecha <= hasta)).length;
 const abonado = p => (p?.pagos || []).reduce((s, x) => s + (Number(x.monto) || 0), 0);
 const recOf = (f, h) => S.clases.find(r => r.fecha === f && r.hora === h);
@@ -739,7 +741,7 @@ V.hoy = () => {
   const idProx = prox ? (recOf(prox.f, prox.h)?.rutina || prediccion().get(prox.f + '|' + prox.h) || rd0.id) : rd0.id;
   const rd = Object.assign({}, rd0, idProx && S.rutinas.get(idProx) ? { id: idProx, r: S.rutinas.get(idProx) } : {});
   const linea = rd.pe && rd.r ? progLinea(rd.r, rd.pe.semana) : '';
-  const mes = t.slice(0, 7); const delMes = S.clases.filter(r => r.fecha.startsWith(mes) && r.asis === 'presente').length;
+  const mes = t.slice(0, 7); const delMes = S.clases.filter(r => r.fecha.startsWith(mes) && terminada(r)).length;
   return `
   <div style="display:flex;justify-content:center;padding:2px 0 6px;border-bottom:1px solid var(--line)">${TL_LOGO}</div>
   <div class="row" style="align-items:center;justify-content:flex-start;gap:12px"><button data-go="plan" aria-label="Mi perfil" style="background:none;border:0;padding:0;cursor:pointer">${avatarHTML('')}</button><div style="flex:1"><div class="eyebrow">${esc(longD(t))}</div><h1>Hola, ${esc(nombreC)}</h1>${S.perfil?.meta ? `<div class="small muted">🎯 ${esc(S.perfil.meta)}</div>` : ''}</div>
@@ -1134,8 +1136,8 @@ V.rutina = () => {
 };
 V.progreso = () => {
   const t = today(); const mes = t.slice(0, 7);
-  const delMes = S.clases.filter(r => r.fecha.startsWith(mes) && r.asis === 'presente').length;
-  const marcadas = S.clases.filter(r => r.fecha.startsWith(mes) && (r.asis === 'presente' || r.asis === 'ausente')).length;
+  const delMes = S.clases.filter(r => r.fecha.startsWith(mes) && terminada(r)).length;
+  const marcadas = S.clases.filter(r => r.fecha.startsWith(mes) && (terminada(r) || r.asis === 'ausente')).length;
   const H = historial(); const mejor = l => l.some(x => x.t != null) ? l.reduce((b, x) => (x.t || 0) > (b.t || 0) ? x : b, l[0]) : l.reduce((b, x) => (x.kg || 0) > (b.kg || 0) || ((x.kg || 0) === (b.kg || 0) && (x.r || 0) > (b.r || 0)) ? x : b, l[0]);
   const best = Object.entries(H).map(([n, l]) => [n, mejor(l), l]).filter(([, b]) => b && (b.kg || b.t));
   best.sort((a, b) => b[2].length - a[2].length);
@@ -1226,7 +1228,7 @@ V.plan = () => {
   return `<h1>Mi perfil</h1>${perfilCard()}${fichaCard()}${avisosCard()}${pagosCard(p, usadas, tot, ab, saldo, dias)}<button class="btn" data-tour="1">▶ Ver el tour de la app</button>`;
 };
 function weekStrip(wk, sel, attr) { const t = today();
-  return `<div class="wk">${Array.from({ length: 7 }, (_, i) => addDays(wk, i)).map(f => { const its = clasesDia(f); const done = its.some(x => x.rec?.asis === 'presente'); const ne = evDia(f).length;
+  return `<div class="wk">${Array.from({ length: 7 }, (_, i) => addDays(wk, i)).map(f => { const its = clasesDia(f); const done = its.some(x => terminada(x.rec)); const ne = evDia(f).length;
     return `<button ${attr}="${f}" aria-pressed="${f === sel}" class="${f === t ? 'today' : ''}" aria-label="${esc(longD(f))}${its.length ? ', con clase' : ''}${ne ? ', con actividad' : ''}">${DL[dayKey(f)].charAt(0)}<b>${pad(parseISO(f).getDate())}</b><span class="ico">${(() => { const ic = []; if (its.length) ic.push(done ? '✅' : '💪');
       evDia(f).forEach(e => { const m = String(e.titulo || '').match(/\p{Extended_Pictographic}/u); ic.push(m ? m[0] : (EVI[e.tipo] || '📌')); });
       const u = [...new Set(ic)]; return u.slice(0, 2).join('') + (u.length > 2 ? '<small>+</small>' : ''); })()}</span></button>`; }).join('')}</div>`; }
@@ -1452,7 +1454,7 @@ V.agenda = () => {
   const items = clasesDia(S.dia); const evs = evDia(S.dia);
   const card = x => { const rec = x.rec; const past = S.dia < t || (S.dia === t && rec?.asis);
     const id = rec?.rutina || pred.get(S.dia + '|' + x.h); const r = id ? S.rutinas.get(id) : null;
-    const est = rec?.asis === 'presente' ? '<span class="small ok" style="font-weight:700">Asististe ✓</span>' : rec?.asis === 'ausente' ? '<span class="small warn" style="font-weight:700">Faltaste</span>' : rec?.asis === 'aviso' ? '<span class="small muted" style="font-weight:700">Avisaste · no se descuenta</span>'
+    const est = terminada(rec) ? '<span class="small ok" style="font-weight:700">' + (rec.asis === 'presente' ? 'Asististe ✓' : 'Terminada ✓') + '</span>' : rec?.asis === 'ausente' ? '<span class="small warn" style="font-weight:700">Faltaste</span>' : rec?.asis === 'aviso' ? '<span class="small muted" style="font-weight:700">Avisaste · no se descuenta</span>'
       : rec?.reag_a ? '<span class="small muted" style="font-weight:700">Movida a otro día</span>' : past ? '<span class="small muted">Sin registro</span>' : rec?.reag_de?.recup ? '<span class="tg ev" style="margin:0">🔁 Recuperación</span>' : rec?.reag_de ? '<span class="tg ev" style="margin:0">↻ Clase movida</span>' : '<span class="small red" style="font-weight:700">Agendada</span>';
     const nEjA = (rec?.ej || []).filter(x => (x.sets || []).some(conDato) || conDato(x)).length; const ej = nEjA ? `<div class="small muted">Anotaste ${nEjA} ejercicio${nEjA === 1 ? '' : 's'}${rec.carga ? ' · ' + esc(rec.carga) : ''}${rec.rpe != null ? ' · RPE ' + esc(rec.rpe) : ''}</div>` : '';
     const nv = !past ? proximas(4).findIndex(p => p.f === S.dia && p.h === x.h) : -1;
@@ -1474,7 +1476,7 @@ V.clases = () => {
   const prox = proximas(4);
   return `<h1>Mis clases</h1>
   <section class="list"><div class="eyebrow">Próximas</div>${prox.length ? prox.map((x, i) => `<div class="li"><div><b>${esc((x.f === t ? 'Hoy' : DL[dayKey(x.f)] + ' ' + fmtD(x.f)) + ' · ' + x.h)}</b></div><button class="btn" style="width:auto;min-height:40px" data-novoy="${i}">No puedo ir</button></div>`).join('') : '<div class="muted small">No tienes clases agendadas.</div>'}</section>
-  ${pas.length ? `<section class="list"><div class="eyebrow">Últimas clases</div>${pas.map(r => `<div class="li"><span>${esc(DL[dayKey(r.fecha)] + ' ' + fmtD(r.fecha) + ' · ' + r.hora)}</span><span class="small ${r.asis === 'presente' ? 'ok' : r.asis === 'ausente' ? 'warn' : 'muted'}" style="font-weight:700">${r.asis === 'presente' ? 'Asistió ✓' : r.asis === 'ausente' ? 'Faltó' : 'Reagendada'}</span></div>`).join('')}</section>` : ''}`;
+  ${pas.length ? `<section class="list"><div class="eyebrow">Últimas clases</div>${pas.map(r => `<div class="li"><span>${esc(DL[dayKey(r.fecha)] + ' ' + fmtD(r.fecha) + ' · ' + r.hora)}</span><span class="small ${terminada(r) ? 'ok' : r.asis === 'ausente' ? 'warn' : 'muted'}" style="font-weight:700">${r.asis === 'presente' ? 'Asistió ✓' : terminada(r) ? 'Terminada ✓' : r.asis === 'ausente' ? 'Faltó' : 'Reagendada'}</span></div>`).join('')}</section>` : ''}`;
 };
 
 let diaRender = '';
