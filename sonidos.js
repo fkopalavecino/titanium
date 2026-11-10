@@ -1,15 +1,19 @@
-/* Titanium Sport · sonidos de los temporizadores (estilo Tabata Pro)
+/* Titanium Sport · sonidos de los temporizadores (tonos propios, estilo timer de intervalos)
    Volumen ajustable, sonidos distintos para inicio, término, final y cuenta regresiva, voz y vibración.
    Los sonidos se generan con Web Audio; además cada persona puede grabar o subir su propio audio
    (queda guardado solo en su teléfono). La configuración también queda guardada en el teléfono. */
 (function () {
   const KEY = 'tl-sonido';
-  const DEF = { vol: 90, inicio: 'campana', fin: 'silbato', final: 'gong', cuenta: 'pitido', vib: true, efecto: {} };
+  const DEF = { vol: 90, inicio: 'pro', fin: 'descanso', final: 'meta', cuenta: 'pro', vib: true, efecto: {}, v: 2 };
   let cfg = Object.assign({}, DEF);
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (_) {}
+  // v2: sonidos nuevos tipo timer profesional; quien tenía los de fábrica pasa a los nuevos (lo que eligió a mano se respeta)
+  if ((cfg.v || 1) < 2) { const VIEJO = { inicio: 'campana', fin: 'silbato', final: 'gong', cuenta: 'pitido' };
+    for (const k in VIEJO) if (cfg[k] === VIEJO[k]) cfg[k] = DEF[k]; cfg.v = 2; try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (_) {} }
   const guardar = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (_) {} };
 
   const SONIDOS = [
+    ['pro', '🎯 Tono timer (agudo)'], ['descanso', '🎯 Tono timer (grave)'], ['meta', '🏁 Final timer (3 tonos)'],
     ['campana', '🥊 Campana de box'], ['silbato', '📣 Silbato'], ['gong', '🔔 Gong'], ['bocina', '📯 Bocina'],
     ['pitido', '⏱ Pitido fuerte'], ['doble', '⏱⏱ Doble pitido'], ['digital', '⌚ Reloj digital'], ['subida', '📈 Tres tonos'],
     ['mio', '🎙 Mi audio (grabado o subido)'], ['voz', '🗣 Voz'], ['ninguno', '🔇 Sin sonido']
@@ -56,17 +60,26 @@
     e.gain.setValueAtTime(g, t0); e.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     s.connect(bp); bp.connect(e); e.connect(OUT); s.start(t0); s.stop(t0 + dur);
   }
+  // tono limpio y parejo (seno puro, sin decaer), como los timers de intervalos profesionales
+  function plano(f, t0, dur, g = 0.9) { const o = AC.createOscillator(), e = AC.createGain(); o.type = 'sine'; o.frequency.value = f;
+    e.gain.setValueAtTime(0.0001, t0); e.gain.exponentialRampToValueAtTime(g, t0 + 0.012);
+    e.gain.setValueAtTime(g, t0 + dur - 0.02); e.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(e); e.connect(OUT); o.start(t0); o.stop(t0 + dur + 0.02); }
+  const AGUDO = 1047, GRAVE = 698; // Do6 y Fa5: la cuenta suena grave y el inicio agudo, una quinta más arriba
   const campanazo = (t, f) => { [[1, .5], [2.76, .3], [5.4, .18], [8.93, .1]].forEach(([m, g]) => tono(f * m, t, 1.4 / Math.sqrt(m), { g, ataque: .002 })); };
   const SYN = {
     campana: t => { [0, .28, .56].forEach(d => campanazo(t + d, 830)); },
     silbato: t => { tono(2900, t, .7, { tipo: 'sine', g: .55, ataque: .02, vib: 160, vibF: 28 }); tono(5800, t, .7, { g: .12, ataque: .02, vib: 320, vibF: 28 }); ruido(t, .7, 2900, .18); },
     gong: t => { [[110, .55], [164, .35], [221, .3], [298, .2], [443, .12]].forEach(([f, g]) => tono(f, t, 3.2, { g, ataque: .01 })); campanazo(t, 330); },
     bocina: t => { [349, 440, 523].forEach(f => { tono(f, t, .9, { tipo: 'sawtooth', g: .3, ataque: .02 }); tono(f * 1.005, t, .9, { tipo: 'square', g: .12, ataque: .02 }); }); },
-    pitido: t => { tono(1100, t, .32, { tipo: 'square', g: .45 }); },
-    doble: t => { tono(1300, t, .16, { tipo: 'square', g: .45 }); tono(1300, t + .22, .2, { tipo: 'square', g: .45 }); },
+    pro: t => plano(AGUDO, t, 1.05),
+    descanso: t => plano(GRAVE, t, 1.05),
+    meta: t => { plano(AGUDO, t, .28); plano(AGUDO, t + .45, .28); plano(AGUDO * 1.26, t + .9, 1.3); },
+    pitido: t => { plano(880, t, .4); },
+    doble: t => { plano(AGUDO, t, .18); plano(AGUDO, t + .26, .22); },
     digital: t => { [0, .12, .24].forEach(d => tono(2100, t + d, .07, { tipo: 'square', g: .4 })); },
-    subida: t => { [880, 1175, 1568].forEach((f, i) => tono(f, t + i * .15, .2, { tipo: 'triangle', g: .6 })); },
-    cuenta: t => { tono(880, t, .14, { tipo: 'square', g: .4 }); }
+    subida: t => { [GRAVE, 880, AGUDO].forEach((f, i) => plano(f, t + i * .17, .2)); },
+    cuenta: t => plano(GRAVE, t, .28)
   };
   function hablar(txt) {
     try {
@@ -170,7 +183,7 @@
       if (MIO[evento]) { decodificar(evento).then(b => b ? sonarBuffer(b, efDe(evento)) : SYN.pitido(AC.currentTime + .01)); return; }
     }
     const t = AC.currentTime + 0.02;
-    if (evento === 'cuenta' || evento === 'prep') { (id === 'pitido' ? SYN.cuenta : SYN[id] || SYN.cuenta)(t); return; }
+    if (evento === 'cuenta' || evento === 'prep') { (id === 'pitido' || id === 'pro' || id === 'descanso' ? SYN.cuenta : SYN[id] || SYN.cuenta)(t); return; }
     (SYN[id] || SYN.pitido)(t);
   }
   function probar(id, evento) { const prev = cfg[evento]; cfg[evento] = id; play(evento, 3); cfg[evento] = prev; }
@@ -210,7 +223,7 @@
     cerrarPanel();
     if (!document.getElementById('sndp-css')) { const st = document.createElement('style'); st.id = 'sndp-css'; st.textContent = css; document.head.appendChild(st); }
     const el = document.createElement('div'); el.id = 'sndp'; let aviso = {};
-    const opts = (ev) => SONIDOS.filter(([id]) => ev !== 'cuenta' || !['campana', 'gong', 'bocina', 'mio'].includes(id))
+    const opts = (ev) => SONIDOS.filter(([id]) => ev !== 'cuenta' || !['campana', 'gong', 'bocina', 'mio', 'descanso', 'meta'].includes(id))
       .map(([id, n]) => `<option value="${id}"${cfg[ev] === id ? ' selected' : ''}>${n}</option>`).join('');
     const mio = (ev) => { if (cfg[ev] !== 'mio') return '';
       const b = DEC[ev], grab = REC && REC.ev === ev;
