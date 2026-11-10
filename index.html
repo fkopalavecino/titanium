@@ -1011,11 +1011,15 @@ function pintarRest() { document.querySelectorAll('[data-tmr-k]').forEach(el => 
 function blqDe(rut, n) { const bl = (rut && rut.bloques) || []; for (let bi = 0; bi < bl.length; bi++) { const ejs = bl[bi].ejercicios || []; const ei = ejs.findIndex(e => e.nombre === n); if (ei < 0) continue;
     const m = String(bl[bi].titulo || '').match(/^bloque\s+([a-z])\s*[·:-]?\s*(.*)$/i); const letra = m ? m[1].toUpperCase() : String.fromCharCode(65 + bi); const nom = String((m ? m[2] : bl[bi].titulo) || '').split('·')[0].trim();
     return { txt: 'Bloque ' + letra + (nom ? ' · ' + nom : ''), pos: ejs.length > 1 ? ` (${ei + 1}/${ejs.length})` : '' }; } return null; }
+// "Bloque A · Calentamiento" a partir del índice de bloque que manda la app del alumno al marcar el circuito
+function blqNom(rut, bi) { const b = rut && (rut.bloques || [])[bi]; if (!b) return ''; const m = String(b.titulo || '').match(/^bloque\s+([a-z])\s*[·:-]?\s*(.*)$/i);
+  const letra = m ? m[1].toUpperCase() : String.fromCharCode(65 + bi); const nom = String((m ? m[2] : b.titulo) || '').split('·')[0].trim(); return 'Bloque ' + letra + (nom ? ' · ' + nom : ''); }
 function vivoInfo(f, hora, code, rut, r) {
   if (!rut) return null;
   const llenos = x => setsOf(x).filter(z => z.kg != null || z.r != null || z.t != null); const cur = r.ej || []; const hechas = cur.reduce((n, x) => n + llenos(x).length, 0);
   const pa = (S.paso || {})[f + '|' + hora + '|' + code];
-  if (!hechas && r.rpe == null && !pa && !(S.typ || {})[f + '|' + hora + '|' + code]) return null;
+  const ci0 = (S.circ || {})[f + '|' + hora + '|' + code]; const ciOk = ci0 && Date.now() - ci0.at < 15 * 60000;
+  if (!hechas && r.rpe == null && !pa && !ciOk && !(S.typ || {})[f + '|' + hora + '|' + code]) return null;
   const ejs = ejsDe(rut); const plan = ejs.reduce((n, x) => n + nSerieD(x.d), 0); const orden = ejs.map(x => x.n);
   const ult = [...cur].filter(x => llenos(x).length).sort((a, b) => orden.indexOf(b.n) - orden.indexOf(a.n))[0]; const ls = ult ? llenos(ult).slice(-1)[0] : null;
   const prev = cargasDe(code).filter(c => c.f < f); const al = [];
@@ -1024,7 +1028,7 @@ function vivoInfo(f, hora, code, rut, r) {
   const terminado = r.rpe != null; const vivo = f === today() && !terminado;
   const txt = terminado ? `<span class="ok-t">✓ Terminó</span> · ${hechas}${plan ? '/' + plan : ''} series · RPE ${esc(r.rpe)}`
     : (() => { const ty = (S.typ || {})[f + '|' + hora + '|' + code]; const tyOk = ty && Date.now() - ty.at < 60000;
-        const actN = pa ? pa.ej : tyOk ? ty.n : ult ? ult.n : ''; const act = actN ? cur.find(x => x.n === actN) : null; const usaTy = tyOk && ty.n === actN;
+        const actN = pa ? pa.ej : tyOk ? ty.n : ciOk && !hechas && blqNom(rut, ci0.bi) ? blqNom(rut, ci0.bi) : ult ? ult.n : ''; const act = actN ? cur.find(x => x.n === actN) : null; const usaTy = tyOk && ty.n === actN;
         const lleno = z => z && (z.kg != null || z.r != null || z.t != null);
         const ss = usaTy ? ty.sets.filter(lleno).map(fmtSetC) : act ? llenos(act).map(fmtSetC) : []; const aps = (usaTy ? ty.ap : act ? (act.ap || []) : []).filter(z => z && (z.kg != null || z.r != null)).map(fmtSetC);
         const esBlq = /^Bloque /.test(actN); const ci = esBlq ? (S.circ || {})[f + '|' + hora + '|' + code] : null;
@@ -2577,7 +2581,7 @@ route();
         if (p.off) delete S.tmr[k]; else S.tmr[k] = Object.assign({}, p, { at: Date.now() }); pintarRest(); })
       .on('broadcast', { event: 'typ' }, ({ payload: p }) => { if (!p || !p.a || !p.n) return; S.typ = S.typ || {}; const k = p.f + '|' + p.h + '|' + p.a;
         S.typ[k] = { n: p.n, sets: p.sets || [], ap: p.ap || [], at: Date.now() }; pintarVivo(k); })
-      .on('broadcast', { event: 'circ' }, ({ payload: p }) => { if (!p || !p.a) return; S.circ = S.circ || {}; const k = p.f + '|' + p.h + '|' + p.a; S.circ[k] = { v: p.v, it: p.it || [], at: Date.now() }; pintarVivo(k); })
+      .on('broadcast', { event: 'circ' }, ({ payload: p }) => { if (!p || !p.a) return; S.circ = S.circ || {}; const k = p.f + '|' + p.h + '|' + p.a; S.circ[k] = { bi: p.bi, v: p.v, it: p.it || [], at: Date.now() }; pintarVivo(k); })
       .on('broadcast', { event: 'paso' }, ({ payload: p }) => { if (!p || !p.a) return; S.paso = S.paso || {}; S.paso[p.f + '|' + p.h + '|' + p.a] = { ej: p.ej || '', k: p.k, n: p.n }; schedule(); });
     // reconexión: si el iPad se duerme o se corta internet, el canal en vivo muere en silencio; se revisa y se vuelve a abrir
     const CHS = { vivo: vivoSub, conf: () => sbc.channel('tl-conf').on('postgres_changes', { event: '*', schema: 'public', table: 'confirmaciones' }, cargarConf) };
