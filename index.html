@@ -2457,23 +2457,37 @@ let confAbierta = false; // la tarjeta parte minimizada; recuerda si la abriste
 document.addEventListener('toggle', e => { if (e.target.id === 'conf-card') confAbierta = e.target.open; }, true);
 function confirmacionesHTML() {
   const t = today(), m = addDays(t, 1); const items = [];
-  (S.conf || new Map()).forEach((est, k) => { const [f, h, code] = k.split('|'); if (f === t || f === m) items.push({ f, h, code, est }); });
+  // las clases de hoy que ya pasaron (más de 1 hora desde su inicio) ya no se muestran
+  const now = new Date(), minNow = now.getHours() * 60 + now.getMinutes(); const minDe = h => { const [hh, mm] = String(h).split(':').map(Number); return hh * 60 + (mm || 0); };
+  (S.conf || new Map()).forEach((est, k) => { const [f, h, code] = k.split('|'); if ((f === t && minDe(h) + 60 > minNow) || f === m) items.push({ f, h, code, est }); });
   items.sort((a, b) => (a.f + a.h).localeCompare(b.f + b.h) || nombre(a.code).localeCompare(nombre(b.code)));
   const e = cpEstado(); const no = items.filter(x => x.est !== 'voy'), si = items.filter(x => x.est === 'voy');
-  const cuando = x => (x.f === t ? 'Hoy' : 'Mañana') + ' ' + x.h;
+  // nombre corto: primer nombre + inicial del apellido (para distinguir Eduardo / Mario repetidos)
+  const corto = code => { const w = String(nombre(code) || '').trim().split(/\s+/); const n = w[0] ? w[0][0].toUpperCase() + w[0].slice(1) : '?'; return w[1] ? n + ' ' + w[1][0].toUpperCase() + '.' : n; };
   const ctrl = { on: `<span class="small" style="color:var(--ok);font-weight:700">🔔 Avisos activados</span><button class="btn sm" data-act="cp-test">Probar</button><button class="btn sm ghost" data-act="cp-off">Desactivar</button>`,
     off: `<button class="btn sm pri" data-act="cp-on">🔔 Activar avisos en este teléfono</button>`,
     instalar: `<span class="small muted">En iPhone: Safari › Compartir › «Agregar a inicio», entra desde ese ícono y activa los avisos aquí.</span>`,
     bloqueado: `<span class="small" style="color:var(--warn)">Avisos bloqueados: Ajustes del teléfono › Notificaciones › Titanium.</span>`,
     no: `<span class="small muted">Este navegador no permite avisos (usa Safari en iPhone o Chrome en Android).</span>` }[e];
+  const chip = x => x.est === 'voy'
+    ? `<span class="cf-c ok">✓ ${esc(corto(x.code))}</span>`
+    : `<button type="button" class="cf-c crit" data-act="msg" data-id="${esc(x.code)}" data-tipo="${esc('recuperar:' + x.f + ':' + x.h)}" title="Ofrecer recuperación a ${esc(nombre(x.code))}">✕ ${esc(corto(x.code))} 💬</button>`;
+  const dia = (f, lbl) => { const L = items.filter(x => x.f === f); if (!L.length) return '';
+    const horas = [...new Set(L.map(x => x.h))];
+    return `<div class="cf-dia">${lbl} <span class="muted" style="font-weight:500">· ${L.filter(x => x.est === 'voy').length} vienen${L.some(x => x.est !== 'voy') ? ' · ' + L.filter(x => x.est !== 'voy').length + ' no' : ''}</span></div>`
+      + horas.map(h => { const H = L.filter(x => x.h === h).sort((a, b) => (a.est === 'voy') - (b.est === 'voy')); return `<div class="cf-row"><span class="cf-h">${esc(h)}</span><span class="cf-cs">${H.map(chip).join('')}</span></div>`; }).join(''); };
   return `<details class="sec" id="conf-card" ${confAbierta ? 'open' : ''} style="background:var(--panel,var(--sunk));border:1px solid var(--line)">
     <summary><span>Asistencia hoy y mañana</span>
       <span class="pill ok">✅ ${si.length}</span>${no.length ? `<span class="pill crit">❌ ${no.length}</span>` : ''}
       ${e === 'on' ? '<span title="Avisos activados">🔔</span>' : '<span class="small muted" style="font-weight:500">· activa los avisos</span>'}</summary>
-    <div style="display:grid;gap:8px">
+    <style>#conf-card .cf-dia{font-weight:700;font-size:13px;margin:8px 0 2px}#conf-card .cf-row{display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--line)}
+      #conf-card .cf-h{font-weight:700;font-variant-numeric:tabular-nums;min-width:44px;padding-top:3px;font-size:13px;color:var(--muted)}#conf-card .cf-cs{display:flex;flex-wrap:wrap;gap:6px;flex:1}
+      #conf-card .cf-c{font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:3px 10px;border:1px solid transparent;white-space:nowrap}
+      #conf-card .cf-c.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}#conf-card .cf-c.crit{color:var(--crit);background:color-mix(in srgb,var(--crit) 14%,transparent);border-color:color-mix(in srgb,var(--crit) 40%,transparent);cursor:pointer}</style>
+    <div style="display:grid;gap:0">
       ${e === 'on' ? '' : `<div class="tools" style="align-items:center">${ctrl}</div>`}
-      ${no.length ? `<div class="small muted" style="font-weight:700;margin-top:4px">No vienen</div>` + no.map(x => `<div class="li" style="padding:7px 0"><span class="grow"><b>${esc(nombre(x.code))}</b> <span class="small muted">· ${esc(cuando(x))}</span></span><button class="btn sm" data-act="msg" data-id="${esc(x.code)}" data-tipo="${esc('recuperar:' + x.f + ':' + x.h)}">💬 Recuperar</button></div>`).join('') : ''}
-      ${si.length ? `<div class="small muted" style="font-weight:700;margin-top:4px">Vienen</div><div class="small" style="line-height:1.7">${si.map(x => `<span style="white-space:nowrap">✅ ${esc(firstName(nombre(x.code)))} <span class="muted">${esc(cuando(x))}</span></span>`).join(' · ')}</div>` : ''}
+      ${dia(t, 'Hoy')}${dia(m, 'Mañana')}
+      ${no.length ? '<div class="small muted" style="margin-top:8px">Toca un nombre en rojo para ofrecerle recuperar la clase.</div>' : ''}
       ${!items.length ? '<p class="small muted" style="margin:0">Cuando un alumno confirme o cancele desde su app, aparece aquí al instante.</p>' : ''}
     </div>
   </details>`; }
