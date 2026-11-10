@@ -2187,7 +2187,14 @@ document.addEventListener('click', e => {
     case 'clase-hora': S.ui.claseHora = el.dataset.hora; render(); break;
     case 'toggle-timer': S.ui.showTimer = !S.ui.showTimer; render(); break;
     case 'agendar': agendarModal(); break;
-    case 'ag-pick': { const f = S.ui.claseFecha || today(); patchDia(f, S.ui.claseHora, id, {extra: true, quitado: null}); closeModal(); toast(`${nombre(id)} agendado a las ${S.ui.claseHora} · clase reagendada.`); break; }
+    case 'ag-pick': { const f = S.ui.claseFecha || today(), h = S.ui.claseHora;
+      // si ese día tiene su bloque fijo a otra hora (y aún no lo usa), se mueve solo: queda una sola clase, sin falta ni clase doble
+      const dk = dayKey(f), al = S.alumnos.get(id) || {};
+      const fijo = (al.bloques || []).filter(b => b.startsWith(dk + '-')).map(b => b.slice(dk.length + 1)).filter(h0 => h0 !== h)
+        .filter(h0 => { const r0 = rec(f, h0, id); return !r0.quitado && !r0.reagA && !r0.asis && !(r0.ej || []).length; })
+        .sort((x, y) => Math.abs(hmToMin(x) - hmToMin(h)) - Math.abs(hmToMin(y) - hmToMin(h)))[0];
+      if (fijo) { patchDia(f, fijo, id, {quitado: true, asis: null, aprobada: null, reagA: {f, h}}); patchDia(f, h, id, {extra: true, quitado: null, reagDe: {f, h: fijo}}); closeModal(); toast(`${nombre(id)} movido de las ${fijo} a las ${h} · no le cuenta como falta.`); break; }
+      patchDia(f, h, id, {extra: true, quitado: null}); closeModal(); toast(`${nombre(id)} agendado a las ${h} · clase reagendada.`); break; }
     case 'reag': reagModal(el.dataset.k); break;
     case 'reag-undo': { const {f, h, code} = toggleOne(el.dataset.k); const v = rec(f, h, code);
       if (v.reagA) { const o = rec(v.reagA.f, v.reagA.h, code); if (o.extra && !o.asis) patchDia(v.reagA.f, v.reagA.h, code, {extra: null, reagDe: null, rutina: null, aprobada: null}); }
