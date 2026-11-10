@@ -180,14 +180,19 @@
   let channel = null;
   function listen() {
     if (channel) return;
-    channel = sb.channel('titanium');
-    [['alumnos', 'alumnos'], ['planes', 'alumnos'], ['rutinas', 'rutinas'], ['config', 'cfg']].forEach(([t, n]) =>
-      channel.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => soon(n)));
-    channel.on('postgres_changes', { event: '*', schema: 'public', table: 'clases' }, aplicarClase);
-    channel.subscribe();
-    // al volver a la pestaña solo se recarga todo si estuvo oculta más de 2 minutos (los cambios llegan en vivo)
+    const soltarCanal = (cli, ch) => { if (!ch || !ch.topic) return; try { cli.realtime._remove(ch); } catch (_) {} try { ch.teardown(); } catch (_) {} };
+    const abrirCanal = () => { soltarCanal(sb, channel); const ch = sb.channel('titanium');
+      [['alumnos', 'alumnos'], ['planes', 'alumnos'], ['rutinas', 'rutinas'], ['config', 'cfg']].forEach(([t, n]) =>
+        ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => soon(n)));
+      ch.on('postgres_changes', { event: '*', schema: 'public', table: 'clases' }, aplicarClase);
+      channel = ch.subscribe(); };
+    abrirCanal();
+    // si el iPad se durmió o se cortó internet, el canal muere en silencio: se revisa cada 20 s y se reabre (y se recarga lo perdido)
+    setInterval(() => { if (channel && !['joined', 'joining'].includes(channel.state)) { abrirCanal(); ['dias', 'alumnos'].forEach(soon); } }, 20000);
     let oculta = 0;
-    document.addEventListener('visibilitychange', () => { if (document.hidden) { oculta = Date.now(); return; } if (Date.now() - oculta > 120000) ['alumnos', 'rutinas', 'dias', 'cfg'].forEach(soon); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { oculta = Date.now(); return; }
+      abrirCanal(); if (Date.now() - oculta > 60000) ['alumnos', 'rutinas', 'dias', 'cfg'].forEach(soon); else soon('dias'); });
+    window.addEventListener('online', () => { abrirCanal(); ['alumnos', 'dias'].forEach(soon); });
   }
 
   /* ---------- escrituras ---------- */

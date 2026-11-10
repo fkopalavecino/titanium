@@ -787,6 +787,12 @@ const snd = (ev, n) => { try { window.SND && SND.play(ev, n); } catch (_) {} };
 let REST = null, VIVO = null;
 // el panel del profe ve en la tarjeta del alumno el reloj de descanso (sin guardar nada en la base)
 const vivoCh = () => { if (!VIVO) { VIVO = sb.channel('tl-vivo', { config: { broadcast: { self: false } } }); VIVO.subscribe(); } return VIVO; };
+// al desbloquear el teléfono o volver internet, el canal en vivo puede quedar muerto: se descarta y se abre uno nuevo en el próximo envío
+const soltarCanal = (cli, ch) => { if (!ch || !ch.topic) return; try { cli.realtime._remove(ch); } catch (_) {} try { ch.teardown(); } catch (_) {} };
+const reiniciarVivo = () => { const v = VIVO; VIVO = null; soltarCanal(sb, v); };
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reiniciarVivo(); });
+window.addEventListener('online', reiniciarVivo);
+setInterval(() => { if (VIVO && !['joined', 'joining'].includes(VIVO.state)) reiniciarVivo(); }, 20000);
 const avisarDescanso = (rem, ej) => { try { const rd = rutinaDeHoy(); vivoCh().send({ type: 'broadcast', event: 'rest', payload: { a: codigo, f: rd.fecha || today(), h: rd.hora || '', rem: Math.max(0, Math.round(rem)), ej: ej || '' } }); } catch (_) {} };
 let PASOTX = '', TYPT = null;
 const avisarCirc = bi => { try { const rd = rutinaDeHoy(); const b = rd.r?.bloques?.[bi]; if (!b) return; const ck = S.cck || new Set();

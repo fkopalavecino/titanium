@@ -2557,16 +2557,24 @@ route();
       if (S.conf) nuevo.forEach((est, k) => { if (S.conf.get(k) !== est) { const [f, h, code] = k.split('|'); if (f >= today()) toast(`${est === 'voy' ? '✅' : '❌'} ${nombre(code)} ${est === 'voy' ? 'viene' : 'no viene'} · ${f === today() ? 'hoy' : fmtD(f)} ${h}`, est !== 'voy'); } });
       S.conf = nuevo; schedule(); };
     cpRevisar(); cargarProxEventos(); sbc.channel('tl-ev-ini').on('postgres_changes', { event: '*', schema: 'public', table: 'eventos' }, cargarProxEventos).subscribe();
-    cargarConf(); sbc.channel('tl-conf').on('postgres_changes', { event: '*', schema: 'public', table: 'confirmaciones' }, cargarConf).subscribe();
+    cargarConf();
     // reloj de descanso en vivo de cada alumno (lo envía su app; no se guarda)
-    S.rest = {}; sbc.channel('tl-vivo').on('broadcast', { event: 'rest' }, ({ payload: p }) => { if (!p || !p.a) return;
+    S.rest = {}; const vivoSub = () => sbc.channel('tl-vivo').on('broadcast', { event: 'rest' }, ({ payload: p }) => { if (!p || !p.a) return;
       const k = p.f + '|' + p.h + '|' + p.a; if (p.rem > 0) S.rest[k] = { fin: Date.now() + p.rem * 1000, ej: p.ej || '' }; else delete S.rest[k]; pintarRest(); })
       .on('broadcast', { event: 'tmr' }, ({ payload: p }) => { if (!p || !p.a) return; S.tmr = S.tmr || {}; const k = p.f + '|' + p.h + '|' + p.a;
         if (p.off) delete S.tmr[k]; else S.tmr[k] = Object.assign({}, p, { at: Date.now() }); pintarRest(); })
       .on('broadcast', { event: 'typ' }, ({ payload: p }) => { if (!p || !p.a || !p.n) return; S.typ = S.typ || {}; const k = p.f + '|' + p.h + '|' + p.a;
         S.typ[k] = { n: p.n, sets: p.sets || [], ap: p.ap || [], at: Date.now() }; pintarVivo(k); })
       .on('broadcast', { event: 'circ' }, ({ payload: p }) => { if (!p || !p.a) return; S.circ = S.circ || {}; const k = p.f + '|' + p.h + '|' + p.a; S.circ[k] = { v: p.v, it: p.it || [], at: Date.now() }; pintarVivo(k); })
-      .on('broadcast', { event: 'paso' }, ({ payload: p }) => { if (!p || !p.a) return; S.paso = S.paso || {}; S.paso[p.f + '|' + p.h + '|' + p.a] = { ej: p.ej || '', k: p.k, n: p.n }; schedule(); }).subscribe();
+      .on('broadcast', { event: 'paso' }, ({ payload: p }) => { if (!p || !p.a) return; S.paso = S.paso || {}; S.paso[p.f + '|' + p.h + '|' + p.a] = { ej: p.ej || '', k: p.k, n: p.n }; schedule(); });
+    // reconexión: si el iPad se duerme o se corta internet, el canal en vivo muere en silencio; se revisa y se vuelve a abrir
+    const CHS = { vivo: vivoSub, conf: () => sbc.channel('tl-conf').on('postgres_changes', { event: '*', schema: 'public', table: 'confirmaciones' }, cargarConf) };
+    const soltarCanal = (cli, ch) => { if (!ch || !ch.topic) return; try { cli.realtime._remove(ch); } catch (_) {} try { ch.teardown(); } catch (_) {} }; const abiertos = {}; const abrir = k => { soltarCanal(sbc, abiertos[k]); abiertos[k] = CHS[k]().subscribe(); };
+    Object.keys(CHS).forEach(abrir);
+    const revisarCanales = forzar => { Object.keys(CHS).forEach(k => { const st = abiertos[k] && abiertos[k].state; if (forzar || !['joined', 'joining'].includes(st)) abrir(k); }); };
+    setInterval(() => revisarCanales(false), 20000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { revisarCanales(true); cargarConf(); } });
+    window.addEventListener('online', () => { revisarCanales(true); cargarConf(); });
     setInterval(pintarRest, 500); }
   db.doc('config/general').onSnapshot(d => { S.cfg = d.exists ? clone(d.data()) : null; S.loaded.cfg = true; schedule(); maybeMigrateLib(); }, fail);
 })();
