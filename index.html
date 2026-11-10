@@ -940,7 +940,7 @@ function studentCard(f, hora, code, ruts) {
   const marcas = [r.reagDe && r.reagDe.flex ? '<span class="sc-ic sc-flex" title="Alumna de agenda libre: agendó esta clase desde su app">📅 Agenda libre</span>' : r.reagDe && r.reagDe.recup ? '<span class="sc-ic sc-rec" title="Viene a recuperar una clase">🔁 Recuperación</span>' : r.extra ? '<span title="Agendado solo para esta fecha">↻</span>' : '',
     les.length ? `<span class="sc-ic" title="Lesiones: ${esc(les.join(', '))}">⚠ ${esc(les[0])}${les.length > 1 ? ' +' + (les.length - 1) : ''}</span>` : '',
     a.ingreso?.parq?.length ? '<span class="sc-ic crit" title="Respondió sí en el PAR-Q">PAR-Q</span>' : '',
-    debe ? '<span class="sc-ic crit" title="Tiene un pago pendiente">$ debe</span>' : '',
+    debe ? `<span class="sc-ic crit go" role="link" tabindex="0" data-act="ir-pago" data-id="${esc(code)}" data-p="${esc(p?.id || '')}" title="Ir a Pagos de este alumno" style="cursor:pointer">$ debe ›</span>` : '',
     cu && cu.dias === 0 ? '<span title="Cumpleaños">🎂</span>' : ''].filter(Boolean).join('');
   const rutNom = r.rutina ? String(S.rutinas.get(r.rutina)?.tipo || 'Rutina').split(' · ')[0] : sug ? 'Le toca ' + String(S.rutinas.get(sug)?.tipo || '').split(' · ')[0] : 'Sin rutina';
   const v = vivoInfo(f, hora, code, rut, r);
