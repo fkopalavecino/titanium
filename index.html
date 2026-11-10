@@ -2026,8 +2026,10 @@ function reagModal(key) {
       const sin = $('#rg-sin').checked, nf = val('rg-f'), nh = val('rg-h');
       if (!sin && (!nf || !nh)) { toast('Elige fecha y hora.', true); return false; }
       if (!sin && nf === f && nh === h) { toast('Elige otra fecha u hora.', true); return false; }
+      // si era una recuperación o una clase de agenda libre, la nueva fecha mantiene ese tipo (no devuelve el crédito ni cuenta doble)
+      const r0 = rec(f, h, code), tipo = r0.extra && r0.reagDe ? (r0.reagDe.recup ? {recup: true, fija: true} : r0.reagDe.flex ? {flex: true} : {}) : {};
       patchDia(f, h, code, {quitado: true, asis: null, aprobada: null, extra: null, reagA: sin ? null : {f: nf, h: nh}});
-      if (!sin) patchDia(nf, nh, code, {extra: true, quitado: null, reagDe: {f, h}});
+      if (!sin) patchDia(nf, nh, code, {extra: true, quitado: null, reagDe: Object.assign({}, tipo, {f, h})});
       toast(sin ? `${nombre(code)} quitada solo de este bloque.` : `${nombre(code)} reagendada al ${fmtD(nf)} a las ${nh}.`);
     }
   });
