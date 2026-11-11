@@ -319,16 +319,18 @@ const swReg = () => navigator.serviceWorker.register('sw.js').then(() => navigat
 if ('serviceWorker' in navigator) swReg().then(r => r.pushManager && r.pushManager.getSubscription()).then(s => {
   const on = !!s && window.Notification && Notification.permission === 'granted'; if (s && on) guardarSub(s);
   if (on !== !!S.push) { S.push = on; if ((S.v === 'hoy' || S.v === 'plan') && !(document.activeElement && document.activeElement.matches('input,textarea'))) render(); } }).catch(() => {});
+// en algunos Android (Chrome con permiso «silencioso», teléfonos sin Google) pedir permiso o suscribirse nunca responde: le ponemos tope para no dejar pegado al alumno
+const conTope = (p, ms) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error('tope')), ms))]);
 async function activarPush(btn) {
   if (!pushOK()) { toast('Este navegador no permite avisos.'); return; }
-  const perm = await Notification.requestPermission();
+  let perm = 'default'; try { perm = await conTope(Promise.resolve(Notification.requestPermission()), 20000); } catch (_) {}
   if (perm !== 'granted') { toast(perm === 'denied' ? 'Avisos bloqueados. Actívalos en Ajustes.' : 'No se activaron los avisos.'); render(); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Activando…'; }
   try {
-    const reg = await swReg();
-    const { pub } = await fetch(PUSH_FN, { method: 'POST', headers: PUSH_H, body: '{"init":true}' }).then(r => r.json());
-    const s = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(pub) }));
-    if (!(await guardarSub(s))) throw new Error('save');
+    const reg = await conTope(swReg(), 10000);
+    const { pub } = await conTope(fetch(PUSH_FN, { method: 'POST', headers: PUSH_H, body: '{"init":true}' }).then(r => r.json()), 10000);
+    const s = (await reg.pushManager.getSubscription()) || (await conTope(reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(pub) }), 15000));
+    if (!(await conTope(guardarSub(s), 10000))) throw new Error('save');
     S.push = true; toast('Avisos activados 🔔'); render();
   } catch (e) { console.error(e); toast('No se pudieron activar los avisos. Intenta de nuevo.'); if (btn) { btn.disabled = false; btn.textContent = '🔔 Activar avisos'; } }
 }
@@ -1748,8 +1750,9 @@ document.addEventListener('click', async ev => {
   const pa = ev.target.closest('[data-push]'); if (pa) { activarPush(pa); return; }
   const ro = ev.target.closest('[data-reglasok]'); if (ro) { if (!$('#reglas-ok')?.checked) { toast('Marca «Leí y entiendo» para continuar.'); $('#reglas-ok')?.focus(); return; }
     ro.disabled = true; const quiere = pushEstado() === 'off';
-    if (quiere) { try { await activarPush(null); } catch (_) {} }
-    S.onbAvisos = false; await guardarPerfil({ reglas: { v: REGLAS_V } }); S.v = 'hoy'; render(); window.scrollTo(0, 0);
+    if (quiere) { ro.textContent = 'Activando…'; try { await conTope(activarPush(null), 45000); } catch (_) {} }
+    // pase lo que pase con los avisos, el alumno entra a su app
+    S.onbAvisos = false; S.v = 'hoy'; S.perfil = Object.assign({}, S.perfil, { reglas: { v: REGLAS_V } }); try { await conTope(guardarPerfil({ reglas: { v: REGLAS_V } }), 10000); } catch (_) {} render(); window.scrollTo(0, 0);
     toast(pushEstado() === 'on' || !quiere ? '¡Listo! Bienvenido a tu app 💪' : 'Entraste sin avisos: actívalos en Perfil cuando puedas.'); return; }
   const pt = ev.target.closest('[data-pushtest]'); if (pt) { probarPush(pt); return; }
   if (ev.target.closest('[data-pushoff]')) { desactivarPush(); return; }
