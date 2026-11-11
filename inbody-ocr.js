@@ -7,6 +7,7 @@
     ['peso', 'Peso', 'kg', ['peso corporal', 'peso', 'weight'], [25, 250], 1, null],
     ['pgc', '% Grasa', '%', ['porcentaje de grasa corporal', 'porcentaje de grasa', 'pgc', 'percent body fat', 'pbf', 'grasa corporal %', 'grasa corporal'], [3, 70], 1, 'baja'],
     ['mgc', 'Masa grasa', 'kg', [], [1, 200], 1, 'baja', 'calc'],
+    ['mlg', 'Masa libre de grasa', 'kg', ['masa libre de grasa', 'peso corporal sin grasa', 'peso sin grasa', 'masa magra', 'fat free mass', 'ffm', 'lean body mass'], [15, 160], 1, 'sube'],
     ['mme', 'Músculo esquelético', 'kg', ['masa muscular esqueletica', 'musculo esqueletico', 'skeletal muscle mass', 'smm', 'masa muscular'], [8, 90], 1, 'sube'],
     ['pmm', '% Músculo', '%', [], [5, 80], 1, 'sube', 'calc'],
     ['visceral', 'Grasa visceral', 'nivel', ['nivel de grasa visceral', 'grasa visceral', 'visceral fat level', 'visceral'], [1, 30], 0, 'baja'],
@@ -29,6 +30,8 @@
     mgc: { que: 'Los kilos de grasa que tienes. Junto al músculo te dice si lo que bajas es grasa (bien) o músculo (mal).', zona: () => null,
       tip: 'La meta es que baje mes a mes mientras el músculo se mantiene o sube.' },
     pmm: { que: 'Qué parte de tu peso es músculo esquelético. Sube cuando ganas músculo o cuando bajas grasa: las dos cosas son avance.', zona: () => null },
+    mlg: { que: 'Todo lo que no es grasa: músculo, huesos, órganos y agua. Con este dato se calcula tu metabolismo basal.', zona: () => null,
+      tip: 'La meta es mantenerla o subirla mientras bajas grasa.' },
     tmb: { que: 'Las calorías que tu cuerpo gasta en reposo solo para funcionar. Es la base para calcular cuánto comer.', zona: () => null,
       tip: 'Más músculo = metabolismo basal más alto.' },
     cintura: { que: 'Perímetro de cintura medido con huincha a la altura del ombligo. Es el mejor reflejo de la grasa abdominal.',
@@ -42,6 +45,7 @@
   window.TL_INBODY_DERIVAR = x => { if (!x) return x; const y = Object.assign({}, x); delete y.imc;
     if (y.peso && y.pgc && y.mgc == null) y.mgc = Math.round(y.peso * y.pgc) / 100;
     if (y.peso && y.mme) y.pmm = Math.round(y.mme / y.peso * 1000) / 10;
+    if (y.peso && y.mlg == null && y.mgc != null && y.mgc < y.peso) y.mlg = Math.round((y.peso - y.mgc) * 10) / 10;
     return y; };
 
   const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[|]/g, ' ').replace(/[ \t]+/g, ' ');
@@ -101,6 +105,7 @@
       if (magra > 0 && magra < out.peso) { const pct = (out.peso - magra) / out.peso * 100;
         if (out.pgc == null || Math.abs(out.pgc - pct) > 1.5) { const alt = (colas.pgc || []).find(n => Math.abs(n - pct) <= 0.8);
           out.pgc = alt != null ? alt : Math.round(pct * 10) / 10; delete out.mgc; } } }
+    if (!out.mlg && ml) { const magra = num(ml[1]); if (magra >= 15 && magra <= 160 && (!out.peso || magra < out.peso)) out.mlg = magra; }
     const f = fechaISO(t); if (f) out.fecha = f;
     // coherencia: si hay peso y % grasa pero no masa grasa, se calcula
     if (out.peso && out.pgc && !out.mgc) out.mgc = Math.round(out.peso * out.pgc) / 100;
@@ -123,7 +128,24 @@
         x.filter = 'grayscale(1) contrast(1.25)'; x.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); res(c); };
       img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('img')); }; img.src = u; });
   }
+  // PDF: primero intenta leer el texto (informes digitales); si no trae texto, se convierte la 1ª página a imagen.
+  let pdfjs = null;
+  function cargarPdfJs() { if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib); if (pdfjs) return pdfjs;
+    pdfjs = new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+      s.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'; res(window.pdfjsLib); };
+      s.onerror = () => rej(new Error('No se pudo cargar el lector de PDF')); document.head.appendChild(s); }); return pdfjs; }
+  const esPdf = f => f && (f.type === 'application/pdf' || /\.pdf$/i.test(f.name || ''));
+  async function abrirPdf(file) { const L = await cargarPdfJs(); return L.getDocument({ data: await file.arrayBuffer() }).promise; }
+  async function textoPdf(doc) { let out = ''; for (let i = 1; i <= Math.min(doc.numPages, 3); i++) { const pg = await doc.getPage(i); const tc = await pg.getTextContent();
+      let y = null; for (const it of tc.items) { const yy = Math.round(it.transform[5]); out += (y != null && Math.abs(yy - y) > 3 ? '\n' : ' ') + it.str; y = yy; } out += '\n'; } return out; }
+  // 1ª página del PDF como imagen JPG (para guardarla como informe y, si hace falta, leerla con OCR)
+  window.tlPdfAImagen = async function (file) { const doc = await abrirPdf(file); const pg = await doc.getPage(1); const vp0 = pg.getViewport({ scale: 1 });
+    const vp = pg.getViewport({ scale: Math.min(3, 2000 / Math.max(vp0.width, vp0.height)) }); const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); await pg.render({ canvasContext: x, viewport: vp }).promise;
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9)); return new File([blob], (file.name || 'inbody').replace(/\.pdf$/i, '') + '.jpg', { type: 'image/jpeg' }); };
   window.tlInbodyLeer = async function (file, onProgress) {
+    if (esPdf(file)) { try { const doc = await abrirPdf(file); const tx = await textoPdf(doc); const v = extraer(tx); if (v.peso && (v.pgc || v.mlg || v.tmb)) return { vals: v, texto: tx }; } catch (_) {}
+      file = await window.tlPdfAImagen(file); }
     const T = await cargarTesseract(); const canvas = await preparar(file);
     const r = await T.recognize(canvas, 'spa+eng', { logger: m => { if (onProgress && m.status === 'recognizing text') onProgress(Math.round((m.progress || 0) * 100)); } });
     const texto = r?.data?.text || '';

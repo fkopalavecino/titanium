@@ -1,0 +1,171 @@
+/* Titanium · cálculo de metas nutricionales y pauta automática (3 opciones por comida con los mismos macros).
+   Lo usan el panel del profe y la app del alumno. Requiere alimentos.js (window.TL_ALIMENTOS). */
+(function () {
+  const BASE = (window.TL_ALIMENTOS || []).map(a => ({ n: a[0], e: a[1] || '', kcal: a[2], prot: a[3], carb: a[4], gras: a[5], pn: a[6] || '', pg: a[7] || 0 }));
+  const food = (n, e) => BASE.find(a => a.n === n && a.e === (e || '')) || BASE.find(a => a.n === n);
+  const r = x => Math.round(Number(x) || 0);
+
+  /* ---------- metas ---------- */
+  const OBJ = {
+    bajar: { l: 'Bajar grasa', ic: '🔥', aj: [-25, -15], def: -20, txt: 'Déficit del 15 al 25 %' },
+    recomp: { l: 'Recomposición corporal', ic: '⚖️', aj: [-10, 0], def: -5, txt: 'Bajar grasa y subir músculo a la vez' },
+    mantener: { l: 'Mantener', ic: '🎯', aj: [0, 0], def: 0, txt: 'Comer lo que gastas' },
+    subir: { l: 'Ganar músculo', ic: '💪', aj: [5, 10], def: 7, txt: 'Superávit del 5 al 10 %' },
+  };
+  const ACT = [['sed', 1.2, 'Sedentario', 'No entrena'], ['1-3', 1.375, '1 a 3 días', 'Entrena 1 a 3 días'], ['3-5', 1.55, '3 a 5 días', 'Entrena 3 a 5 días'], ['6-7', 1.725, '6 a 7 días', 'Entrena 6 a 7 días']];
+  const factor = (dias, fisico) => { const f = (ACT.find(a => a[0] === dias) || ACT[2])[1]; return fisico ? Math.max(f, 1.725) : f; };
+  // datos del último InBody con peso: peso, % grasa, masa libre de grasa, músculo, basal
+  function datos(inbody) {
+    const ls = (inbody || []).filter(x => x && Number(x.peso)).slice().sort((a, b) => String(a.f).localeCompare(String(b.f)));
+    const x = ls[ls.length - 1]; if (!x) return null; const n = v => (v == null || v === '' || isNaN(+v)) ? null : +v;
+    const peso = n(x.peso), pgc = n(x.pgc), tmb = n(x.tmb), mme = n(x.mme);
+    let mlg = n(x.mlg); if (mlg == null && pgc != null) mlg = Math.round(peso * (1 - pgc / 100) * 10) / 10;
+    return { f: x.f, peso, pgc, mlg, mme, tmb: tmb >= 800 && tmb <= 4500 ? tmb : null };
+  }
+  function basal(d) { if (!d) return null; if (d.tmb) return { v: d.tmb, src: 'InBody' }; if (d.mlg) return { v: 370 + 21.6 * d.mlg, src: 'Katch-McArdle' }; return null; }
+  function calcMetas(d, o) {
+    const b = basal(d); if (!b || !d.peso) return null; o = o || {};
+    const obj = OBJ[o.obj] ? o.obj : 'recomp', ob = OBJ[obj];
+    const aj = Math.min(ob.aj[1], Math.max(ob.aj[0], o.aj != null && o.aj !== '' ? +o.aj : ob.def));
+    const fac = factor(o.dias, o.fisico), get = b.v * fac;
+    const kcal = Math.round(get * (1 + aj / 100) / 10) * 10;
+    const pRango = aj < 0 ? [2.0, 2.4] : [1.6, 2.2];
+    const pkg = Math.min(pRango[1], Math.max(pRango[0], o.pkg ? +o.pkg : (aj < 0 ? 2.2 : obj === 'subir' ? 2.0 : 1.8)));
+    const gkg = Math.min(1, Math.max(0.8, o.gkg ? +o.gkg : 0.9));
+    const prot = r(d.peso * pkg); const gras = Math.max(r(d.peso * gkg), Math.ceil(kcal * 0.2 / 9));
+    const carb = Math.max(0, r((kcal - prot * 4 - gras * 9) / 4));
+    return { kcal, prot, carb, gras, obj, dias: o.dias || '3-5', fisico: !!o.fisico, aj, pkg, gkg, factor: fac, basal: r(b.v), basalSrc: b.src, get: r(get), peso: d.peso, ib: d.f };
+  }
+
+  /* ---------- pauta ---------- */
+  const COMIDAS = { 4: [['desayuno', 'Desayuno', 0.25], ['almuerzo', 'Almuerzo', 0.30], ['once', 'Once', 0.20], ['cena', 'Cena', 0.25]],
+    5: [['desayuno', 'Desayuno', 0.22], ['colacion', 'Colación', 0.10], ['almuerzo', 'Almuerzo', 0.28], ['once', 'Once', 0.18], ['cena', 'Cena', 0.22]] };
+  const ENS = 'Ensalada surtida (lechuga, tomate, pepino)';
+  // cada opción: alimentos fijos [nombre, estado, g] + 3 que se ajustan (proteína, carbohidrato, grasa)
+  const T = {
+    desayuno: [
+      { fijo: [['Frutillas', '', 100]], v: [['Yogur griego natural 0%'], ['Avena en hojuelas'], ['Almendras']] },
+      { fijo: [['Huevo entero', '', 100], ['Tomate', '', 60]], v: [['Clara de huevo'], ['Pan marraqueta'], ['Palta']] },
+      { fijo: [['Plátano', '', 60]], v: [['Yogur proteico'], ['Pan de molde integral'], ['Mantequilla de maní']] },
+    ],
+    colacion: [
+      { fijo: [], v: [['Yogur griego natural 0%'], ['Manzana'], ['Almendras']] },
+      { fijo: [], v: [['Yogur proteico'], ['Plátano'], ['Nueces']] },
+      { fijo: [['Huevo entero', '', 50]], v: [['Clara de huevo'], ['Galletas de arroz'], ['Maní tostado']] },
+    ],
+    almuerzo: [
+      { fijo: [[ENS, '', 200]], v: [['Pechuga de pollo', 'cocido'], ['Arroz blanco', 'cocido'], ['Aceite de oliva']] },
+      { fijo: [[ENS, '', 200]], v: [['Carne molida 5% grasa', 'cocido'], ['Papa', 'cocido'], ['Palta']] },
+      { fijo: [['Brócoli', 'cocido', 150]], v: [['Atún en agua (escurrido)'], ['Arroz integral', 'cocido'], ['Aceite de oliva']] },
+    ],
+    once: [
+      { fijo: [['Tomate', '', 60]], v: [['Atún en agua (escurrido)'], ['Pan marraqueta'], ['Palta']] },
+      { fijo: [['Arándanos', '', 75]], v: [['Yogur griego natural 0%'], ['Avena en hojuelas'], ['Nueces']] },
+      { fijo: [['Huevo entero', '', 50]], v: [['Clara de huevo'], ['Pan de molde integral'], ['Palta']] },
+    ],
+    cena: [
+      { fijo: [['Zapallo italiano', '', 150]], v: [['Pechuga de pollo', 'cocido'], ['Papa', 'cocido'], ['Aceite de oliva']] },
+      { fijo: [[ENS, '', 200]], v: [['Carne molida 5% grasa', 'cocido'], ['Arroz blanco', 'cocido'], ['Aceite de oliva']] },
+      { fijo: [[ENS, '', 150], ['Huevo entero', '', 100]], v: [['Clara de huevo'], ['Pan marraqueta'], ['Palta']] },
+    ],
+  };
+  // unidades (se redondea a unidades enteras o medias) y topes razonables
+  const UNI = { 'Huevo entero': [50, 'huevo', 'huevos'], 'Clara de huevo': [33, 'clara', 'claras'], 'Pan marraqueta': [50, '½ marraqueta', ''], 'Pan de molde integral': [30, 'rebanada', 'rebanadas'], 'Pan hallulla': [45, '½ hallulla', ''], 'Galletas de arroz': [9, 'galleta', 'galletas'] };
+  const PASO = n => UNI[n] ? UNI[n][0] : /Aceite|Mantequilla de maní|Almendras|Nueces|Maní/.test(n) ? 5 : 10;
+  const TOPE = n => /Aceite/.test(n) ? 25 : /Mantequilla de maní|Almendras|Nueces|Maní/.test(n) ? 40 : /Palta/.test(n) ? 120 : /Clara/.test(n) ? 330 : /Pan/.test(n) ? 200 : /Avena/.test(n) ? 120 : /Yogur/.test(n) ? 400 : 450;
+  const mac = (f, g) => ({ kcal: f.kcal * g / 100, prot: f.prot * g / 100, carb: f.carb * g / 100, gras: f.gras * g / 100 });
+  function suma(items) { return items.reduce((t, it) => { const f = food(it.n, it.e); if (!f) return t; const m = mac(f, it.g); return { kcal: t.kcal + m.kcal, prot: t.prot + m.prot, carb: t.carb + m.carb, gras: t.gras + m.gras }; }, { kcal: 0, prot: 0, carb: 0, gras: 0 }); }
+  // mínimos cuadrados con pesos por kcal (prot y carb ×4, grasa ×9) sobre las variables libres, con límites
+  function resolver(fs, obj) {
+    const W = [4, 4, 9]; const col = f => [f.prot / 100, f.carb / 100, f.gras / 100];
+    const fijo = [null, null, null];
+    for (let it = 0; it < 6; it++) {
+      const libres = [0, 1, 2].filter(i => fijo[i] == null && fs[i].n !== '_'); [0, 1, 2].forEach(i => { if (fs[i].n === '_') fijo[i] = 0; });
+      const rest = [0, 1, 2].map(k => obj[k] - [0, 1, 2].reduce((s, i) => s + (fijo[i] != null ? col(fs[i])[k] * fijo[i] : 0), 0));
+      // normal equations: (AᵀWA) x = AᵀW b
+      const A = [0, 1, 2].map(k => libres.map(i => col(fs[i])[k] * W[k])); const b = rest.map((v, k) => v * W[k]);
+      const n = libres.length; const M = [...Array(n)].map((_, a) => [...Array(n)].map((_, c) => A.reduce((s, row) => s + row[a] * row[c], 0)));
+      const y = [...Array(n)].map((_, a) => A.reduce((s, row, k) => s + row[a] * b[k], 0));
+      const x = gauss(M, y); if (!x) { libres.forEach(i => { fijo[i] = 0; }); break; }
+      let mal = false; libres.forEach((i, j) => { const tp = TOPE(fs[i].n); if (x[j] < 0) { fijo[i] = 0; mal = true; } else if (x[j] > tp) { fijo[i] = tp; mal = true; } });
+      if (!mal) { libres.forEach((i, j) => { fijo[i] = x[j]; }); break; }
+      if (libres.length === 0) break;
+    }
+    return fijo.map(v => v || 0);
+  }
+  function gauss(M, y) { const n = y.length; if (!n) return []; const a = M.map((row, i) => [...row, y[i]]);
+    for (let c = 0; c < n; c++) { let p = c; for (let i = c + 1; i < n; i++) if (Math.abs(a[i][c]) > Math.abs(a[p][c])) p = i; if (Math.abs(a[p][c]) < 1e-9) return null; [a[c], a[p]] = [a[p], a[c]];
+      for (let i = 0; i < n; i++) if (i !== c) { const k = a[i][c] / a[c][c]; for (let j = c; j <= n; j++) a[i][j] -= k * a[c][j]; } }
+    return a.map((row, i) => row[n] / row[i]); }
+  function opcion(tpl, meta) {
+    const esc = Math.min(1, meta.kcal / 550); // en comidas chicas los fijos (huevos, fruta) se achican
+    const fijos = tpl.fijo.map(([n, e, g]) => { const st = PASO(n); return { n, e: e || '', g: Math.max(st, Math.round(g * esc / st) * st) }; }); const fm = suma(fijos);
+    const fs = tpl.v.map(([n, e]) => food(n, e)); const obj = [meta.prot - fm.prot, meta.carb - fm.carb, meta.gras - fm.gras];
+    const redo = (x, i) => { const st = PASO(fs[i].n); let g = Math.round(x / st) * st; if (g === 0 && x >= st * 0.35) g = st; return g; };
+    let x = resolver(fs, obj);
+    // 1º se redondean los alimentos por unidad (claras, pan) y se reajustan los demás para compensar
+    const uni = fs.map((f, i) => !!UNI[f.n] && x[i] > 0);
+    if (uni.some(Boolean)) { const fijo = fs.map((f, i) => uni[i] ? redo(x[i], i) : null);
+      const rest = [0, 1, 2].map(k => obj[k] - fs.reduce((sm, f, i) => sm + (fijo[i] != null ? [f.prot, f.carb, f.gras][k] / 100 * fijo[i] : 0), 0));
+      const libres = fs.map((f, i) => fijo[i] == null ? i : -1).filter(i => i >= 0);
+      if (libres.length) { const sub = resolver([...libres.map(i => fs[i]), ...Array(3 - libres.length).fill(null)].map(f => f || { n: '_', prot: 0, carb: 0, gras: 0 }), rest); libres.forEach((i, j) => { fijo[i] = sub[j]; }); }
+      x = fijo; }
+    const vars = fs.map((f, i) => ({ n: f.n, e: f.e, g: redo(x[i], i) })).filter(it => it.g > 0);
+    return { items: [...vars, ...fijos] };
+  }
+  function generar(metas, nCom) {
+    const cs = COMIDAS[nCom === 5 ? 5 : 4];
+    return { fecha: new Date().toISOString().slice(0, 10), nCom: cs.length, comidas: cs.map(([k, l, p]) => {
+      const meta = { kcal: r(metas.kcal * p), prot: r(metas.prot * p), carb: r(metas.carb * p), gras: r(metas.gras * p) };
+      return { k, l, p, meta, ops: T[k].map(t => opcion(t, meta)) }; }) };
+  }
+  // medida casera para mostrar junto a los gramos
+  const FR = q => { const e = Math.floor(q), f = q - e; const s = f >= 0.875 ? '' : f >= 0.625 ? '¾' : f >= 0.375 ? '½' : f >= 0.125 ? '¼' : ''; const ee = f >= 0.875 ? e + 1 : e; return (ee ? ee : '') + s || '¼'; };
+  function medida(n, e, g) {
+    const u = UNI[n]; if (u) { const q = g / u[0]; if (n === 'Pan marraqueta' || n === 'Pan hallulla') { const und = q / 2; return FR(und) + (n === 'Pan marraqueta' ? ' marraqueta' : ' hallulla'); } const k = Math.round(q * 2) / 2; return FR(k) + ' ' + (k > 1 ? u[2] : u[1]); }
+    const f = food(n, e); if (!f || !f.pg || /Ensalada/.test(n)) return '';
+    const m = f.pn.match(/^(\d+)(?:\/(\d+))?\s+(.*)$/); const qty = m ? (m[2] ? +m[1] / +m[2] : +m[1]) : 1; let un = m ? m[3] : f.pn;
+    const q = g / f.pg * qty; if (q < 0.15 || q > 8) return '';
+    un = un.replace(/^unidad mediana$/, 'unidad').replace(/^unidades$/, 'unidad').replace(/^cucharadas$/, 'cucharada');
+    const k = Math.round(q * 4) / 4; const pl = k > 1 && !/^(taza|lata|porción|unidad|lámina|cucharada|cucharadita|puñado|filete|bistec|chuleta|presa|trozo|vaso|copa)$/.test(un) ? '' : '';
+    const plural = k > 1 ? un.replace(/^(taza|lata|porción|unidad|lámina|cucharada|cucharadita|puñado|filete|bistec|chuleta|presa|trozo|vaso|copa)\b/, w => w === 'porción' ? 'porciones' : w === 'unidad' ? 'unidades' : w + 's') : un;
+    return '≈ ' + FR(k) + ' ' + plural + pl;
+  }
+  const nombre = (n, e) => n.replace(' (escurrido)', '') + (e === 'cocido' ? ' (cocido)' : e === 'crudo' ? ' (crudo)' : '');
+
+  /* ---------- PDF (HTML negro listo para imprimir / guardar como PDF) ---------- */
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const nf = x => r(x).toLocaleString('es-CL');
+  const MK = '<svg viewBox="123 138 394 461" style="width:46px;height:auto"><path fill="#ea203a" fill-rule="evenodd" d="M480,198 393,198 393,534 512,431 512,323 478,352 478,415 431,456 427,457 427,233 453,232 478,288 478,308 512,279ZM160,198 123,285 213,363 213,456 210,457 162,415 162,352 128,323 128,431 247,534 247,342 165,271 183,232 212,232 213,279 247,308 247,198Z"/><path fill="#cbcbcb" fill-rule="evenodd" d="M516,138 333,138 333,539 320,554 307,539 307,138 124,138 160,172 273,173 273,557 320,598 367,557 367,173 479,172Z"/></svg>';
+  function pdfHTML(pauta, metas, per) {
+    const MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const fd = s => { const [y, m, d] = String(s).split('-').map(Number); return d + ' de ' + MES[m - 1] + ' de ' + y; };
+    const datos = [['Nombre', per.nombre], ['Fecha', fd(pauta.fecha)], ['Edad', per.edad ? per.edad + ' años' : ''], ['Estatura', per.estatura ? per.estatura + ' cm' : ''],
+      ['Peso', per.peso ? String(per.peso).replace('.', ',') + ' kg' : ''], ['% Grasa', per.pgc != null ? String(per.pgc).replace('.', ',') + ' %' : ''], ['Masa muscular', per.mme ? String(per.mme).replace('.', ',') + ' kg' : ''],
+      ['Objetivo', (OBJ[metas.obj] || {}).l || '']].filter(x => x[1]);
+    const cel = op => { const t = suma(op.items); return `<td><ul>${op.items.map(it => `<li><b>${nf(it.g)} g</b> ${esc(nombre(it.n, it.e))}${medida(it.n, it.e, it.g) ? ` <span>(${esc(medida(it.n, it.e, it.g))})</span>` : ''}</li>`).join('')}</ul><div class="tt">${nf(t.kcal)} kcal · P ${nf(t.prot)} · C ${nf(t.carb)} · G ${nf(t.gras)}</div></td>`; };
+    return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Pauta nutricional · ${esc(per.nombre)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<style>@page{size:A4;margin:9mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}html,body{background:#0e0c0f;color:#f2eef0;margin:0;font:13px/1.4 Barlow,system-ui,sans-serif}
+.pg{max-width:900px;margin:0 auto;padding:22px}.hd{display:flex;align-items:center;gap:14px;border-bottom:2px solid #d71f30;padding-bottom:12px;margin-bottom:14px}
+h1{font:800 30px/1 'Barlow Condensed',sans-serif;margin:0;letter-spacing:.02em;text-transform:uppercase}.sub{color:#a69ea3;font:600 12px 'Barlow Condensed',sans-serif;letter-spacing:.2em;text-transform:uppercase}
+h2{font:700 15px 'Barlow Condensed',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#ff5a68;margin:16px 0 8px}
+table{width:100%;border-collapse:collapse;table-layout:fixed}td,th{border:1px solid #2f2a2e;padding:7px 9px;vertical-align:top;text-align:left}th{background:#1b181c;font:700 13px 'Barlow Condensed',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#cbcbcb}
+.dt td{background:#161317}.dt td:nth-child(odd){color:#a69ea3;width:16%}.dt td:nth-child(even){font-weight:600}
+.mt{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.mt div{background:#1b181c;border:1px solid #2f2a2e;border-radius:10px;padding:10px;text-align:center}.mt b{display:block;font:800 26px/1 'Barlow Condensed',sans-serif}.mt span{color:#a69ea3;font-size:12px}
+.ml{display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 6px}.ml h2{margin:0}.ml span{color:#a69ea3;font-size:12px}
+ul{margin:0;padding:0;list-style:none}li{padding:2px 0}li span{color:#a69ea3}.tt{margin-top:6px;padding-top:5px;border-top:1px dashed #2f2a2e;color:#a69ea3;font-size:11.5px}
+.ft{margin-top:18px;color:#6d656a;font-size:11px;text-align:center}.blk{break-inside:avoid}
+@media print{.pg{padding:0}.noprint{display:none}}
+.noprint{position:fixed;right:16px;bottom:16px;background:#d71f30;color:#fff;border:0;border-radius:12px;padding:14px 20px;font:700 16px Barlow,sans-serif;cursor:pointer}</style></head>
+<body><div class="pg"><div class="hd">${MK}<div><div class="sub">Titanium Sport Center</div><h1>Pauta nutricional</h1></div></div>
+<h2>Datos personales</h2><table class="dt">${datos.reduce((rows, d, i) => { if (i % 2 === 0) rows.push([]); rows[rows.length - 1].push(d); return rows; }, []).map(row => `<tr>${row.map(([l, v]) => `<td>${esc(l)}</td><td>${esc(v)}</td>`).join('')}${row.length < 2 ? '<td></td><td></td>' : ''}</tr>`).join('')}</table>
+<h2>Metas diarias</h2><div class="mt"><div><b>${nf(metas.kcal)}</b><span>kcal</span></div><div><b style="color:#ff5a68">${nf(metas.prot)} g</b><span>Proteína</span></div><div><b style="color:#f3b45b">${nf(metas.carb)} g</b><span>Carbohidratos</span></div><div><b style="color:#7cc0ff">${nf(metas.gras)} g</b><span>Grasas</span></div></div>
+${pauta.comidas.map(c => `<div class="blk"><div class="ml"><h2>${esc(c.l)}</h2><span>≈ ${nf(c.meta.kcal)} kcal · P ${nf(c.meta.prot)} · C ${nf(c.meta.carb)} · G ${nf(c.meta.gras)} — elige 1 opción</span></div>
+<table><tr><th>Opción 1</th><th>Opción 2</th><th>Opción 3</th></tr><tr>${c.ops.map(cel).join('')}</tr></table></div>`).join('')}
+<div class="ft">Pesos en gramos según se indica (cocido o crudo). Verduras libres. Agua 2–3 litros al día. · Titanium Sport Center · ${esc(per.coach || 'Franco Palavecino')}</div></div>
+<button class="noprint" onclick="window.print()">Guardar PDF / Imprimir</button></body></html>`;
+  }
+
+  window.TL_NUTRI = { OBJ, ACT, COMIDAS, datos, basal, calcMetas, generar, suma, medida, nombre, food, pdfHTML, factor };
+})();
