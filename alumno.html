@@ -402,6 +402,7 @@ const recOf = (f, h) => S.clases.find(r => r.fecha === f && r.hora === h);
 const ONL = () => !!S.a?.online;
 const esHora = h => /^\d\d:\d\d$/.test(h) || h === 'online'; // las sesiones online pasadas se ven siempre en su historial, aunque vuelva a presencial
 const horaTxt = h => h === 'online' ? 'Online' : h;
+const ONL_NOMBRE = 'Titanium Online Coaching'; // nombre del servicio online (se muestra al alumno)
 function bloquesDe(f) {
   // online: sus clases ya agendadas en el centro (con hora) se respetan; si ese día no tiene, va la sesión online sugerida
   if (ONL()) { const ag = [...new Set(S.clases.filter(r => r.fecha === f && r.extra && !r.quitado && /^\d\d:\d\d$/.test(r.hora)).map(r => r.hora))].sort();
@@ -707,7 +708,7 @@ function onboardingHTML() {
           <div>📋 <b>Tu agenda:</b> evaluaciones, reuniones, pautas y documentos.</div>
         </div></section>
       ${ONL() ? `<section class="card" style="gap:8px">
-        <h2 style="margin:0">🌐 Tu plan online</h2>
+        <h2 style="margin:0">🌐 ${ONL_NOMBRE}</h2>
         <div style="display:grid;gap:6px" class="small">
           <div>• Entrenas por tu cuenta con la rutina de la app. Los días sugeridos están en tu <b>Agenda</b>.</div>
           <div>• Si se te corre la semana, haz tu próxima sesión el día que te acomode: la app siempre te muestra la que sigue.</div>
@@ -835,7 +836,7 @@ V.hoy = () => {
   const mes = t.slice(0, 7); const delMes = S.clases.filter(r => r.fecha.startsWith(mes) && terminada(r)).length;
   return `
   <div style="display:flex;justify-content:center;padding:2px 0 6px;border-bottom:1px solid var(--line)">${TL_LOGO}</div>
-  <div class="row" style="align-items:center;justify-content:flex-start;gap:12px"><button data-go="plan" aria-label="Mi perfil" style="background:none;border:0;padding:0;cursor:pointer">${avatarHTML('')}</button><div style="flex:1"><div class="eyebrow">${esc(longD(t))}</div><h1>Hola, ${esc(nombreC)}</h1>${S.perfil?.meta ? `<div class="small muted">🎯 ${esc(S.perfil.meta)}</div>` : ''}</div>
+  <div class="row" style="align-items:center;justify-content:flex-start;gap:12px"><button data-go="plan" aria-label="Mi perfil" style="background:none;border:0;padding:0;cursor:pointer">${avatarHTML('')}</button><div style="flex:1"><div class="eyebrow">${esc(longD(t))}</div><h1>Hola, ${esc(nombreC)}</h1>${ONL() ? `<span style="display:inline-flex;align-items:center;gap:6px;margin-top:4px;padding:3px 10px;border-radius:999px;border:1px solid rgba(215,31,48,.55);background:rgba(215,31,48,.12);font:700 12px Barlow,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#f2eef0">🌐 ${ONL_NOMBRE}</span>` : ''}${S.perfil?.meta ? `<div class="small muted">🎯 ${esc(S.perfil.meta)}</div>` : ''}</div>
 </div>
   ${(() => { const [tit, txt] = fraseDelDia(); return `<section class="card" style="background:linear-gradient(135deg,#2a0d12,#1b181c 60%);border-color:#4a1d24"><div class="row"><span class="eyebrow red">Pensamiento del día</span><span class="small muted">${esc(tit)}</span></div><div style="font:600 19px/1.35 Barlow,sans-serif">«${esc(txt)}»</div><div class="small muted">Inspirado en los principios de Napoleon Hill · <i>Piense y hágase rico</i> y <i>Más astuto que el diablo</i></div></section>`; })()}
   ${mensajesHTML()}
@@ -1677,8 +1678,8 @@ function pagosCard(p, usadas, tot, ab, saldo, dias) { const cp = S.cfg?.pago || 
   const montoSug = saldo || p.monto || '';
   const pend = S.pagoPend;
   return `<details class="card blk" data-sec="pagos" id="pagos-card" ${abierto ? 'open' : ''}><summary><div><h2>💳 Pagos</h2><div class="small ${st.t === 'ok' ? 'ok' : st.t === 'crit' ? 'red' : 'warn'}">${esc(st.l)}${pend ? ' · comprobante en revisión' : ''}</div></div><span class="chev" aria-hidden="true">›</span></summary>
-    <div class="row" style="align-items:center"><div><div class="disp" style="font-size:24px">${ONL() ? 'Plan online mensual' : 'Plan ' + (tot || '') + ' clases'}</div><div class="small muted">${esc(fmtD(p.inicio))} → ${esc(fmtD(p.fin))}${dias ? ' · ' + esc(dias) : ''}</div></div><span class="small ${saldo ? 'warn' : 'ok'}" style="font-weight:700">${saldo ? 'Pendiente' : 'Pagado'}</span></div>
-    ${ONL() ? '<div class="row small"><span class="muted">Asesoría</span><b>Rutina y seguimiento online</b></div>' : `<div class="row small"><span class="muted">Clases usadas</span><b>${usadas} de ${tot || '—'}</b></div>`}${tot && !ONL() ? `<div class="bar"><i style="width:${Math.min(100, Math.round(usadas / tot * 100))}%"></i></div>` : ''}
+    <div class="row" style="align-items:center"><div><div class="disp" style="font-size:24px">${ONL() ? ONL_NOMBRE : 'Plan ' + (tot || '') + ' clases'}</div><div class="small muted">${esc(fmtD(p.inicio))} → ${esc(fmtD(p.fin))}${dias ? ' · ' + esc(dias) : ''}</div></div><span class="small ${saldo ? 'warn' : 'ok'}" style="font-weight:700">${saldo ? 'Pendiente' : 'Pagado'}</span></div>
+    ${ONL() ? '<div class="row small"><span class="muted">Plan</span><b>Mensual · programación y seguimiento</b></div>' : `<div class="row small"><span class="muted">Clases usadas</span><b>${usadas} de ${tot || '—'}</b></div>`}${tot && !ONL() ? `<div class="bar"><i style="width:${Math.min(100, Math.round(usadas / tot * 100))}%"></i></div>` : ''}
     <div class="row small"><span class="muted">Monto</span><b>${clp(p.monto)}</b></div>
     <div class="row small"><span class="muted">Pagado</span><b>${clp(ab)}</b></div>
     ${saldo ? `<div class="row small"><span class="muted">Saldo</span><b class="warn">${clp(saldo)}</b></div>` : ''}
