@@ -619,16 +619,20 @@
   const DOL = [['lun', 'L'], ['mar', 'M'], ['mie', 'X'], ['jue', 'J'], ['vie', 'V'], ['sab', 'S'], ['dom', 'D']];
   async function pintarOnline(el) {
     const code = el.dataset.tlOnline; el.dataset.done = '1';
-    const { data: a } = await sb.from('alumnos').select('online,dias_online').eq('codigo', code).maybeSingle(); if (!a) return;
+    const { data: a } = await sb.from('alumnos').select('online,dias_online,bloques,flex,modo_prev').eq('codigo', code).maybeSingle(); if (!a) return;
     const on = !!a.online, dias = a.dias_online || [];
     const chip = (k, l) => `<button type="button" data-tl-od="${k}" aria-pressed="${dias.includes(k)}" aria-label="${k}" style="min-width:38px;min-height:36px;border-radius:999px;border:1px solid ${dias.includes(k) ? '#4da3ff' : 'var(--line,#2f2a2e)'};background:${dias.includes(k) ? '#4da3ff' : 'transparent'};color:${dias.includes(k) ? '#0e0c0f' : 'inherit'};font:700 14px Barlow,sans-serif;cursor:pointer">${l}</button>`;
     el.innerHTML = `<div style="display:grid;gap:8px;padding:8px 12px;border:1px solid ${on ? '#4da3ff' : 'var(--line,#2f2a2e)'};border-radius:10px;font-size:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>${on ? '🌐 <b>Alumno online</b> · entrena por su cuenta con la rutina de la app' : '🏋️ Presencial'}</span><button type="button" data-tl-on="${on ? 'off' : 'on'}" style="min-height:36px;padding:0 12px;border-radius:8px;border:1px solid ${on ? 'var(--line,#2f2a2e)' : '#4da3ff'};background:transparent;color:${on ? 'inherit' : '#4da3ff'};font:600 14px Barlow,sans-serif;cursor:pointer">${on ? 'Volver a presencial' : 'Activar modo online'}</button></div>
       ${on ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span style="color:var(--muted,#a69ea3);font-size:13px;margin-right:4px">Días sugeridos</span>${DOL.map(([k, l]) => chip(k, l)).join('')}</div><div style="color:var(--muted,#a69ea3);font-size:12px">Sin hora ni cupo. En su app ve la sesión sugerida de cada día y puede hacerla otro día si se le corre la semana.</div>` : ''}</div>`;
     el.querySelector('[data-tl-on]').onclick = async ev => { const btn = ev.currentTarget, v = btn.dataset.tlOn === 'on';
-      if (v && !confirm('¿Activar modo online?\n\nSe quita su horario fijo: no ocupa cupos ni aparece en «Clase de hoy». Entrena por su cuenta con la rutina de la app y paga su plan mensual sin número de clases.')) return;
-      if (!v && !confirm('¿Volver a presencial? Después asígnale sus bloques en la ficha. Sus sesiones online quedan en el historial.')) return;
-      btn.disabled = true; const { error } = await sb.from('alumnos').update(v ? { online: true, flex: false, bloques: [], dias_online: dias.length ? dias : ['lun', 'mar', 'mie', 'jue'] } : { online: false }).eq('codigo', code);
+      const prev = a.modo_prev || {}, tenia = (a.bloques || []).length || a.flex;
+      if (v && !confirm('¿Activar modo online?\n\nNo ocupa cupos ni aparece en «Clase de hoy». Entrena por su cuenta con la rutina de la app y paga su plan mensual sin número de clases.' + (tenia ? '\n\nSu horario presencial queda guardado y vuelve tal cual si lo pasas de nuevo a presencial.' : ''))) return;
+      if (!v && !confirm('¿Volver a presencial?' + ((prev.bloques || []).length || prev.flex ? '\n\nRecupera su horario de antes.' : '\n\nAsígnale sus bloques en la ficha.') + ' Sus días online y sus sesiones quedan guardados por si vuelve a online.')) return;
+      // al pasar a online se respalda el horario presencial; al volver se restaura tal cual (los días online también se guardan)
+      btn.disabled = true; const { error } = await sb.from('alumnos').update(v
+        ? { online: true, flex: false, bloques: [], modo_prev: { bloques: a.bloques || [], flex: !!a.flex }, dias_online: dias.length ? dias : ['lun', 'mar', 'mie', 'jue'] }
+        : { online: false, bloques: (prev.bloques || []).length ? prev.bloques : (a.bloques || []), flex: !!prev.flex, modo_prev: null }).eq('codigo', code);
       if (error) { alert('No se pudo cambiar: ' + error.message); btn.disabled = false; return; } pintarOnline(el); };
     el.querySelectorAll('[data-tl-od]').forEach(b => b.onclick = async () => { const k = b.dataset.tlOd;
       const nuevo = dias.includes(k) ? dias.filter(x => x !== k) : DOL.map(([x]) => x).filter(x => x === k || dias.includes(x));

@@ -400,7 +400,7 @@ const abonado = p => (p?.pagos || []).reduce((s, x) => s + (Number(x.monto) || 0
 const recOf = (f, h) => S.clases.find(r => r.fecha === f && r.hora === h);
 // alumno online: entrena por su cuenta con la rutina de la app; sus sesiones se guardan con hora 'online' (no ocupa cupos)
 const ONL = () => !!S.a?.online;
-const esHora = h => /^\d\d:\d\d$/.test(h) || (h === 'online' && ONL());
+const esHora = h => /^\d\d:\d\d$/.test(h) || h === 'online'; // las sesiones online pasadas se ven siempre en su historial, aunque vuelva a presencial
 const horaTxt = h => h === 'online' ? 'Online' : h;
 function bloquesDe(f) {
   // online: sus clases ya agendadas en el centro (con hora) se respetan; si ese día no tiene, va la sesión online sugerida
@@ -1560,7 +1560,7 @@ V.agenda = () => {
     const nEjA = (rec?.ej || []).filter(x => (x.sets || []).some(conDato) || conDato(x)).length; const ej = nEjA ? `<div class="small muted">Anotaste ${nEjA} ejercicio${nEjA === 1 ? '' : 's'}${rec.carga ? ' · ' + esc(rec.carga) : ''}${rec.rpe != null ? ' · RPE ' + esc(rec.rpe) : ''}</div>` : '';
     const nv = !past ? proximas(4).findIndex(p => p.f === S.dia && p.h === x.h) : -1;
     return `<section class="card"><div class="row"><div class="disp" style="font-size:26px">${esc(x.h === 'online' ? (past ? 'Online' : 'Sugerida') : x.h)}</div>${est}</div>
-      ${r ? `<button class="ag-rut" data-abrses="${esc(S.dia + '|' + x.h + '|' + id)}"><div style="flex:1;min-width:0"><b>${esc(r.tipo || 'Rutina')}</b><div class="small muted">${esc(r.familia || '')}${!rec?.rutina && !past ? ' · según tu programa' : ''}</div></div><span class="chev" aria-hidden="true">›</span></button>` : `<div class="small muted">${past ? (ONL() ? 'Sesión online' : 'Clase en Titanium') : 'Franco te asigna la rutina en la clase.'}</div>`}
+      ${r ? `<button class="ag-rut" data-abrses="${esc(S.dia + '|' + x.h + '|' + id)}"><div style="flex:1;min-width:0"><b>${esc(r.tipo || 'Rutina')}</b><div class="small muted">${esc(r.familia || '')}${!rec?.rutina && !past ? ' · según tu programa' : ''}</div></div><span class="chev" aria-hidden="true">›</span></button>` : `<div class="small muted">${past ? (x.h === 'online' ? 'Sesión online' : 'Clase en Titanium') : 'Franco te asigna la rutina en la clase.'}</div>`}
       ${ej}
       ${S.dia === t && r && !past ? `<button class="btn pri" data-abrses="${esc(S.dia + '|' + x.h + '|' + id)}">Entrenar ahora</button>` : ''}
       ${r && past && S.dia >= addDays(t, -30) && rec?.asis !== 'ausente' ? `<button class="btn ${(rec?.ej || []).length ? '' : 'pri'}" data-abrses="${esc(S.dia + '|' + x.h + '|' + id)}">${(rec?.ej || []).length ? 'Ver / editar lo que anotaste' : 'Abrir y anotar esta sesión'}</button>` : ''}
