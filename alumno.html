@@ -494,7 +494,7 @@ document.addEventListener('input', ev => { const i = ev.target; const d = getDra
   else if (i.id === 'carga') { d.carga = i.value; putDraft(d); autoGuardar(2500); } });
 
 // el alumno puede borrar los InBody que subió él (si se equivocó); los que cargó el profe no
-const ibDelBtn = (x, mini) => x && x.por === 'alumno' ? `<button type="button" class="${mini ? 'chip' : 'btn'}" data-ibdel="${esc(x.img || '')}" data-ibf="${esc(x.f)}" style="${mini ? 'padding:2px 10px;min-height:28px' : ''};color:var(--crit,#e5484d)" aria-label="Borrar InBody del ${esc(fmtD(x.f))}">${mini ? '✕' : '🗑 Borrar este InBody'}</button>` : '';
+const ibDelBtn = (x, mini) => false && x && x.por === 'alumno' ? `<button type="button" class="${mini ? 'chip' : 'btn'}" data-ibdel="${esc(x.img || '')}" data-ibf="${esc(x.f)}" style="${mini ? 'padding:2px 10px;min-height:28px' : ''};color:var(--crit,#e5484d)" aria-label="Borrar InBody del ${esc(fmtD(x.f))}">${mini ? '✕' : '🗑 Borrar este InBody'}</button>` : '';
 /* ---------- subir InBody ---------- */
 function achicar(file, max) { return new Promise((res, rej) => { const u = URL.createObjectURL(file), img = new Image();
   img.onload = () => { const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
@@ -1254,7 +1254,9 @@ V.progreso = () => {
     <div class="kpi"><div class="small muted">Cintura</div><div class="v">${m1.cintura != null ? String(m1.cintura).replace('.', ',') : '—'}<span class="small muted"> cm</span></div>${dlt('cintura', ' cm')}</div></div>
     <div class="small muted">Última medición ${esc(fmtD(m1.f))}${md.length > 1 ? ' · comparado con ' + esc(fmtD(m0.f)) : ''}</div></section>` : '';
   const C = IBC(); const ib = S.inbody; const ibL = ib[ib.length - 1];
-  const upBtn = (txt, pri) => `<label class="btn ${pri ? 'pri' : ''}" style="position:relative;overflow:hidden">${txt}<input type="file" accept="image/*" id="inb-file" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label>`;
+  const profeIB = esc(String(S.cfg?.coach || 'tu profe').split(' ')[0]);
+  const upBtn = (txt, pri) => `<div class="small muted" style="text-align:center">📋 Tu InBody y tu cintura los registra ${profeIB} el día de tu evaluación.</div>`;
+  const upBtnViejo = (txt, pri) => `<label class="btn ${pri ? 'pri' : ''}" style="position:relative;overflow:hidden">${txt}<input type="file" accept="image/*" id="inb-file" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label>`;
   let inbCard;
   if (S.ibNew && S.ibNew.estado === 'leyendo') inbCard = `<section class="card" id="ib-card"><h2>InBody</h2><div class="row" style="align-items:center;gap:14px"><img src="${S.ibNew.prev}" alt="" style="width:64px;height:84px;object-fit:cover;border-radius:8px"><div><b>Leyendo tus datos…</b><div class="small muted">Esto toma unos segundos · <span id="ib-pct">0 %</span></div></div></div></section>`;
   else if (S.ibNew) { const n = S.ibNew;
@@ -1263,13 +1265,13 @@ V.progreso = () => {
       <div class="row" style="gap:12px;align-items:flex-start"><img src="${n.prev}" data-zoom="1" alt="Tu informe" style="width:84px;height:112px;object-fit:cover;border-radius:8px;cursor:zoom-in"><div style="flex:1;display:grid;gap:8px"><label class="field">Fecha del InBody<input type="date" id="ib-f" value="${esc(n.f)}"></label><label class="field">Sexo (para tus rangos de referencia)<select id="ib-sexo"><option value="">—</option><option value="h" ${n.sexo === 'h' ? 'selected' : ''}>Hombre</option><option value="m" ${n.sexo === 'm' ? 'selected' : ''}>Mujer</option></select></label></div></div>
       <div class="grid2">${C.filter(c => c[7] !== 'calc').map(([k, l, u]) => `<label class="field">${esc(l)}${u ? ` <span class="small">(${esc(u)})</span>` : ''}${k === 'cintura' ? ' <span class="small" style="color:var(--red)">· mídela ahora con huincha, a la altura del ombligo</span>' : ''}<input inputmode="decimal" data-ibk="${k}" value="${esc(n.vals[k] ?? '')}" placeholder="—"></label>`).join('')}</div>
       <button class="btn pri" id="ib-ok">Guardar InBody</button><button class="btn" id="ib-cancel">Cancelar</button></section>`; }
-  else if (!ibL) inbCard = `<section class="card" id="ib-card"><h2>InBody</h2><div class="small muted">Sube la foto o el pantallazo de tu informe InBody o BodyGo. Leemos los datos automáticamente y vas viendo tu evolución.</div>${upBtn('＋ Subir mi InBody', true)}</section>`;
+  else if (!ibL) inbCard = `<section class="card" id="ib-card"><h2>InBody</h2><div class="small muted">Aquí verás tus resultados de composición corporal (peso, grasa, músculo y cintura) y tu evolución. Se cargan el día de tu evaluación con ${profeIB}.</div></section>`;
   else { const prevOf = k => { for (let i = ib.length - 2; i >= 0; i--) if (ib[i][k] != null) return ib[i]; return null; };
     // la cintura se muestra siempre: es parte de cada evaluación (se mide al subir el InBody)
     const PRIN = ['pgc', 'mgc', 'visceral', 'mme', 'pmm', 'peso', 'cintura']; const conDato = C.filter(([k]) => ibL[k] != null || k === 'cintura'); const extra = conDato.filter(([k]) => !PRIN.includes(k)).length;
     const tiles = conDato.filter(([k]) => S.ibAll || PRIN.includes(k) || S.ibInfo === k).map(([k, l, u, , , dec, mejor]) => { const pv = prevOf(k); const d = pv ? ibL[k] - pv[k] : null;
       const cls = d == null || Math.abs(d) < 0.05 || !mejor ? 'muted' : ((mejor === 'baja') === (d < 0) ? 'ok' : 'warn');
-      if (ibL[k] == null) return `<div class="card kpi" style="padding:10px;gap:2px;min-width:0"><div class="small muted" style="font-size:12px;line-height:1.2;min-height:2.4em">${esc(l)}</div><div class="v" style="font-size:24px;color:var(--muted)">—</div><div class="small muted" style="font-size:11px">Se mide al subir tu próximo InBody</div></div>`;
+      if (ibL[k] == null) return `<div class="card kpi" style="padding:10px;gap:2px;min-width:0"><div class="small muted" style="font-size:12px;line-height:1.2;min-height:2.4em">${esc(l)}</div><div class="v" style="font-size:24px;color:var(--muted)">—</div><div class="small muted" style="font-size:11px">Se mide en tu próxima evaluación</div></div>`;
       return `<div class="card kpi ${S.ibInfo === k ? 'sel' : ''}" data-ibi="${k}" role="button" tabindex="0" style="padding:10px;gap:2px;cursor:pointer;min-width:0"><div class="small muted" style="font-size:12px;line-height:1.2;min-height:2.4em">${esc(l)}</div><div class="v" style="font-size:24px">${fmtN(ibL[k], dec)}<span class="small muted"> ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</span></div>${d != null ? `<div class="small ${cls}">${d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= '}${fmtN(Math.abs(d), dec)} ${esc(u === 'nivel' || u === 'pts' ? '' : u)}</div>` : ''}</div>`; }).join('');
     const gk = (S.ibInfo && ib.filter(x => x[S.ibInfo] != null).length >= 2) ? S.ibInfo : (['pgc', 'mme', 'pmm', 'mgc', 'peso', 'visceral', 'cintura'].find(k => ib.filter(x => x[k] != null).length >= 2) || null);
     const gc = gk && C.find(c => c[0] === gk);

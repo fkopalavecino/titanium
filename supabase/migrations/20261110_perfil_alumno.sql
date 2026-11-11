@@ -39,3 +39,7 @@ begin
 end $$;
 revoke all on function public.borrar_mi_foto(date, text) from public, anon;
 grant execute on function public.borrar_mi_foto(date, text) to authenticated;
+
+-- el InBody (y la cintura) lo registra solo el profe
+revoke execute on function public.agregar_mi_inbody(text, date, jsonb) from authenticated, public, anon;
+revoke execute on function public.borrar_mi_inbody(text, date) from authenticated, public, anon;
