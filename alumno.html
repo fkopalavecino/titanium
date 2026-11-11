@@ -541,12 +541,15 @@ function ibInfoHTML(x) { const C = IBC(); const k = S.ibInfo && x[S.ibInfo] != n
   else if (k === 'pgc' && !sexo) bar = '<div class="small muted">Indica tu sexo en el próximo InBody para ver tu rango.</div>';
   const extra = k === 'mme' && x.peso ? `<div class="small">Tu músculo es el <b>${fmtN(v / x.peso * 100, 1)} %</b> de tu peso.</div>` : '';
   return `<div class="note" style="display:grid;gap:8px"><div class="row" style="align-items:center"><b>${esc(c[1])}</b>${estado}</div>${info.que ? `<div class="small">${esc(info.que)}</div>` : ''}${bar}${extra}${info.tip ? `<div class="small muted">💡 ${esc(info.tip)}</div>` : ''}</div>`; }
+// agrega la foto subida a la pantalla sin recargar toda la app
+async function fotoLocal(f, ang, id) { const { data } = await sb.storage.from('fotos').createSignedUrls([id], 3600 * 12); (data || []).forEach(x => { if (x.signedUrl) S.urls[x.path] = x.signedUrl; });
+  let row = S.fotos.find(x => x.f === f); if (!row) { row = { f }; S.fotos.push(row); S.fotos.sort((x, y) => x.f.localeCompare(y.f)); } row[ang] = id; if (S.a) S.a.fotos = S.fotos; }
 async function subirFotoAlumno(input) { const ang = input.dataset.fang2, f = $('#fu-f')?.value || today(), file = input.files?.[0]; if (!file) return;
   const lbl = input.closest('label'); lbl?.classList.add('busy');
   try { const blob = await achicar(file, 1400); const id = 'alumno/' + codigo + '/' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()) + '.jpg';
     const { error: e1 } = await sb.storage.from('fotos').upload(id, blob, { contentType: 'image/jpeg' }); if (e1) throw e1;
     const { error: e2 } = await sb.rpc('agregar_mi_foto', { p_id: id, p_f: f, p_ang: ang }); if (e2) throw e2;
-    S.fotoUpF = f; await load(); toast('Foto guardada ✓'); render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' });
+    S.fotoUpF = f; await fotoLocal(f, ang, id); toast('Foto guardada ✓'); render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' });
   } catch (e) { lbl?.classList.remove('busy'); toast('No se pudo subir la foto: ' + (e.message || 'intenta de nuevo')); } }
 // imagen Titanium para historias: antes y ahora lado a lado con los cambios del InBody
 async function compartirFotos(btn) {
@@ -586,19 +589,25 @@ document.addEventListener('click', ev => { const b = ev.target.closest('[data-fs
 // las 3 fotos de una vez, en el orden elegido: frente, perfil, espalda
 async function subirFotos3Alumno(input) { const f = $('#fu-f')?.value || today(); const files = [...(input.files || [])].slice(0, 3); if (!files.length) return;
   const lbl = input.closest('label'); lbl?.classList.add('busy'); if (lbl?.firstChild) lbl.firstChild.textContent = '⏳ Subiendo ' + files.length + ' fotos…';
-  try { for (let i = 0; i < files.length; i++) { const blob = await achicar(files[i], 1400); const id = 'alumno/' + codigo + '/' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + i) + '.jpg';
-      const { error: e1 } = await sb.storage.from('fotos').upload(id, blob, { contentType: 'image/jpeg' }); if (e1) throw e1;
-      const { error: e2 } = await sb.rpc('agregar_mi_foto', { p_id: id, p_f: f, p_ang: ['frente', 'perfil', 'espalda'][i] }); if (e2) throw e2; }
-    S.fotoUpF = f; await load(); toast(files.length + ' fotos guardadas ✓ Si alguna quedó en otro lugar, toca ese recuadro para cambiarla.'); render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' });
+  try { // las 3 se comprimen y suben a la vez; después se registran en orden
+    const ids = await Promise.all(files.map(async (file, i) => { const blob = await achicar(file, 1400); const id = 'alumno/' + codigo + '/' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + i) + '.jpg';
+      const { error: e1 } = await sb.storage.from('fotos').upload(id, blob, { contentType: 'image/jpeg' }); if (e1) throw e1; return id; }));
+    for (let i = 0; i < ids.length; i++) { const id = ids[i];
+      const { error: e2 } = await sb.rpc('agregar_mi_foto', { p_id: id, p_f: f, p_ang: ['frente', 'perfil', 'espalda'][i] }); if (e2) throw e2; await fotoLocal(f, ['frente', 'perfil', 'espalda'][i], id); }
+    S.fotoUpF = f; toast(files.length + ' fotos guardadas ✓ Si alguna quedó en otro lugar, toca ese recuadro para cambiarla.'); render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' });
   } catch (e) { lbl?.classList.remove('busy'); toast('No se pudieron subir las fotos: ' + (e.message || 'intenta de nuevo')); render(); } }
 // borrar una foto: primer toque pide confirmar, el segundo borra
 async function borrarFotoAlumno(btn) { const ang = btn.dataset.fdel, f = btn.dataset.ff || $('#fu-f')?.value || S.fotoUpF || today();
   if (!btn.classList.contains('ok')) { btn.classList.add('ok'); btn.textContent = '¿Borrar?'; setTimeout(() => { if (btn.isConnected) { btn.classList.remove('ok'); btn.textContent = '✕'; } }, 3000); return; }
   btn.disabled = true;
+  const antes = JSON.parse(JSON.stringify(S.fotos));
+  S.fotos = S.fotos.map(x => x.f === f ? Object.fromEntries(Object.entries(x).filter(([k]) => k !== ang)) : x).filter(x => x.frente || x.perfil || x.espalda);
+  if (!btn.dataset.ff) S.fotoUpF = f; if (!S.fotos.some(x => x.f === S.fA)) S.fA = null; if (!S.fotos.some(x => x.f === S.fB)) S.fB = null;
+  render(); toast('Foto borrada ✓');
   const { data: path, error } = await sb.rpc('borrar_mi_foto', { p_f: f, p_ang: ang });
-  if (error) { btn.disabled = false; toast(error.message || 'No se pudo borrar la foto.'); return; }
+  if (error) { S.fotos = antes; render(); toast(error.message || 'No se pudo borrar la foto.'); return; }
   if (path) sb.storage.from('fotos').remove([path]).then(() => {}, () => {});
-  if (!btn.dataset.ff) S.fotoUpF = f; if (S.fA === f || S.fB === f) { S.fA = null; S.fB = null; } await load(); toast('Foto borrada ✓'); render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); }
+  if (S.a) S.a.fotos = S.fotos; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); }
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-fdel]'); if (b) { ev.preventDefault(); ev.stopPropagation(); borrarFotoAlumno(b); } }, true);
 document.addEventListener('change', ev => { if (ev.target.dataset?.fmulti) { subirFotos3Alumno(ev.target); return; } if (ev.target.dataset?.fsel) { S['f' + ev.target.dataset.fsel] = ev.target.value; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; } if (ev.target.dataset?.fang2) subirFotoAlumno(ev.target); else if (ev.target.id === 'fu-f') { S.fotoUpF = ev.target.value; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); } });
 function avatarHTML(cls) { const u = S.perfil?.avatar && S.urls[S.perfil.avatar]; const ini = (S.perfil?.apodo || S.a.nombre || '?').trim().charAt(0).toUpperCase();
