@@ -39,6 +39,7 @@ h2{font-size:22px}
 .ej{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line)}
 .ej-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.ej-n{min-width:0}
 .ej-acc{display:flex;gap:6px;flex:none;align-items:center}
+.vid-b{flex:none;display:inline-flex;align-items:center;gap:4px;min-height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--fg);font:700 14px Barlow,sans-serif;text-decoration:none;white-space:nowrap}.vid-b.own{background:var(--red);border-color:var(--red);color:#fff}
 .com-add{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;padding:0 14px;border:1px dashed color-mix(in srgb,var(--red) 45%,var(--line));border-radius:20px;background:rgba(215,31,48,.06);color:var(--red-t);font:600 14px Barlow,sans-serif;text-align:left;cursor:pointer;transition:background .2s,transform .15s;animation:comIn .3s ease both}
 .com-add span{color:var(--muted);font-weight:500}.com-add:active{transform:scale(.98);background:rgba(215,31,48,.14)}.com-add[hidden]{display:none}.com-add svg{flex:none}
 .com-w{position:relative}.com-ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none}.com-w .com-i{padding-left:36px}
@@ -1036,6 +1037,8 @@ function cerrarTimer() { const habia = !!document.getElementById('tmr'); clearIn
 const normEj = n => String(n || '').toLowerCase().replace(/^(min(uto)?\s*\d+|\d+[ab]?|par \d+|min (par|impar)|test \d+|intervalo[^·]*)\s*·\s*/i, '').replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
 const tecDe = n => { const x = normEj(n); return (S.tec || []).find(t => { try { return t.re.test(x); } catch (_) { return false; } }) || null; };
 const ytBuscar = q => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q + ' técnica ejercicio');
+// modo clase: botón de video siempre a mano; tu video si está grabado, si no ejemplos en YouTube
+const vidBtn = (e, tc) => tc && tc.video ? `<a class="vid-b own" href="${esc(tc.video)}" target="_blank" rel="noopener" aria-label="Ver video: ${esc(e.nombre)}">▶ Video</a>` : `<a class="vid-b" href="${esc(ytBuscar(tc ? tc.nombre : normEj(e.nombre)))}" target="_blank" rel="noopener" aria-label="Ver ejemplos en YouTube: ${esc(e.nombre)}">▶ YouTube</a>`;
 const fmtKg = v => String(Math.round(v * 10) / 10).replace('.', ',');
 // carga sugerida: si en la sesión anterior llegó al tope de reps en todas sus series pesadas, sube; si no, mantiene
 function sugerencia(e) { if (tipoEj(e) === 'tiempo') { const pv = prevSets(e.nombre).filter(x => x && x.t > 0); if (!pv.length) return null; const t = Math.max(...pv.map(x => x.t)); const obj = segObj(e);
@@ -1050,7 +1053,7 @@ function sugerencia(e) { if (tipoEj(e) === 'tiempo') { const pv = prevSets(e.nom
 function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nSer(e.dosis) : 0; const sets = c?.sets || [];
   const tc = tecDe(e.nombre); const sg = isB ? sugerencia(e) : null; const pv = isB ? prevSets(e.nombre) : [];
   const com = c?.c || ''; const pcom = isB ? prevCom(e.nombre) : '';
-  return `<div class="ej${foco ? ' ej-f' : ''}"><div class="ej-h"><b class="ej-n">${esc(e.nombre)}</b><span class="ej-acc">${tc && !foco ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</span></div>
+  return `<div class="ej${foco ? ' ej-f' : ''}"><div class="ej-h"><b class="ej-n">${esc(e.nombre)}</b><span class="ej-acc">${foco ? vidBtn(e, tc) : ''}${tc && !foco ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</span></div>
     <div class="small muted">${esc(e.dosis)}${isB && !/desc|\d\s*(min|s)\b/i.test(String(e.dosis || '').replace(/^\d+\s*[×x]\s*[\d–-]+/, '')) ? ` · ⏱ ${mmss(descansoDe(e))}` : ''}</div>
     ${sg ? `<div class="sug${sg.sube ? ' up' : ''}">${sg.sube ? '↗' : '→'} ${esc(sg.txt)}</div>` : ''}
     ${tc && foco ? `<details class="tec-d"><summary>¿Cómo se hace?</summary><ol>${(tc.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol>${tc.video ? `<a class="btn" href="${esc(tc.video)}" target="_blank" rel="noopener">▶ Ver video</a>` : `<a class="small red-t" href="${esc(ytBuscar(tc.nombre))}" target="_blank" rel="noopener">🔎 Ver ejemplos en YouTube</a>`}</details>` : ''}
@@ -1221,7 +1224,7 @@ V.rutina = () => {
     <section class="card foco">${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}
       ${!st.inf.isC && nV > 1 ? `<div class="row" style="align-items:center"><b>Vuelta ${Math.min(v, nV)} de ${nV}</b>${v < nV ? `<button class="chip" data-vuelta="${bi}">Siguiente vuelta ›</button>` : '<span class="small ok" style="font-weight:700">Última vuelta</span>'}</div>` : ''}
       <div class="circ">${ejs.map((e, ei) => { const tc = tecDe(e.nombre); const on = ck.has(bi + '-' + ei);
-        return `<div class="circ-it${on ? ' ok' : ''}"><button class="circ-ck" data-cck="${bi}-${ei}" aria-pressed="${on}" aria-label="Marcar ${esc(e.nombre)}">✓</button><div class="circ-tx"><b>${esc(e.nombre)}</b><span class="small muted">${esc(e.dosis)}</span></div>${tc ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</div>`; }).join('')}</div>
+        return `<div class="circ-it${on ? ' ok' : ''}"><button class="circ-ck" data-cck="${bi}-${ei}" aria-pressed="${on}" aria-label="Marcar ${esc(e.nombre)}">✓</button><div class="circ-tx"><b>${esc(e.nombre)}</b><span class="small muted">${esc(e.dosis)}</span></div>${vidBtn(e, tc)}${tc ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</div>`; }).join('')}</div>
       ${!st.inf.isC ? `<button class="btn" data-timer="${bi}" data-sinres="1" data-vtas="${nV > 1 ? nV : 0}">⏱ Cronómetro · ${esc(timerTxt(Object.assign(detectarTimer(b), (() => { const c = detectarTimer(b); return c.modo === 'crono' && !c.vueltas && nV > 1 ? { nombre: c.nombre === 'Cronómetro' ? 'Circuito' : c.nombre, vueltas: nV } : {}; })())))}</button>` : ''}
       ${st.inf.isC ? `<button class="btn pri" data-timer="${bi}">⏱ Iniciar · ${esc(timerTxt(detectarTimer(b)))}</button>
       ${cIdx === bi ? `<label class="field">Resultado · ${esc(cNom)}<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>` : ''}` : ''}
