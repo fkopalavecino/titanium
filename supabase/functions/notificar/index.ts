@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
       return json(await enviar(await subsProfe(), {
         title: `🥗 ${String(a?.nombre || n.alumno).trim()} eligió «${OBJ[n.meta.obj] || 'objetivo'}»`,
         body: `Meta ${Math.round(n.meta.kcal || 0).toLocaleString('es-CL')} kcal · P ${n.meta.prot} · C ${n.meta.carb} · G ${n.meta.gras}. Revisa y envía su pauta.`,
-        url: './index.html#inicio', tag: 'nutri-obj-' + n.alumno }));
+        url: './index.html#nutri/' + n.alumno, tag: 'nutri-obj-' + n.alumno }));
     }
     if (b.modo === 'nutri_pauta') {
       // el profe envió la pauta: aviso al alumno (una vez por envío)
