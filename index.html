@@ -448,6 +448,18 @@ i.mov,.pf-k.mov,.it.mov,i.quit,.pf-k.quit,.it.quit,i.pend,.pf-k.pend,.it.pend,i.
 /* día seleccionado */
 .pf-day{border:1px solid var(--line);border-left:4px solid var(--red);border-radius:12px;padding:12px 14px;display:grid;gap:10px;background:var(--surface)}
 .pf-day-h{display:flex;align-items:center;gap:8px}
+
+.pf-cal-wrap{display:grid;gap:14px;align-items:start}
+.pf-cal-wrap>*{min-width:0}
+.pf-day-vacio{border-left-color:var(--line);text-align:center;padding:22px 14px}
+@media (min-width:900px){
+  .pf-cal-wrap{grid-template-columns:minmax(0,1.55fr) minmax(320px,1fr)}
+  #pf-dia{position:sticky;top:120px;max-height:calc(100vh - 260px);overflow:auto;border-radius:12px}
+  .pf-cal-wrap .pf-d{min-height:78px}
+  .pf-cal-wrap .pf-modo{grid-template-columns:1fr 1fr}
+  .pf-cal-wrap .pf-modo button{padding:8px 10px}.pf-cal-wrap .pf-modo button b{font-size:15px}
+  .pf-cal-wrap .pf-day .li{flex-wrap:wrap}.pf-cal-wrap .pf-day .li .acts{width:100%;justify-content:flex-start;padding-left:22px}
+}
 .pf-modo{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
 .pf-modo button{display:grid;gap:2px;text-align:left;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);font:inherit;cursor:pointer}
 .pf-modo button b{font-family:var(--display);font-size:18px;letter-spacing:.03em;text-transform:uppercase}
@@ -499,7 +511,8 @@ td.crit{color:var(--crit);font-weight:700}
 
 .sheet.pf-sheet header{z-index:5}
 .pf-fc-lbl{flex-wrap:wrap}
-@media (max-width:380px){.pf-tabs button span{display:none}}
+@media (max-width:640px){.pf-tabs button span{display:none}}
+#pf-dia{scroll-margin-top:120px}
 @media (max-width:640px){
   .pf-hero{padding:14px 12px 12px;gap:10px}
   .pf-id{gap:10px}
@@ -2285,12 +2298,12 @@ function pfAgenda(a) {
       ${cu.tot ? `<div class="pf-bar" role="img" aria-label="${cu.pres} vino, ${cu.aus} faltó, ${cu.quedan} le quedan"><i class="ok" style="width:${100 * cu.pres / cu.tot}%"></i><i class="crit" style="width:${100 * cu.aus / cu.tot}%"></i></div>` : ''}
       <div class="pf-est">${est.map(([k, n, l]) => `<div><i class="${k}"></i><b class="num">${n}</b><span>${l}</span></div>`).join('')}<div><i></i><b class="num">${cu.quedan ?? '—'}</b><span>Le quedan</span></div></div>
     </div>` : `<div class="notice">Sin plan activo. <button type="button" class="btn sm pri" data-act="nuevo-plan" data-id="${esc(code)}">Crear plan</button></div>`}
-    <div class="pf-cal">
+    <div class="pf-cal-wrap"><div class="pf-cal">
       <div class="pf-cal-h"><button type="button" class="btn sm" data-act="pf-mes" data-v="-1" aria-label="Mes anterior">‹</button><h4>${esc(fmtMes(mes))}</h4><button type="button" class="btn sm" data-act="pf-mes" data-v="1" aria-label="Mes siguiente">›</button>${mes !== t.slice(0, 7) ? '<button type="button" class="btn sm ghost" data-act="pf-mes" data-v="0">Hoy</button>' : ''}<span style="flex:1"></span><span class="small muted" id="pf-ev-est"></span></div>
       <div class="pf-grid">${DLETRA.map(x => `<span class="wd">${x}</span>`).join('')}${celdas.join('')}</div>
       <div class="pf-ley">${[['ok', 'Vino'], ['crit', 'Faltó'], ['warn', 'Avisó'], ['rec', 'Recuperación'], ['plan', 'Clase fija'], ['ext', 'Agendada'], ['ev', 'Evento'], ['pl', 'Plan']].map(([k, l]) => `<span><i class="${k}"></i>${l}</span>`).join('')}</div>
     </div>
-    <div id="pf-dia">${sel ? pfDia(a, sel) : ''}</div>
+    <div id="pf-dia">${sel ? pfDia(a, sel) : '<div class="pf-day pf-day-vacio"><p class="small muted" style="margin:0">Toca un día del calendario para ver lo que tiene o agendar algo.</p></div>'}</div></div>
     <div id="pf-msj">${pfMensajes(a)}</div>`;
 }
 function pfDia(a, f) {
@@ -2754,7 +2767,8 @@ document.addEventListener('click', e => {
       S.ui.pfSel = f; if (f.slice(0, 7) !== (S.ui.pfMes || today().slice(0, 7))) { S.ui.pfMes = f.slice(0, 7); pfPintar(code, 'agenda'); }
       else { document.querySelectorAll('#pf .pf-d.sel').forEach(x => x.classList.remove('sel')); document.querySelector(`#pf .pf-d[data-f="${f}"]`)?.classList.add('sel');
         const d = document.getElementById('pf-dia'); if (d) d.innerHTML = pfDia(S.alumnos.get(code), f); }
-      requestAnimationFrame(() => document.getElementById('pf-dia')?.scrollIntoView({block: 'nearest', behavior: 'smooth'})); break; }
+      // en el iPad el día se abre al lado del calendario (sin saltos); en el teléfono baja hasta el detalle
+      if (!matchMedia('(min-width: 900px)').matches) requestAnimationFrame(() => document.getElementById('pf-dia')?.scrollIntoView({block: 'start', behavior: 'smooth'})); break; }
     case 'pf-modo': { const code = $('#pf')?.dataset.id, f = S.ui.pfSel; S.ui.pfModo = el.dataset.v; const d = document.getElementById('pf-dia'); if (d && code && f) d.innerHTML = pfDia(S.alumnos.get(code), f); break; }
     case 'pf-add-t': { const code = $('#pf')?.dataset.id, f = S.ui.pfSel; S.ui.pfAddT = el.dataset.v; const d = document.getElementById('pf-dia'); if (d && code && f) d.innerHTML = pfDia(S.alumnos.get(code), f); break; }
     case 'pf-add': pfAgregar(el); break;
