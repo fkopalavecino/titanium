@@ -1065,6 +1065,20 @@ VIEWS.inicio = () => {
         ${x.tipo === 'rec' ? '<span class="sc-ic sc-rec">🔁 Recuperación</span>' : `<span class="sc-ic">↻ Movida${x.de ? ' desde ' + esc(fmtD(x.de.f)) + ' ' + esc(x.de.h || '') : ''}</span>`}<span class="muted">›</span></a>`).join('')}</div>`
         : '<div class="small muted">No hay clases reagendadas por ahora.</div>'}
     </section>`; })()}
+    ${(() => { // alumnos online: qué sesiones hicieron esta semana (entrenan por su cuenta con la rutina de la app)
+      const ons = al.filter(a => a.online && a.estado !== 'inactivo'); if (!ons.length) return '';
+      const lun = addDays(t, -((parseISO(t).getDay() + 6) % 7));
+      const fila = a => { const ses = []; for (const [f, d] of S.dias) { const r = d.bloques?.online?.[a.codigo]; if (r && f <= t && f >= addDays(t, -60) && (r.rpe != null || (r.ej || []).length)) ses.push({ f, r }); }
+        ses.sort((x, y) => y.f.localeCompare(x.f)); const sem = ses.filter(x => x.f >= lun && x.r.rpe != null);
+        const meta = (a.diasOnline || []).length || 0; const ult = ses[0]; const pe = progEstado(a);
+        const rt = ult?.r.rutina && S.rutinas.get(ult.r.rutina);
+        const det = ult ? `Última: ${diffDays(ult.f, t) === 0 ? 'hoy' : diffDays(ult.f, t) === 1 ? 'ayer' : esc(DSHORT[dayKey(ult.f)] + ' ' + fmtD(ult.f))}${rt ? ' · ' + esc(rt.tipo || '') : ''}${ult.r.rpe != null ? ' · RPE ' + esc(ult.r.rpe) : ' · sin terminar'}` : 'Aún no registra sesiones';
+        const tono = !ult || diffDays(ult.f, t) >= 7 ? 'crit' : sem.length < Math.min(meta, ((parseISO(t).getDay() + 6) % 7) + 1) - 1 ? 'warn' : 'ok';
+        return `<div class="seg-row"><span class="ic">🌐</span><div class="grow" style="flex:1;min-width:0"><button class="st-name" data-act="ficha" data-id="${esc(a.codigo)}" style="border:0;background:none;padding:0;cursor:pointer;font-size:15px;text-align:left">${esc(a.nombre)}</button><div class="small muted">${det}${pe ? ' · sem ' + Math.min(pe.semana, pe.total) + '/' + pe.total : ''}</div></div><span class="count ${tono === 'crit' ? 'crit' : tono === 'warn' ? '' : 'zero'}" title="Sesiones terminadas esta semana">${sem.length}${meta ? '/' + meta : ''}</span></div>`; };
+      return `<section class="card pad">
+      <h2 style="font-size:22px;margin-bottom:2px">Alumnos online</h2>
+      <p class="muted small" style="margin:0 0 6px">Sesiones terminadas esta semana (de lunes a hoy) y su última sesión. Toca el nombre para ver sus cargas.</p>
+      <div>${ons.map(fila).join('')}</div></section>`; })()}
     <section class="card pad">
       <h2 style="font-size:22px;margin-bottom:6px">Lo que necesita tu atención</h2>
       <div class="list">
@@ -1791,6 +1805,7 @@ function fichaAlumno(code, tabIni) {
     <div style="display:grid;gap:10px;margin-top:8px">
       <div data-tl-acceso="${esc(code)}"></div>
       <div data-tl-flex="${esc(code)}"></div>
+      <div data-tl-online="${esc(code)}"></div>
     ${a.vinculado ? `<div class="card pad" style="box-shadow:none;background:var(--sunk);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="grow small">📱 <b>Usa la app${a.email ? ' con ' + esc(a.email) : ''}.</b> ${(() => { const e = appEstado(a); return `<span class="${e.t}">${esc(e.l)}</span> · ${e.push ? '🔔 Avisos activos' : '🔕 Avisos apagados'} · ${e.reglas ? '✅ Leyó la información (' + esc(e.reglasF) + ')' : '⏳ No ha leído la información'}`; })()}<br>Si borró la app o cambió de teléfono, mándale un código nuevo con Reinvitar (vale 24 horas).</span><button type="button" class="btn sm" data-act="reinvitar" data-id="${esc(a.codigo)}">🔄 Reinvitar</button></div>` : ''}
     ${!a.vinculado ? `<div class="card pad" style="box-shadow:none;background:var(--sunk);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="grow small">📲 <b>${esc(firstName(a.nombre))} aún no usa la app.</b> Mándale su link personal por WhatsApp: entra con el correo que quiera y queda vinculado a esta ficha.</span><button type="button" class="btn sm pri" data-act="invitar" data-id="${esc(a.codigo)}">Invitar a la app</button></div>` : ''}
     </div></details>
@@ -2249,7 +2264,7 @@ function pfHero(a) {
       <div class="pf-nm">
         <div class="pf-eb">${esc(code)}${a.estado === 'inactivo' ? ' · INACTIVO' : ''}${a.perfil?.apodo ? ' · «' + esc(a.perfil.apodo) + '»' : ''}</div>
         <h3>${esc(a.nombre)}</h3>
-        <div class="pf-meta">${[edadN != null ? edadN + ' años' : '', ing.objetivo || a.perfil?.meta ? '🎯 ' + esc(ing.objetivo || a.perfil.meta) : '', a.programa?.familia ? '🏋️ ' + esc(a.programa.familia) + (progEstado(a) ? ' · sem ' + Math.min(progEstado(a).semana, progEstado(a).total) + '/' + progEstado(a).total : '') : '', bloquesTexto(a) !== '—' ? '🗓 ' + esc(bloquesTexto(a)) : (a.flex ? '📅 Agenda libre' : ''), a.perfil?.ig ? `<a href="https://instagram.com/${esc(a.perfil.ig)}" target="_blank" rel="noopener" style="color:inherit">📸 @${esc(a.perfil.ig)}</a>` : ''].filter(Boolean).join('<span class="dot">·</span>')}</div>
+        <div class="pf-meta">${[edadN != null ? edadN + ' años' : '', ing.objetivo || a.perfil?.meta ? '🎯 ' + esc(ing.objetivo || a.perfil.meta) : '', a.programa?.familia ? '🏋️ ' + esc(a.programa.familia) + (progEstado(a) ? ' · sem ' + Math.min(progEstado(a).semana, progEstado(a).total) + '/' + progEstado(a).total : '') : '', a.online ? '🌐 Online' + ((a.diasOnline || []).length ? ' · ' + esc(a.diasOnline.map(d => DSHORT[d]).join(' ')) : '') : bloquesTexto(a) !== '—' ? '🗓 ' + esc(bloquesTexto(a)) : (a.flex ? '📅 Agenda libre' : ''), a.perfil?.ig ? `<a href="https://instagram.com/${esc(a.perfil.ig)}" target="_blank" rel="noopener" style="color:inherit">📸 @${esc(a.perfil.ig)}</a>` : ''].filter(Boolean).join('<span class="dot">·</span>')}</div>
       </div>
       <div class="pf-acc">
         ${tel ? `<a class="pf-b" href="https://wa.me/${tel}" data-act="wa-chat" data-tel="${esc(tel)}" title="WhatsApp">${ICON_WA}<span>WhatsApp</span></a>` : ''}
@@ -2282,17 +2297,18 @@ function pfItemsDia(a, f, evs) {
     if (cfg().noDisponible.includes(dk + '-' + h) && !d[h]?.[code]) return;
     // nombre corto de la rutina (Fuerza A, Fuerza B…) para que se vea qué entrenamiento es
     const rut = r.rutina ? S.rutinas.get(r.rutina) : null, corto = rut ? String(rut.tipo || rut.familia || '').split('·')[0].trim() : '';
-    const hh = corto || (h === 'libre' ? 'Libre' : h); let k, l, tt;
+    const hh = corto || (h === 'libre' ? 'Libre' : h === 'online' ? 'Online' : h); let k, l, tt;
     if (r.quitado && r.reagA) { k = 'mov'; l = '↻ ' + hh; tt = `Movida al ${fmtD(r.reagA.f)} ${r.reagA.h}`; }
     else if (r.quitado) { k = 'quit'; l = '– ' + hh; tt = 'Quitada de esta clase'; }
     else if (r.asis === 'presente') { k = 'ok'; l = (r.extra && r.reagDe?.recup ? '🔁 ' : '✓ ') + hh; tt = 'Vino' + (r.rpe ? ' · RPE ' + r.rpe : '') + (r.extra && r.reagDe?.recup ? ' · recuperación' : ''); }
     else if (r.asis === 'ausente') { k = 'crit'; l = '✗ ' + hh; tt = 'Faltó sin aviso'; }
     else if (r.asis === 'aviso') { k = 'warn'; l = '📩 ' + hh; tt = 'Avisó que no venía'; }
+    else if (h === 'online') { const fin = r.rpe != null; k = fin ? 'ok' : 'pend'; l = (fin ? '🌐 ' : '… ') + hh; tt = fin ? 'Sesión online terminada · RPE ' + r.rpe : 'Sesión online sin terminar'; }
     else if (f < t || (f === t && h !== 'libre' && hmToMin(h) + 60 < hmToMin(nowHM()))) { if (!r.extra && !fijo) return; k = 'pend'; l = '? ' + hh; tt = 'Sin marcar asistencia'; }
     else if (r.extra && r.reagDe?.recup) { k = 'rec'; l = '🔁 ' + hh; tt = 'Viene a recuperar'; }
     else if (r.extra) { k = 'ext'; l = '＋ ' + hh; tt = r.reagDe ? `Reagendada desde el ${fmtD(r.reagDe.f)}` : 'Clase agendada para esta fecha'; }
     else { k = 'plan'; l = hh; tt = 'Clase de su horario'; }
-    if (rut) tt = [h === 'libre' ? 'Libre' : h, String(rut.tipo || '').split('·').slice(1).join('·').trim(), tt].filter(Boolean).join(' · ');
+    if (rut) tt = [h === 'libre' ? 'Libre' : h === 'online' ? 'Online' : h, String(rut.tipo || '').split('·').slice(1).join('·').trim(), tt].filter(Boolean).join(' · ');
     out.push({ c: 'cl', k, l, tt, h, r, rut });
   });
   planes.forEach(p => { if (p.inicio === f) out.push({ c: 'pl', k: 'pl', l: '▶ Inicia plan', tt: `${p.clases || '—'} clases` }); if (p.fin === f) out.push({ c: 'pl', k: 'pl', l: '⟳ Renueva', tt: 'Fin del plan · ' + pagoEstado(p).l }); });
