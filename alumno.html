@@ -2316,25 +2316,35 @@ sb.channel('al-' + codigo)
 })();
 </script>
 <script>
-/* Fija la barra de abajo: iOS a veces deja el viewport descuadrado (tras teclado o scroll) y la barra "flota" a media pantalla */
+/* Fija la barra de abajo: iOS a veces deja el viewport descuadrado (tras teclado, scroll o volver a la app) y la barra "flota".
+   Se mide dónde quedó realmente y se corrige; nunca se calcula a ciegas. */
 (() => {
   const vv = window.visualViewport, nav = document.getElementById('tabs');
-  if (!vv || !nav) return;
+  if (!nav) return;
+  nav.style.bottom = '0px';
   const esInput = el => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
-  let raf = 0;
+  let raf = 0, intento = 0;
+  const fondo = () => vv ? vv.offsetTop + vv.height : window.innerHeight;
   const ajustar = () => {
     raf = 0;
     if (esInput(document.activeElement)) { nav.style.visibility = 'hidden'; return; }
     nav.style.visibility = '';
-    const off = Math.round(window.innerHeight - vv.height - vv.offsetTop);
-    nav.style.bottom = Math.abs(off) > 1 ? off + 'px' : '0px';
+    if (nav.hidden) return;
+    nav.style.transform = '';
+    const dif = Math.round(fondo() - nav.getBoundingClientRect().bottom);
+    if (Math.abs(dif) <= 2) { intento = 0; return; }
+    if (intento === 0) { intento = 1; const y = window.scrollY; window.scrollTo(window.scrollX, y + 1); window.scrollTo(window.scrollX, y); pedir(); return; }
+    intento = 0; nav.style.transform = 'translateY(' + dif + 'px)';
   };
   const pedir = () => { if (!raf) raf = requestAnimationFrame(ajustar); };
-  vv.addEventListener('resize', pedir); vv.addEventListener('scroll', pedir);
+  if (vv) { vv.addEventListener('resize', pedir); vv.addEventListener('scroll', pedir); }
   window.addEventListener('scroll', pedir, { passive: true }); window.addEventListener('resize', pedir);
+  window.addEventListener('pageshow', pedir); window.addEventListener('orientationchange', () => setTimeout(pedir, 300));
   document.addEventListener('focusin', pedir);
-  document.addEventListener('focusout', () => setTimeout(() => { if (!esInput(document.activeElement)) window.scrollTo(window.scrollX, window.scrollY); pedir(); }, 60));
-  document.addEventListener('visibilitychange', pedir);
+  document.addEventListener('focusout', () => [60, 300, 700].forEach(t => setTimeout(pedir, t)));
+  document.addEventListener('visibilitychange', () => [0, 300].forEach(t => setTimeout(pedir, t)));
+  document.addEventListener('touchend', pedir, { passive: true });
+  setInterval(() => { if (!document.hidden) pedir(); }, 1500);
   pedir();
 })();
 </script>
