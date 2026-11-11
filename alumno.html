@@ -700,13 +700,19 @@ function onboardingHTML() {
       <section class="card" style="gap:10px;border-color:var(--red)">
         <h2 style="margin:0">🔔 Te avisaremos de</h2>
         <div style="display:grid;gap:7px" class="small">
-          <div>⏰ <b>Tus clases:</b> recordatorio para confirmar si vas o no.</div>
-          <div>🔁 <b>Clases por recuperar:</b> cuando tengas una disponible y cuándo vence.</div>
+          ${ONL() ? '' : `<div>⏰ <b>Tus clases:</b> recordatorio para confirmar si vas o no.</div>
+          <div>🔁 <b>Clases por recuperar:</b> cuando tengas una disponible y cuándo vence.</div>`}
           <div>💳 <b>Pagos:</b> 5 días antes de que venza tu plan, el día que vence y si quedó pendiente.</div>
           <div>📣 <b>Mensajes de ${prof}:</b> cambios de horario, clases suspendidas o situaciones del gimnasio.</div>
           <div>📋 <b>Tu agenda:</b> evaluaciones, reuniones, pautas y documentos.</div>
         </div></section>
-      <section class="card" style="gap:8px">
+      ${ONL() ? `<section class="card" style="gap:8px">
+        <h2 style="margin:0">🌐 Tu plan online</h2>
+        <div style="display:grid;gap:6px" class="small">
+          <div>• Entrenas por tu cuenta con la rutina de la app. Los días sugeridos están en tu <b>Agenda</b>.</div>
+          <div>• Si se te corre la semana, haz tu próxima sesión el día que te acomode: la app siempre te muestra la que sigue.</div>
+          <div>• Anota tus series y termina con el <b>RPE</b>: así ${prof} ve tu avance y ajusta tu programa.</div>
+        </div></section>` : `<section class="card" style="gap:8px">
         <h2 style="margin:0">🔁 Si no puedes ir a una clase</h2>
         <div style="display:grid;gap:6px" class="small">
           <div>• Avisa en la app con <b>al menos 2 horas de anticipación</b> (botón «No puedo ir»). Así ganas <b>1 clase para recuperar</b>.</div>
@@ -714,13 +720,13 @@ function onboardingHTML() {
           <div>• Recuperas tú mismo en los bloques habilitados <b>de esta semana y la próxima</b>, según los cupos disponibles.</div>
           <div>• Las clases por recuperar <b>vencen cuando termina tu plan</b>: no pasan al plan siguiente.</div>
           <div>• Elige bien el bloque: una vez agendada la recuperación, <b>no se puede cambiar</b>. Si no asistes, la pierdes.</div>
-        </div></section>
+        </div></section>`}
       <section class="card" style="gap:8px">
         <h2 style="margin:0">💳 Pagos</h2>
         <div style="display:grid;gap:6px" class="small">
           <div>• En <b>Perfil › Pagos</b> están los datos de transferencia y el botón <b>«Ya pagué»</b> para enviar tu comprobante.</div>
           <div>• Tu plan se renueva en la fecha de vencimiento. Tienes <b>${gracia} días de margen</b> para pagar.</div>
-          ${bloq ? `<div>• Si tienes un pago atrasado, <b>no podrás recuperar clases</b> hasta regularizarlo.</div>` : ''}
+          ${bloq && !ONL() ? `<div>• Si tienes un pago atrasado, <b>no podrás recuperar clases</b> hasta regularizarlo.</div>` : ''}
         </div></section>
       <section class="card" style="gap:12px">
         <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" id="reglas-ok" style="width:22px;height:22px;accent-color:var(--red);flex:none;margin-top:2px"><span><b>Leí y entiendo</b> cómo funcionan los avisos, las recuperaciones y los pagos.</span></label>
@@ -1480,7 +1486,7 @@ async function confirmar(k, estado) { const [f, h] = k.split('_');
   const gano = (S.recup?.disponibles || 0) > antes;
   toast(estado === 'voy' ? '¡Te esperamos! 💪 Franco ya sabe que vienes.' : gano ? 'Listo, Franco ya sabe. Ganaste 1 clase para recuperar 🔁' : S.recup?.activo ? 'Franco ya sabe que no vienes. Avisaste con menos de 2 horas: esta no se puede recuperar.' : 'Listo, Franco ya sabe que no vienes.');
   render(); return true; }
-function recupHTML() { const R = S.recup; if (!R || !R.activo) return '';
+function recupHTML() { const R = S.recup; if (!R || !R.activo || ONL()) return '';
   const t = today(), ahora = new Date();
   const prox = (R.usadas || []).filter(u => u.f >= t && !u.asis);
   if (!R.disponibles && !prox.length) return '';
@@ -1499,7 +1505,7 @@ function recupHTML() { const R = S.recup; if (!R || !R.activo) return '';
     ${prox.length ? `<div style="display:grid;gap:6px"><div class="small muted">Tus recuperaciones agendadas</div>${prox.map(u => `<div class="row" style="align-items:center"><span>✅ <b>${esc(dia(u.f))} · ${esc(u.h)}</b></span><span class="small muted">agendada</span></div>`).join('')}</div>` : ''}
   </details>`; }
 /* ---------- agenda libre (alumnas por turnos): agendan sus clases hasta completar su plan ---------- */
-function flexHTML() { const R = S.flex; if (!R || !R.activo) return '';
+function flexHTML() { const R = S.flex; if (!R || !R.activo || ONL()) return '';
   const t = today(); const dia = f => (f === t ? 'Hoy' : f === addDays(t, 1) ? 'Mañana' : DL[dayKey(f)] + ' ' + fmtD(f));
   if (!R.plan) return `<section class="card" style="border-color:#f2b44f"><span class="eyebrow" style="color:#f2b44f">📅 Agenda tus clases</span><div class="small muted">Tu plan aún no está activo. Escríbele a Franco para renovarlo.</div></section>`;
   const prox = (R.agendadas || []).filter(u => u.f >= t && !u.asis);
