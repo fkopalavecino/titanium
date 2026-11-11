@@ -85,6 +85,8 @@ label.f input,label.f select,label.f textarea{color:var(--fg);font-weight:400}
 /* surfaces */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
 .pad{padding:18px}
+/* inicio: tarjetas que se pueden minimizar (se recuerda en este equipo) */
+.ini-c{position:relative}.ini-c>:first-child{padding-right:44px;cursor:pointer}.ini-tg{position:absolute;top:10px;right:10px;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--sunk);color:var(--muted);font:700 15px/1 sans-serif;cursor:pointer;display:grid;place-items:center;transition:transform .15s}.ini-c.ini-min{align-self:start;padding-top:12px;padding-bottom:12px}.ini-c.ini-min>:not(:first-child):not(.ini-tg){display:none!important}.ini-c.ini-min>:first-child{margin-bottom:0!important}.ini-c.ini-min .ini-tg{transform:rotate(-90deg);top:50%;margin-top:-18px}
 .eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--red)}
 .muted{color:var(--muted)}
 .small{font-size:13px}
@@ -957,7 +959,19 @@ function render() {
   $('#view').innerHTML = html;
   if (fid) { const el = document.getElementById(fid); if (el) { if (fval !== null && 'value' in el && el.type !== 'checkbox' && el.type !== 'date' && el.type !== 'month' && el.tagName !== 'SELECT') el.value = fval; el.focus(); try { if (fs !== null) el.setSelectionRange(fs, fe); } catch(e) {} } }
   if (v === 'clase') paintTimer();
+  if (v === 'inicio') iniPlegables();
 }
+const iniMin = () => { try { return new Set(JSON.parse(localStorage.getItem('tl-ini-min') || '[]')); } catch (_) { return new Set(); } };
+function iniPlegables() { const m = iniMin();
+  document.querySelectorAll('#view section.card.pad').forEach(sec => { const h = sec.firstElementChild; if (!h) return;
+    const k = ((h.querySelector('b,h2') || h).textContent || '').trim().slice(0, 40); if (!k) return;
+    sec.classList.add('ini-c'); sec.dataset.ik = k; sec.classList.toggle('ini-min', m.has(k));
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ini-tg'; b.textContent = '▾'; b.setAttribute('aria-label', 'Minimizar o abrir: ' + k); sec.appendChild(b); }); }
+document.addEventListener('click', ev => { if (S.view !== 'inicio') return; const sec = ev.target.closest('#view section.ini-c'); if (!sec) return;
+  const tg = ev.target.closest('.ini-tg'); const hd = !tg && ev.target.closest('section.ini-c > :first-child');
+  if (!tg && !(hd && !ev.target.closest('a,button,input,select,label'))) return;
+  ev.preventDefault(); ev.stopPropagation(); const m = iniMin(), k = sec.dataset.ik; const min = !sec.classList.contains('ini-min');
+  sec.classList.toggle('ini-min', min); min ? m.add(k) : m.delete(k); try { localStorage.setItem('tl-ini-min', JSON.stringify([...m])); } catch (_) {} }, true);
 function route() {
   let h = (location.hash || '#inicio').slice(1);
   // link de un aviso: #clase/2026-11-09/11:30 abre esa clase en su día y bloque
