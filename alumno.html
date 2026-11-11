@@ -149,6 +149,10 @@ details.ses summary::-webkit-details-marker{display:none}
 .fup label img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .fup label input{position:absolute;inset:0;opacity:0;cursor:pointer}
 .fup label.busy{opacity:.5}
+.fup .fs{position:relative}.fup .fs>label{width:100%}
+.fup .fdel{position:absolute;top:6px;right:6px;z-index:3;min-width:34px;height:34px;padding:0 10px;border:0;border-radius:999px;background:rgba(0,0,0,.65);color:#fff;font:700 14px inherit;cursor:pointer}
+.fup .fdel.ok{background:#d71f30}
+.fmulti{position:relative;overflow:hidden}.fmulti input{position:absolute;inset:0;opacity:0;cursor:pointer}.fmulti.busy{opacity:.6;pointer-events:none}
 .av{width:48px;height:48px;border-radius:50%;object-fit:cover;background:var(--red);color:#fff;display:grid;place-items:center;font:700 20px 'Barlow Condensed',sans-serif;flex:none;overflow:hidden;border:2px solid var(--line)}
 .av.lg{width:96px;height:96px;font-size:40px}
 .av-up{position:relative;cursor:pointer;display:inline-block}
@@ -540,7 +544,24 @@ async function subirFotoAlumno(input) { const ang = input.dataset.fang2, f = $('
     const { error: e2 } = await sb.rpc('agregar_mi_foto', { p_id: id, p_f: f, p_ang: ang }); if (e2) throw e2;
     S.fotoUpF = f; await load(); toast('Foto guardada ✓'); render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' });
   } catch (e) { lbl?.classList.remove('busy'); toast('No se pudo subir la foto: ' + (e.message || 'intenta de nuevo')); } }
-document.addEventListener('change', ev => { if (ev.target.dataset?.fsel) { S['f' + ev.target.dataset.fsel] = ev.target.value; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; } if (ev.target.dataset?.fang2) subirFotoAlumno(ev.target); else if (ev.target.id === 'fu-f') { S.fotoUpF = ev.target.value; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); } });
+// las 3 fotos de una vez, en el orden elegido: frente, perfil, espalda
+async function subirFotos3Alumno(input) { const f = $('#fu-f')?.value || today(); const files = [...(input.files || [])].slice(0, 3); if (!files.length) return;
+  const lbl = input.closest('label'); lbl?.classList.add('busy'); if (lbl?.firstChild) lbl.firstChild.textContent = '⏳ Subiendo ' + files.length + ' fotos…';
+  try { for (let i = 0; i < files.length; i++) { const blob = await achicar(files[i], 1400); const id = 'alumno/' + codigo + '/' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + i) + '.jpg';
+      const { error: e1 } = await sb.storage.from('fotos').upload(id, blob, { contentType: 'image/jpeg' }); if (e1) throw e1;
+      const { error: e2 } = await sb.rpc('agregar_mi_foto', { p_id: id, p_f: f, p_ang: ['frente', 'perfil', 'espalda'][i] }); if (e2) throw e2; }
+    S.fotoUpF = f; await load(); toast(files.length + ' fotos guardadas ✓ Si alguna quedó en otro lugar, toca ese recuadro para cambiarla.'); render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' });
+  } catch (e) { lbl?.classList.remove('busy'); toast('No se pudieron subir las fotos: ' + (e.message || 'intenta de nuevo')); render(); } }
+// borrar una foto: primer toque pide confirmar, el segundo borra
+async function borrarFotoAlumno(btn) { const ang = btn.dataset.fdel, f = $('#fu-f')?.value || S.fotoUpF || today();
+  if (!btn.classList.contains('ok')) { btn.classList.add('ok'); btn.textContent = '¿Borrar?'; setTimeout(() => { if (btn.isConnected) { btn.classList.remove('ok'); btn.textContent = '✕'; } }, 3000); return; }
+  btn.disabled = true;
+  const { data: path, error } = await sb.rpc('borrar_mi_foto', { p_f: f, p_ang: ang });
+  if (error) { btn.disabled = false; toast(error.message || 'No se pudo borrar la foto.'); return; }
+  if (path) sb.storage.from('fotos').remove([path]).then(() => {}, () => {});
+  S.fotoUpF = f; await load(); toast('Foto borrada ✓'); render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); }
+document.addEventListener('click', ev => { const b = ev.target.closest('[data-fdel]'); if (b) { ev.preventDefault(); ev.stopPropagation(); borrarFotoAlumno(b); } }, true);
+document.addEventListener('change', ev => { if (ev.target.dataset?.fmulti) { subirFotos3Alumno(ev.target); return; } if (ev.target.dataset?.fsel) { S['f' + ev.target.dataset.fsel] = ev.target.value; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; } if (ev.target.dataset?.fang2) subirFotoAlumno(ev.target); else if (ev.target.id === 'fu-f') { S.fotoUpF = ev.target.value; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); } });
 function avatarHTML(cls) { const u = S.perfil?.avatar && S.urls[S.perfil.avatar]; const ini = (S.perfil?.apodo || S.a.nombre || '?').trim().charAt(0).toUpperCase();
   return u ? `<img class="av ${cls}" src="${esc(u)}" alt="Tu foto de perfil">` : `<span class="av ${cls}" aria-hidden="true">${esc(ini)}</span>`; }
 function cuadrado(file, lado) { return new Promise((res, rej) => { const u = URL.createObjectURL(file), img = new Image();
@@ -1160,7 +1181,9 @@ V.progreso = () => {
   const opts = sel => ses.map(x => `<option value="${esc(x.f)}" ${x.f === sel.f ? 'selected' : ''}>${esc(fmtD(x.f))}</option>`).join('');
   const fuF = S.fotoUpF || today(); const fuRow = S.fotos.find(x => x.f === fuF) || {};
   const uploader = S.fotoUp ? `<div style="display:grid;gap:8px"><label class="field">Fecha de las fotos<input type="date" id="fu-f" value="${esc(fuF)}"></label>
-    <div class="fup">${ANG.map(([k, l]) => `<label>${fuRow[k] && S.urls[fuRow[k]] ? `<img src="${esc(S.urls[fuRow[k]])}" alt="${l}">` : `＋<br>${l}`}<input type="file" accept="image/*" data-fang2="${k}" aria-label="Subir foto ${l}"></label>`).join('')}</div>
+    <label class="btn pri fmulti">📸 Elegir las 3 de una vez<input type="file" accept="image/*" multiple data-fmulti="1" aria-label="Elegir tus 3 fotos: frente, perfil y espalda"></label>
+    <div class="small muted" style="margin-top:-2px">Elígelas en este orden: <b>frente, perfil y espalda</b>. O toca cada recuadro para subir o cambiar una sola.</div>
+    <div class="fup">${ANG.map(([k, l]) => `<div class="fs"><label>${fuRow[k] && S.urls[fuRow[k]] ? `<img src="${esc(S.urls[fuRow[k]])}" alt="${l}">` : `＋<br>${l}`}<input type="file" accept="image/*" data-fang2="${k}" aria-label="Subir foto ${l}"></label>${fuRow[k] ? `<button type="button" class="fdel" data-fdel="${k}" aria-label="Borrar foto ${l}">✕</button>` : ''}</div>`).join('')}</div>
     <div class="small muted">Misma luz, misma distancia y ropa ajustada en cada sesión. Si subes otra foto del mismo ángulo y fecha, reemplaza la anterior.</div></div>` : '';
   const fuBtn = `<button class="btn ${S.fotos.length ? '' : 'pri'}" id="fup-open">${S.fotoUp ? 'Listo' : '＋ Subir mis fotos'}</button>`;
   const fotosCard = S.fotos.length ? `<section class="card" id="fup-card"><div class="row"><h2>Fotos de progreso</h2><span class="small muted">${S.fotos.length === 1 ? '1 sesión' : S.fotos.length + ' sesiones'}</span></div>

@@ -249,10 +249,10 @@ details.fotos>summary::-webkit-details-marker{display:none}
 .f-slots{display:grid;grid-template-columns:repeat(3,minmax(0,140px));gap:8px}
 .f-slot{position:relative;aspect-ratio:3/4;border:2px dashed var(--line);border-radius:10px;display:grid;place-items:center;text-align:center;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;overflow:hidden;background:var(--sunk)}
 .f-slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.f-slot input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.f-slot input{position:absolute;inset:0;opacity:0;cursor:pointer;z-index:1}
 .f-slot .cap{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:3px}
 .f-slot.busy::after{content:'Subiendo…';position:absolute;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.55);color:#fff}
-.f-del{position:absolute;top:4px;right:4px;z-index:2;border:0;border-radius:999px;width:26px;height:26px;background:rgba(0,0,0,.6);color:#fff;cursor:pointer}
+.f-del{position:absolute;top:4px;right:4px;z-index:3;min-width:30px;height:30px;padding:0 8px;border:0;border-radius:999px;background:rgba(0,0,0,.6);color:#fff;cursor:pointer}
 .f-cmp{display:grid;grid-template-columns:repeat(2,minmax(0,240px));gap:10px;justify-content:center}
 .f-cmp figure{margin:0;display:grid;gap:4px}
 .f-cmp img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;background:var(--sunk);cursor:zoom-in}
@@ -2054,6 +2054,21 @@ async function subirFoto(code, fecha, ang, file, slot) {
     S.ui.fotosOpen = true; S.ui.fotoFecha = fecha; toast('Foto guardada.'); refrescarCuerpo(code);
   } catch(e) { slot?.classList.remove('busy'); toast('No se pudo subir la foto. Intenta de nuevo.', true); }
 }
+// las 3 fotos de una vez: se asignan en el orden en que las eliges (frente, perfil, espalda)
+async function subirFotos3(code, fecha, files, el) {
+  if (!assets) { toast('Las fotos no están disponibles en esta vista.', true); return; }
+  const fs0 = [...files].filter(f => /^image\//.test(f.type) || /\.(jpe?g|png|heic|webp)$/i.test(f.name)).slice(0, 3);
+  if (!fs0.length) return; if (files.length > 3) toast('Elegiste más de 3: se usan las 3 primeras.');
+  const lbl = el?.closest('label'); if (lbl) { lbl.classList.add('busy'); lbl.firstChild && (lbl.firstChild.textContent = '⏳ Subiendo ' + fs0.length + ' fotos… '); }
+  try {
+    const ups = []; for (let i = 0; i < fs0.length; i++) { const blob = await achicarFoto(fs0[i]); ups.push(await assets.upload(blob)); }
+    const a = clone(S.alumnos.get(code)); const fs = a.fotos || []; let row = fs.find(x => x.f === fecha); if (!row) { row = {f: fecha}; fs.push(row); }
+    const viejas = []; ups.forEach((up, i) => { const k = ANG[i][0]; if (row[k]) viejas.push(row[k]); row[k] = up.id; });
+    a.fotos = fs.sort((x, y) => x.f.localeCompare(y.f)); saveAlumno(a); viejas.forEach(v => assets.delete(v).catch(() => {}));
+    S.ui.fotosOpen = true; S.ui.fotoFecha = fecha;
+    toast(`${ups.length} foto${ups.length === 1 ? '' : 's'} guardada${ups.length === 1 ? '' : 's'} ✓ Si alguna quedó en el lugar equivocado, toca ese recuadro para cambiarla.`); refrescarCuerpo(code);
+  } catch (e) { console.error(e); toast('No se pudieron subir las fotos. Intenta de nuevo.', true); if (lbl) lbl.classList.remove('busy'); }
+}
 async function subirInbody(code, fecha, file, el) {
   if (!assets) { toast('Las fotos no están disponibles en esta vista.', true); return; }
   el?.closest('.inb-up')?.classList.add('busy');
@@ -2104,6 +2119,8 @@ function fotosHTML(a, {sinCmp = false} = {}) {
       ${!assets ? '<div class="notice">Para subir fotos abre el Control dentro de Claude con tu cuenta.</div>' : `
       <div style="display:grid;gap:8px">
         <div class="tools" style="justify-content:space-between"><b class="small">Nueva sesión de fotos</b><label class="f" style="flex-direction:row;align-items:center;gap:6px">Fecha <input type="date" id="foto-fecha" value="${fecha}"></label></div>
+        <label class="btn pri" style="position:relative;overflow:hidden;cursor:pointer;justify-self:start">📸 Subir las 3 de una vez <input type="file" accept="image/*" multiple class="foto-in3" data-id="${esc(code)}" aria-label="Elegir las 3 fotos: frente, perfil y espalda" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label>
+        <div class="small muted" style="margin-top:-4px">Elige las 3 en este orden: <b>frente, perfil y espalda</b>. También puedes tocar cada recuadro para subir o cambiar una sola.</div>
         <div class="f-slots">${ANG.map(([k, l]) => `<div class="f-slot" data-ang="${k}">${cur[k] ? `<img src="${fotoURL(cur[k])}" alt="${l}"><button type="button" class="f-del" data-act="foto-del" data-id="${esc(code)}" data-f="${fecha}" data-ang="${k}" aria-label="Borrar foto ${l}">✕</button><span class="cap">${l} · toca para cambiar</span>` : `<span>＋<br>${l}</span>`}<input type="file" accept="image/*" class="foto-in" data-id="${esc(code)}" data-ang="${k}" aria-label="Foto ${l}"></div>`).join('')}</div>
         <div class="small muted">Misma luz, misma distancia y misma ropa en cada sesión. En el iPad se abre la cámara o la galería.</div>
       </div>`}
@@ -3042,6 +3059,7 @@ document.addEventListener('change', e => {
     const v = parseFloat(String(t.value).replace(',', '.')); if (t.value.trim() === '') delete it.cintura; else if (v >= 40 && v <= 200) it.cintura = v; else { toast('Cintura fuera de rango (40–200 cm).', true); return; }
     saveAlumno(a); toast('Cintura guardada.'); }
   else if (t.classList?.contains('inb-in') && t.files?.[0]) { subirInbody(t.dataset.id, $('#inb-fecha')?.value || today(), t.files[0], t); }
+  else if (t.classList?.contains('foto-in3') && t.files?.length) { const f = $('#foto-fecha')?.value || today(); subirFotos3(t.dataset.id, f, t.files, t); }
   else if (t.classList?.contains('foto-in') && t.files?.[0]) { const f = $('#foto-fecha')?.value || today(); subirFoto(t.dataset.id, f, t.dataset.ang, t.files[0], t.closest('.f-slot')); }
   else if (t.id === 'foto-fecha') { S.ui.fotoFecha = t.value || today(); S.ui.fotosOpen = true; const code = t.closest('.fotos')?.querySelector('.foto-in')?.dataset.id; if (code) refrescarCuerpo(code); }
   else if (t.id === 'pf-fa' || t.id === 'pf-fb') { const id = t.dataset.id; S.ui.fotoCmp = Object.assign({}, S.ui.fotoCmp?.code === id ? S.ui.fotoCmp : {code: id}, {[t.id === 'pf-fa' ? 'a' : 'b']: t.value}); refrescarCuerpo(id); }
