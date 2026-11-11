@@ -1767,14 +1767,9 @@ function fichaAlumno(code, tabIni) {
     </div>
   `;
   const fichaExistente = () => `
-    ${a.perfil ? `<div style="display:flex;gap:12px;align-items:center">${a.perfil.avatar && fotoURL(a.perfil.avatar) ? `<img src="${fotoURL(a.perfil.avatar)}" alt="" data-act="foto-zoom" style="width:52px;height:52px;border-radius:50%;object-fit:cover;cursor:zoom-in">` : ''}<div>${a.perfil.apodo ? `<b>«${esc(a.perfil.apodo)}»</b>` : ''}${a.perfil.meta ? `<div class="small muted">🎯 Su objetivo: ${esc(a.perfil.meta)}</div>` : ''}<div class="small muted">${[a.perfil.nac ? '🎂 ' + fmtDY(a.perfil.nac) : '', a.perfil.ig ? `<a href="https://instagram.com/${esc(a.perfil.ig)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;background:linear-gradient(45deg,#f58529,#dd2a7b,#8134af);color:#fff;text-decoration:none;font-weight:600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="vertical-align:-3px"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg> @${esc(a.perfil.ig)}</a>` : '', (a.perfil.deportes || []).length ? '🏅 ' + esc(a.perfil.deportes.join(', ')) : ''].filter(Boolean).join(' · ')}</div></div></div>` : ''}
-    ${fichaAlumnoHTML(a)}
-    <div data-tl-acceso="${esc(code)}"></div>
-    <div data-tl-flex="${esc(code)}"></div>
-    ${a.vinculado ? `<div class="card pad" style="box-shadow:none;background:var(--sunk);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="grow small">📱 <b>Usa la app${a.email ? ' con ' + esc(a.email) : ''}.</b> ${(() => { const e = appEstado(a); return `<span class="${e.t}">${esc(e.l)}</span> · ${e.push ? '🔔 Avisos activos' : '🔕 Avisos apagados'} · ${e.reglas ? '✅ Leyó la información (' + esc(e.reglasF) + ')' : '⏳ No ha leído la información'}`; })()}<br>Si borró la app o cambió de teléfono, mándale un código nuevo con Reinvitar (vale 24 horas).</span><button type="button" class="btn sm" data-act="reinvitar" data-id="${esc(a.codigo)}">🔄 Reinvitar</button></div>` : ''}
-    ${!a.vinculado ? `<div class="card pad" style="box-shadow:none;background:var(--sunk);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="grow small">📲 <b>${esc(firstName(a.nombre))} aún no usa la app.</b> Mándale su link personal por WhatsApp: entra con el correo que quiera y queda vinculado a esta ficha.</span><button type="button" class="btn sm pri" data-act="invitar" data-id="${esc(a.codigo)}">Invitar a la app</button></div>` : ''}
-    <label class="f">Notas · lesiones, objetivos, preferencias<textarea id="fa-notas" rows="3">${esc(a.notas)}</textarea></label>
-    <details class="sec" ${!a.programa?.familia ? 'open' : ''}><summary>Cambiar programa <span class="small muted" style="font-weight:500">· ${esc(a.programa?.familia ? a.programa.familia + ' · ' + (a.programa.nivel || '') : 'sin programa')}</span></summary>
+    ${a.perfil?.ficha ? fichaAlumnoHTML(a) : `<div class="notice">🩺 ${esc(firstName(a.nombre))} aún no completa su ficha de salud en la app (lesiones, enfermedades, PAR-Q y contacto de emergencia). ${a.vinculado ? 'Se la pedirá al abrirla.' : 'La llenará al entrar por primera vez.'}</div>`}
+    <label class="f">📝 Notas del profe · lo que debes recordar al entrenarlo<textarea id="fa-notas" rows="3">${esc(a.notas)}</textarea></label>
+    <details class="sec" ${!a.programa?.familia ? 'open' : ''}><summary>🏋️ Programa <span class="small muted" style="font-weight:500">· ${esc(a.programa?.familia ? a.programa.familia + ' · ' + (a.programa.nivel || '') : 'sin programa')}</span></summary>
     <div style="display:grid;gap:10px;margin-top:8px">
       <div class="frow">
         <label class="f">Programa<select id="fa-prog"><option value="">Sin programa</option>${progOptions(a.programa?.familia)}</select></label>
@@ -1785,28 +1780,21 @@ function fichaAlumno(code, tabIni) {
         <label class="f">Duración<select id="fa-psem">${[4,6,8,12].map(n => `<option value="${n}" ${(Number(a.programa?.semanas) || 6) === n ? 'selected' : ''}>${n} semanas</option>`).join('')}</select></label>
       </div>
       ${(() => { const pg = progEstado(a); return pg ? `<div class="small muted num">Semana ${Math.min(pg.semana, pg.total)} de ${pg.total} · ${pg.hechas} sesiones hechas · próxima: <b style="color:var(--fg)">${esc(pg.next[1].tipo || '')}</b>${pg.terminado ? ' · <b style="color:var(--warn)">terminado: elige el siguiente programa o sube de nivel</b>' : ''}</div>` : `<div class="small muted">La sesión que le toca aparecerá sola en "Clase de hoy" y rota según su asistencia.</div>`; })()}
+      ${(() => { const sug = sugerencias(ingDe(a)); return sug.length ? `<div><span class="small muted" style="font-weight:600">Sugeridos por sus lesiones o deportes</span><div class="list small">${sug.map(([fam, why]) => `<div class="li"><span class="grow"><b>${esc(fam)}</b> <span class="muted">· ${esc(why)}</span></span><button type="button" class="btn sm" data-act="sug-prog" data-fam="${esc(fam)}">Usar</button></div>`).join('')}</div></div>` : ''; })()}
     </div>
     </details>
-    ${isNew ? '' : `<details class="sec" id="fa-hab-sec"><summary>Skills <span class="small muted" id="fa-hab-n" style="font-weight:500">· cargando…</span></summary><div class="small muted" style="margin:8px 0 6px">Toca para asignar o quitar. La pestaña Skills solo aparece en la app de quien tenga alguna asignada.</div><div class="chips" id="fa-hab" data-alumno="${esc(a.codigo)}"></div></details>`}
-    ${isNew ? '' : '<details class="sec" id="fa-acts-sec" hidden><summary>Actividades hechas en su app <span class="small muted" id="fa-acts-n" style="font-weight:500"></span></summary><div class="list small" id="fa-acts" style="margin-top:8px"></div></details>'}
-    <details class="sec" ${isNew ? 'open' : ''}><summary>Horario fijo <span class="small muted" style="font-weight:500">· ${esc(bloquesTexto(a))}</span></summary>
+    ${isNew ? '' : `<details class="sec" id="fa-hab-sec"><summary>⭐ Skills <span class="small muted" id="fa-hab-n" style="font-weight:500">· cargando…</span></summary><div class="small muted" style="margin:8px 0 6px">Toca para asignar o quitar. La pestaña Skills solo aparece en la app de quien tenga alguna asignada.</div><div class="chips" id="fa-hab" data-alumno="${esc(a.codigo)}"></div></details>`}
+    <details class="sec" ${isNew ? 'open' : ''}><summary>🗓 Horario fijo <span class="small muted" style="font-weight:500">· ${esc(bloquesTexto(a))}</span></summary>
       ${grid}
     </details>
-    ${(() => { const ing = a.ingreso || {}; const sug = sugerencias(ingDe(a)); return `
-    <details class="sec" ${!a.ingreso ? 'open' : ''}>
-      <summary>Ficha de ingreso ${ingDe(a).parq.length ? '<span class="pill crit">PAR-Q: pedir autorización médica</span>' : ''}${lesionCorta(a).length ? `<span class="pill warn">${esc(lesionCorta(a).join(', '))}</span>` : ''}${!a.ingreso ? '<span class="pill muted">Pendiente</span>' : ''}</summary>
-      <div style="display:grid;gap:12px">
-        <div class="frow">
-          <label class="f">Fecha de nacimiento<input type="date" id="fa-nac" value="${esc(a.nacimiento || '')}"></label>
-          <label class="f">Objetivo principal<select id="fa-obj"><option value="">—</option>${OBJETIVOS.map(o => `<option ${ing.objetivo === o ? 'selected' : ''}>${o}</option>`).join('')}</select></label>
-        </div>
-        <details class="f fold" ${(ing.deportes || []).length ? 'open' : ''}><summary>Deportes que practica<span class="cnt">${(ing.deportes || []).length ? (ing.deportes || []).length + ' marcado' + ((ing.deportes || []).length === 1 ? '' : 's') : ''}</span></summary><div class="ckgrid">${DEPORTES.map(([k, l]) => `<label class="ck"><input type="checkbox" name="fa-dep" value="${k}" ${(ing.deportes || []).includes(k) ? 'checked' : ''}>${l}</label>`).join('')}</div></details>
-        <details class="f fold" ${(ing.lesiones || []).length ? 'open' : ''}><summary>Lesiones o molestias (actuales o recientes)<span class="cnt">${(ing.lesiones || []).length ? (ing.lesiones || []).length + ' marcado' + ((ing.lesiones || []).length === 1 ? '' : 's') : ''}</span></summary><div class="ckgrid">${LESIONES.map(([k, l]) => `<label class="ck"><input type="checkbox" name="fa-les" value="${k}" ${(ing.lesiones || []).includes(k) ? 'checked' : ''}>${l}</label>`).join('')}</div></details>
-        <details class="f fold" ${(ing.parq || []).length ? 'open' : ''}><summary>PAR-Q · marca solo las respuestas "sí"<span class="cnt">${(ing.parq || []).length ? (ing.parq || []).length + ' marcado' + ((ing.parq || []).length === 1 ? '' : 's') : ''}</span></summary><div style="display:grid;gap:6px">${PARQ.map((q, i) => `<label class="ck"><input type="checkbox" name="fa-parq" value="${i}" ${(ing.parq || []).includes(i) ? 'checked' : ''}>${q}</label>`).join('')}</div></details>
-        ${sug.length ? `<div><span class="small muted" style="font-weight:600">Programas sugeridos</span><div class="list small">${sug.map(([fam, why]) => `<div class="li"><span class="grow"><b>${esc(fam)}</b> <span class="muted">· ${esc(why)}</span></span><button type="button" class="btn sm" data-act="sug-prog" data-fam="${esc(fam)}">Usar</button></div>`).join('')}</div></div>` : '<div class="small muted">Marca lesiones o deportes y guarda: aquí aparecerán los programas de rehabilitación y prevención que le sirven.</div>'}
-      </div>
-    </details>`; })()}
-    <details class="sec"><summary>Datos del alumno <span class="small muted" style="font-weight:500">· ${esc(a.telefono || 'sin teléfono')} · ${a.estado === 'inactivo' ? 'Inactivo' : 'Activo'} · ${esc(a.clases || '—')} clases por ciclo</span></summary>
+    <details class="sec"><summary>📱 App y acceso <span class="small muted" style="font-weight:500">· ${a.vinculado ? esc(appEstado(a).l) : 'aún no usa la app'}</span></summary>
+    <div style="display:grid;gap:10px;margin-top:8px">
+      <div data-tl-acceso="${esc(code)}"></div>
+      <div data-tl-flex="${esc(code)}"></div>
+    ${a.vinculado ? `<div class="card pad" style="box-shadow:none;background:var(--sunk);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="grow small">📱 <b>Usa la app${a.email ? ' con ' + esc(a.email) : ''}.</b> ${(() => { const e = appEstado(a); return `<span class="${e.t}">${esc(e.l)}</span> · ${e.push ? '🔔 Avisos activos' : '🔕 Avisos apagados'} · ${e.reglas ? '✅ Leyó la información (' + esc(e.reglasF) + ')' : '⏳ No ha leído la información'}`; })()}<br>Si borró la app o cambió de teléfono, mándale un código nuevo con Reinvitar (vale 24 horas).</span><button type="button" class="btn sm" data-act="reinvitar" data-id="${esc(a.codigo)}">🔄 Reinvitar</button></div>` : ''}
+    ${!a.vinculado ? `<div class="card pad" style="box-shadow:none;background:var(--sunk);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="grow small">📲 <b>${esc(firstName(a.nombre))} aún no usa la app.</b> Mándale su link personal por WhatsApp: entra con el correo que quiera y queda vinculado a esta ficha.</span><button type="button" class="btn sm pri" data-act="invitar" data-id="${esc(a.codigo)}">Invitar a la app</button></div>` : ''}
+    </div></details>
+    <details class="sec"><summary>👤 Datos del alumno <span class="small muted" style="font-weight:500">· ${esc(a.telefono || 'sin teléfono')} · ${a.estado === 'inactivo' ? 'Inactivo' : 'Activo'} · ${esc(a.clases || '—')} clases por ciclo</span></summary>
     <div class="frow">
       <label class="f">Nombre<input type="text" id="fa-nombre" value="${esc(a.nombre)}" required></label>
       <label class="f">Código<input type="text" id="fa-codigo" value="${esc(a.codigo)}" ${isNew ? '' : 'readonly'}></label>
@@ -1815,6 +1803,7 @@ function fichaAlumno(code, tabIni) {
       <label class="f">Teléfono<input type="tel" id="fa-tel" value="${esc(a.telefono)}" placeholder="+56 9 …"></label>
       <label class="f">Correo (para entrar a la app)<input type="email" id="fa-email" value="${esc(a.email || '')}" placeholder="nombre@correo.cl"></label>
       <label class="f">Estado<select id="fa-estado">${[['activo','Activo'],['inactivo','Inactivo (conserva historial)']].map(([v,l]) => `<option value="${v}" ${a.estado === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="f">Fecha de nacimiento<input type="date" id="fa-nac" value="${esc(a.nacimiento || a.perfil?.nac || '')}"></label>
       <label class="f">Clases por ciclo<input type="number" id="fa-clases" min="1" value="${esc(a.clases || '')}"></label>
     </div>
     </details>
@@ -1857,8 +1846,8 @@ function fichaAlumno(code, tabIni) {
         fresh.programasHechos = [...(fresh.programasHechos || []), {familia: prevProg.familia, nivel: prevProg.nivel, inicio: prevProg.inicio, fin: today()}];
       fresh.nacimiento = val('fa-nac') || null;
       const chk = n => [...document.querySelectorAll(`input[name=${n}]:checked`)].map(x => x.value);
-      const ingN = {objetivo: val('fa-obj') || null, deportes: chk('fa-dep'), lesiones: chk('fa-les'), parq: chk('fa-parq').map(Number)};
-      if (ingN.objetivo || ingN.deportes.length || ingN.lesiones.length || ingN.parq.length || fresh.ingreso) fresh.ingreso = Object.assign({}, fresh.ingreso || {}, {fecha: fresh.ingreso?.fecha || today()}, ingN);
+      if (document.getElementById('fa-obj')) { const ingN = {objetivo: val('fa-obj') || null, deportes: chk('fa-dep'), lesiones: chk('fa-les'), parq: chk('fa-parq').map(Number)};
+        if (ingN.objetivo || ingN.deportes.length || ingN.lesiones.length || ingN.parq.length || fresh.ingreso) fresh.ingreso = Object.assign({}, fresh.ingreso || {}, {fecha: fresh.ingreso?.fecha || today()}, ingN); }
       saveAlumno(fresh); toast(isNew ? `${n} quedó registrado.` : 'Cambios guardados.');
       if (isNew) setTimeout(() => planModal(codigo, null, 'nuevo'), 50);
     }
@@ -2260,7 +2249,7 @@ function pfHero(a) {
       <div class="pf-nm">
         <div class="pf-eb">${esc(code)}${a.estado === 'inactivo' ? ' · INACTIVO' : ''}${a.perfil?.apodo ? ' · «' + esc(a.perfil.apodo) + '»' : ''}</div>
         <h3>${esc(a.nombre)}</h3>
-        <div class="pf-meta">${[edadN != null ? edadN + ' años' : '', ing.objetivo || a.perfil?.meta ? '🎯 ' + esc(ing.objetivo || a.perfil.meta) : '', a.programa?.familia ? '🏋️ ' + esc(a.programa.familia) + (progEstado(a) ? ' · sem ' + Math.min(progEstado(a).semana, progEstado(a).total) + '/' + progEstado(a).total : '') : '', bloquesTexto(a) !== '—' ? '🗓 ' + esc(bloquesTexto(a)) : (a.flex ? '📅 Agenda libre' : '')].filter(Boolean).join('<span class="dot">·</span>')}</div>
+        <div class="pf-meta">${[edadN != null ? edadN + ' años' : '', ing.objetivo || a.perfil?.meta ? '🎯 ' + esc(ing.objetivo || a.perfil.meta) : '', a.programa?.familia ? '🏋️ ' + esc(a.programa.familia) + (progEstado(a) ? ' · sem ' + Math.min(progEstado(a).semana, progEstado(a).total) + '/' + progEstado(a).total : '') : '', bloquesTexto(a) !== '—' ? '🗓 ' + esc(bloquesTexto(a)) : (a.flex ? '📅 Agenda libre' : ''), a.perfil?.ig ? `<a href="https://instagram.com/${esc(a.perfil.ig)}" target="_blank" rel="noopener" style="color:inherit">📸 @${esc(a.perfil.ig)}</a>` : ''].filter(Boolean).join('<span class="dot">·</span>')}</div>
       </div>
       <div class="pf-acc">
         ${tel ? `<a class="pf-b" href="https://wa.me/${tel}" data-act="wa-chat" data-tel="${esc(tel)}" title="WhatsApp">${ICON_WA}<span>WhatsApp</span></a>` : ''}
