@@ -1225,7 +1225,12 @@ const ejCorto = n => limpiarEj(n).split(/,|\s+—\s+/)[0].trim();
 const nSerieD = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? Math.min(6, Number(m[1])) : 1; };
 function restHTML(key) { const x = (S.rest || {})[key]; if (!x) return ''; const q = Math.ceil((x.fin - Date.now()) / 1000); if (q < -3) return '';
   return `<span class="sc-rest${q <= 0 ? ' go' : ''}">${q > 0 ? `⏱ Descanso <b class="num">${Math.floor(q / 60)}:${String(q % 60).padStart(2, '0')}</b>` : '💪 Le toca la siguiente serie'}${x.ej ? ` · ${esc(ejCorto(x.ej))}` : ''}</span>`; }
-function tmrHTML(key) { const x = (S.tmr || {})[key]; if (!x) return ''; const viejo = Date.now() - x.at > (x.fin ? 60000 : 8000); if (viejo) return '';
+// el reloj corre solo en el panel desde la hora de inicio que mandó el alumno: si su teléfono se bloquea o se corta un mensaje, el tiempo se sigue viendo
+const mmssP = s => Math.floor(Math.max(0, s) / 60) + ':' + String(Math.floor(Math.max(0, s)) % 60).padStart(2, '0');
+function tmrHTML(key) { let x = (S.tmr || {})[key]; if (!x) return ''; const corre = !x.fin && x.t0 && (x.modo === 'crono' || x.modo === 'amrap');
+  const e = corre ? (x.pz ? x.e : (Date.now() - x.t0) / 1000) : 0;
+  const viejo = corre ? (Date.now() - x.at > 45 * 60000 || (x.T && e > x.T + 60)) : Date.now() - x.at > (x.fin ? 60000 : 8000); if (viejo) return '';
+  if (corre) x = Object.assign({}, x, { big: x.modo === 'amrap' ? mmssP(Math.ceil(Math.max(0, x.T - e))) : mmssP(e) });
   if (x.fin) return `<span class="sc-tmr fin">✓ ${esc(x.n)} terminado · ${esc(x.big || '')}${x.res ? ' · ' + esc(x.res) : ''}</span>`;
   const fz = x.ronda ? String(x.fase || '').replace(/\s*·?\s*(ronda\s*)?\d+\s*(\/|de)\s*\d+\s*$/i, '').trim() : String(x.fase || '');
   const partes = ['⏱ ' + esc(x.n), x.ronda ? `<b class="num">Ronda ${esc(x.ronda)}</b>` : '', esc(fz), `<b class="num">${esc(x.big || '')}</b>`, x.sub ? esc(x.sub) : ''].filter(Boolean);
