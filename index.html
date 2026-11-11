@@ -480,6 +480,16 @@ input[type=time]{background:var(--surface);border:1px solid var(--line);border-r
 .pf-m b small{font-size:15px;color:var(--muted)}
 .pf-m .s{font-size:12px;font-weight:600}
 .pf-obj{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:12px}
+.pf-m.go{text-align:left;border:1px solid transparent;font:inherit;color:inherit;cursor:pointer;align-content:start}
+.pf-m.go:hover{border-color:var(--muted)}
+.pf-m.on{border-color:var(--red);box-shadow:inset 0 -3px 0 var(--red)}
+.pf-g{display:grid;gap:6px;padding:14px 16px;border:1px solid var(--line);border-radius:14px}
+.pf-g-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.pf-g-h h4{font-family:var(--display);font-size:20px;letter-spacing:.03em;text-transform:uppercase;margin:0}
+.pf-g-svg{width:100%;height:auto;max-height:260px;overflow:visible}
+.pf-g-svg .gv{font:700 15px var(--display);fill:var(--fg)}
+.pf-g-svg .gd{font:600 12px var(--body);fill:var(--muted)}
+.pf-g-svg .gt{font:700 12px var(--body)}.pf-g-svg .gt.ok{fill:var(--ok)}
 .pf-obj{display:grid;gap:10px;align-items:stretch}
 .pf-obj-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 .pf-obj-k{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -2430,8 +2440,8 @@ function pfCuerpo(a) {
   const card = ([k, l, u, bueno]) => { const xs = ser.filter(x => x[k] != null);
     if (!xs.length) return k === 'cintura' ? `<div class="pf-m"><span class="l">${l}</span><b class="num muted">—</b><span class="s muted">Se anota al subir el próximo InBody</span></div>` : '';
     const fi = xs[0], la = xs[xs.length - 1], d = la[k] - fi[k], col = Math.abs(d) < 0.05 ? 'muted' : (d * bueno > 0 ? 'up' : 'down');
-    return `<div class="pf-m"><span class="l">${l}</span><b class="num">${k === 'tmb' ? Math.round(la[k]) : n1(la[k])}<small> ${u}</small></b>
-      <span class="s ${col}">${xs.length > 1 ? (d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= ') + (k === 'tmb' ? Math.round(d) : n1(d)) + ' ' + u + ' desde ' + fmtD(fi.f) : 'Primera medición ' + fmtD(la.f)}</span>${spark(xs.map(x => x[k]), 150, 30)}</div>`; };
+    return `<button type="button" class="pf-m go${(S.ui.pfMet || 'peso') === k ? ' on' : ''}" data-act="pf-met" data-id="${esc(code)}" data-v="${k}" aria-pressed="${(S.ui.pfMet || 'peso') === k}"><span class="l">${l}</span><b class="num">${k === 'tmb' ? Math.round(la[k]) : n1(la[k])}<small> ${u}</small></b>
+      <span class="s ${col}">${xs.length > 1 ? (d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= ') + (k === 'tmb' ? Math.round(d) : n1(d)) + ' ' + u + ' desde ' + fmtD(fi.f) : 'Primera medición ' + fmtD(la.f)}</span></button>`; };
   const pesos = ser.filter(x => x.peso != null), p0 = pesos[0]?.peso, pN = pesos[pesos.length - 1]?.peso;
   const fP = pesos[0]?.f, fN = pesos[pesos.length - 1]?.f;
   const objHTML = `<div class="pf-obj">
@@ -2451,10 +2461,42 @@ function pfCuerpo(a) {
       : `<div class="small muted">${pesos.length ? 'Escribe el peso al que quiere llegar para ver cuánto le falta y en cuántas semanas.' : 'Registra su peso (InBody o medición) para seguir el objetivo.'}</div>`}
   </div>`;
   return `${ser.length ? `<div class="pf-ms">${MET.map(card).join('')}</div>` : '<div class="notice">Aún no hay mediciones. Sube su InBody o anota una medición abajo.</div>'}
+    ${ser.length ? pfGrafico(a, ser, MET) : ''}
     ${objHTML}
     ${pfComparador(a)}
     ${fotosHTML(a, { sinCmp: true })}
     ${inbodyHTML(a)}`;
+}
+// gráfico de evolución: una línea limpia por métrica (se elige tocando una tarjeta)
+function pfGrafico(a, ser, MET) {
+  const k = MET.some(m => m[0] === S.ui.pfMet) ? S.ui.pfMet : 'peso', [, l, u, bueno] = MET.find(m => m[0] === k);
+  const xs = ser.filter(x => x[k] != null), obj = k === 'peso' ? Number(a.ingreso?.pesoObj) || null : null;
+  const fmt = v => k === 'tmb' ? String(Math.round(v)) : n1(v);
+  if (!xs.length) return `<div class="pf-g"><div class="pf-g-h"><h4>📈 ${l}</h4></div><p class="small muted" style="margin:0">Sin datos de ${l.toLowerCase()} todavía. ${k === 'cintura' ? 'Se anota al subir el InBody.' : ''}</p></div>`;
+  const W = 640, H = 230, pl = 14, pr = 14, pt = 30, pb = 34;
+  const vals = xs.map(x => x[k]).concat(obj ? [obj] : []);
+  let mn = Math.min(...vals), mx = Math.max(...vals); const pad = Math.max((mx - mn) * 0.25, k === 'tmb' ? 20 : 1); mn -= pad; mx += pad;
+  const t0 = parseISO(xs[0].f).getTime(), t1 = parseISO(xs[xs.length - 1].f).getTime(), span = Math.max(1, t1 - t0);
+  const X = f => xs.length === 1 ? W / 2 : pl + 30 + (parseISO(f).getTime() - t0) / span * (W - pl - pr - 60);
+  const Y = v => pt + (1 - (v - mn) / (mx - mn)) * (H - pt - pb);
+  const pts = xs.map(x => [X(x.f), Y(x[k])]);
+  const linea = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const area = xs.length > 1 ? linea + ` L${pts[pts.length - 1][0].toFixed(1)} ${H - pb} L${pts[0][0].toFixed(1)} ${H - pb} Z` : '';
+  const d = xs.length > 1 ? xs[xs.length - 1][k] - xs[0][k] : null, col = d == null || Math.abs(d) < .05 ? 'muted' : d * bueno > 0 ? 'up' : 'down';
+  return `<div class="pf-g">
+    <div class="pf-g-h"><h4>📈 ${l}</h4><span class="small ${col}" style="font-weight:700">${d == null ? 'Primer InBody · con el segundo aparece la línea' : (d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= ') + fmt(d) + ' ' + u + ' en ' + diffDays(xs[0].f, xs[xs.length - 1].f) + ' días'}</span></div>
+    <svg viewBox="0 0 ${W} ${H}" class="pf-g-svg" role="img" aria-label="Evolución de ${l}: ${xs.map(x => fmtD(x.f) + ' ' + fmt(x[k]) + ' ' + u).join(', ')}">
+      <defs><linearGradient id="pfgA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--red)" stop-opacity=".28"/><stop offset="1" stop-color="var(--red)" stop-opacity="0"/></linearGradient></defs>
+      <line x1="${pl}" x2="${W - pr}" y1="${H - pb}" y2="${H - pb}" stroke="var(--line)"/>
+      ${obj ? `<line x1="${pl}" x2="${W - pr}" y1="${Y(obj).toFixed(1)}" y2="${Y(obj).toFixed(1)}" stroke="var(--ok)" stroke-dasharray="6 6" stroke-width="1.5"/><text x="${W - pr}" y="${(Y(obj) - 6).toFixed(1)}" text-anchor="end" class="gt ok">🎯 Objetivo ${fmt(obj)} ${u}</text>` : ''}
+      ${area ? `<path d="${area}" fill="url(#pfgA)"/>` : ''}
+      ${xs.length > 1 ? `<path d="${linea}" fill="none" stroke="var(--red)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>` : ''}
+      ${pts.map((p, i) => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${i === pts.length - 1 ? 6 : 4.5}" fill="${i === pts.length - 1 ? 'var(--red)' : 'var(--surface)'}" stroke="var(--red)" stroke-width="2.5"/>
+        <text x="${p[0].toFixed(1)}" y="${(p[1] - 12).toFixed(1)}" text-anchor="middle" class="gv">${fmt(xs[i][k])}</text>
+        <text x="${p[0].toFixed(1)}" y="${H - pb + 20}" text-anchor="middle" class="gd">${fmtD(xs[i].f)}</text>`).join('')}
+    </svg>
+    <div class="small muted">Toca otra tarjeta de arriba para ver su gráfico.</div>
+  </div>`;
 }
 function pfComparador(a) {
   const code = a.codigo, fs = (a.fotos || []).filter(x => ANG.some(([k]) => x[k]));
@@ -2807,6 +2849,7 @@ document.addEventListener('click', e => {
       window.__sb.from('mensajes').delete().eq('id', el.dataset.m).then(({error}) => { if (error) toast('No se pudo borrar: ' + error.message, true); else { toast('Mensaje borrado.'); pfCargarMensajes(code); } }); break; }
     case 'pf-fang': S.ui.fotoCmp = Object.assign({}, S.ui.fotoCmp?.code === id ? S.ui.fotoCmp : {code: id}, {ang: el.dataset.v}); refrescarCuerpo(id); break;
     case 'pf-share': pfCompartir(id, el); break;
+    case 'pf-met': S.ui.pfMet = el.dataset.v; refrescarCuerpo(id); break;
     case 'pf-cint': { const v = parseFloat(String(val('pf-cint')).replace(',', '.')); if (!(v >= 40 && v <= 200)) { toast('Escribe la cintura en cm (40–200).', true); break; }
       const a = clone(S.alumnos.get(id)); if (!a) break; const t0 = today(), ib = (a.inbody || []).slice().sort((x, y) => x.f.localeCompare(y.f)).pop();
       // si su último InBody es de esta semana y no tiene cintura, se suma ahí; si no, queda como medición de hoy
