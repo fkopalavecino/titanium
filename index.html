@@ -1121,7 +1121,7 @@ VIEWS.inicio = () => {
   </div>
   ${S.nuRes && S.nuRes.size ? (() => { const ls = [...S.nuRes].filter(([k]) => S.alumnos.has(k)).sort((x, y) => (y[1].revisar - x[1].revisar) || (x[1].dias - y[1].dias)); if (!ls.length) return '';
     return `<details class="sec" id="nu-card" ${nuAbierta() ? 'open' : ''} style="background:var(--surface);border:1px solid var(--line);border-left:4px solid ${nuRev.length ? 'var(--warn)' : 'var(--ok)'};margin-bottom:14px"><summary><span>🥗 Nutrición · últimos 7 días</span>${nuRev.length ? `<span class="small" style="color:var(--warn);font-weight:700">${nuRev.length} pauta${nuRev.length > 1 ? 's' : ''} por revisar</span>` : `<span class="small muted" style="font-weight:500">${ls.length} alumno${ls.length > 1 ? 's' : ''}</span>`}<span class="muted" style="margin-left:auto">▾</span></summary>
-      <div style="display:grid;gap:4px">${ls.slice(0, 10).map(([k, r]) => `<button type="button" data-act="nu-ir" data-id="${esc(k)}" style="display:flex;justify-content:space-between;align-items:center;gap:8px;border:0;border-top:1px solid var(--line);background:none;color:var(--fg);padding:8px 0;cursor:pointer;text-align:left;font:inherit"><span>${esc(firstName(S.alumnos.get(k).nombre))}${r.revisar ? ' <span class="pill" style="background:var(--warn-soft);color:var(--warn)">revisar pauta</span>' : ''}</span><span class="small"><b style="color:${r.dias >= 5 ? 'var(--ok)' : r.dias >= 3 ? 'var(--warn)' : 'var(--crit)'}">${r.dias}/7 días</b>${r.conMeta ? ` <span class="muted">· ${r.enMeta} en meta</span>` : ' <span class="muted">· sin metas</span>'} ›</span></button>`).join('')}</div></details>`; })() : ''}
+      <div style="display:grid;gap:4px">${ls.slice(0, 10).map(([k, r]) => `<button type="button" data-act="nu-ir" data-id="${esc(k)}" style="display:flex;justify-content:space-between;align-items:center;gap:8px;border:0;border-top:1px solid var(--line);background:none;color:var(--fg);padding:8px 0;cursor:pointer;text-align:left;font:inherit"><span>${esc(firstName(S.alumnos.get(k).nombre))}${r.revisar ? ' <span class="pill" style="background:var(--warn-soft);color:var(--warn)">revisar pauta</span>' : ''}</span><span class="small"><b style="color:${r.dias >= 5 ? 'var(--ok)' : r.dias >= 3 ? 'var(--warn)' : 'var(--crit)'}">${r.dias}/7 días</b>${r.conMeta ? ` <span class="muted">· ${r.enMeta} en meta</span>` : ' <span class="muted">· sin metas</span>'} ›</span></button>`).join('')}</div><button type="button" class="btn sm" data-rc="abrir" style="margin-top:8px">🍲 Recetario</button></details>`; })() : ''}
   <div class="grid2">
     <section class="card pad" style="display:grid;gap:10px;align-content:start">
       <div class="eyebrow">Una idea para tu día</div>
@@ -1795,6 +1795,77 @@ async function nuPanel(code) {
   lbl.textContent = '· ' + (m.revisar ? '⚠️ pauta por revisar · ' : '') + (m.kcal ? nuN(m.kcal) + ' kcal · ' : 'sin metas · ') + reg + '/7 días registrados';
   nuPintarPanel(code);
 }
+/* ---------- recetario (lo ven en la pestaña 🍲 Recetas de la app los alumnos con nutrición activa) ---------- */
+const RC_COM = [['desayuno', '🍳 Desayuno'], ['almuerzo', '🍽️ Almuerzo'], ['once', '☕ Once'], ['cena', '🌙 Cena'], ['snack', '🍎 Snack']];
+const RC = { list: [], ed: null, q: '' };
+const rcNorm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const rcBase = () => (window.TL_ALIMENTOS || []).map(a => ({ n: a[0], e: a[1] || '', pg: a[7] || 0 }));
+async function recetarioAbrir() {
+  openModal('🍲 Recetario', '<div id="rc-box"><div class="small muted">Cargando recetas…</div></div>', { wide: true, cancel: 'Cerrar' });
+  RC.ed = null; RC.q = '';
+  const { data, error } = await window.__sb.from('recetario').select('*').order('orden');
+  if (error) { const b = document.getElementById('rc-box'); if (b) b.innerHTML = '<div class="small muted">No se pudo cargar: ' + esc(error.message) + '</div>'; return; }
+  RC.list = data || []; rcPintar(); }
+function rcTot(items) { return NUC() ? NUC().suma(items || []) : { kcal: 0, prot: 0, carb: 0, gras: 0 }; }
+const rcMac = t => `${nuN(t.kcal)} kcal · P ${nuN(t.prot)} · C ${nuN(t.carb)} · G ${nuN(t.gras)}`;
+function rcPintar() { const b = document.getElementById('rc-box'); if (!b) return; const N = NUC();
+  if (!RC.ed) { const act = RC.list.filter(r => r.activo).length;
+    b.innerHTML = `<div style="display:grid;gap:10px">
+      <div class="small muted">Las recetas visibles aparecen en la pestaña <b>🍲 Recetas</b> de la app de cada alumno con nutrición activa. Los gramos son para 1 porción; el alumno puede ajustarla a su meta.</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${act} visible${act === 1 ? '' : 's'} de ${RC.list.length}</b><button type="button" class="btn pri" data-rc="nueva">+ Nueva receta</button></div>
+      <div style="display:grid;gap:6px">${RC.list.map((r, i) => `<div style="display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--surface);opacity:${r.activo ? 1 : .5}">
+        <span style="font-size:26px">${esc(r.emoji || '🍽️')}</span>
+        <button type="button" data-rc="edit" data-i="${i}" style="flex:1;min-width:0;border:0;background:none;color:var(--fg);text-align:left;cursor:pointer;padding:0;font:inherit"><b style="display:block">${esc(r.nombre)}</b><span class="small muted">${rcMac(rcTot(r.items))} · ${(r.comidas || []).map(k => (RC_COM.find(c => c[0] === k) || [, k])[1]).join(', ')}</span></button>
+        <button type="button" class="chip" data-rc="vis" data-i="${i}" aria-pressed="${r.activo}" title="Mostrar u ocultar en la app">${r.activo ? '👁 Visible' : 'Oculta'}</button>
+        <button type="button" class="btn sm" data-rc="edit" data-i="${i}">✏️</button></div>`).join('') || '<div class="small muted">Aún no hay recetas.</div>'}</div></div>`; return; }
+  const e = RC.ed, t = rcTot(e.items), q = rcNorm(RC.q).split(/\s+/).filter(Boolean);
+  const res = q.length ? rcBase().filter(a => { const h = rcNorm(a.n + ' ' + a.e); return q.every(w => h.includes(w)); }).slice(0, 12) : [];
+  b.innerHTML = `<div style="display:grid;gap:12px">
+    <button type="button" class="btn ghost sm" data-rc="volver" style="justify-self:start">‹ Volver a la lista</button>
+    <div style="display:grid;grid-template-columns:64px minmax(0,1fr) 90px;gap:8px">
+      <label class="f">Emoji<input type="text" class="rc-f" data-k="emoji" value="${esc(e.emoji)}" maxlength="4" style="text-align:center;font-size:20px"></label>
+      <label class="f">Nombre<input type="text" class="rc-f" data-k="nombre" value="${esc(e.nombre)}" maxlength="80" placeholder="Ej: Pollo con arroz"></label>
+      <label class="f">Minutos<input type="text" inputmode="numeric" class="rc-f" data-k="minutos" value="${e.minutos ?? ''}"></label></div>
+    <div><div class="small muted" style="margin-bottom:4px">Para qué comida</div><div class="chips" style="flex-wrap:wrap">${RC_COM.map(([k, l]) => `<button type="button" class="chip" data-rc="com" data-v="${k}" aria-pressed="${e.comidas.includes(k)}">${l}</button>`).join('')}</div></div>
+    <div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b>Ingredientes (1 porción)</b><span class="small" id="rc-tot"><b>${rcMac(t)}</b></span></div>
+      ${e.items.map((it, ii) => `<div style="display:grid;grid-template-columns:64px minmax(0,1fr) 34px;gap:6px;align-items:center"><input type="text" inputmode="numeric" class="rc-g" data-ii="${ii}" value="${it.g}" style="height:34px;padding:0 6px;text-align:right" aria-label="gramos"><span class="small">g · ${esc(N ? N.nombre(it.n, it.e) : it.n)}<span class="muted" style="display:block;font-size:12px">${esc(N ? N.medida(it.n, it.e, it.g) || '' : '')}</span></span><button type="button" data-rc="quitar" data-ii="${ii}" aria-label="Quitar" style="border:0;background:none;cursor:pointer;font-size:16px">✕</button></div>`).join('') || '<div class="small muted">Agrega ingredientes con el buscador.</div>'}
+      <input type="search" id="rc-q" value="${esc(RC.q)}" placeholder="🔎 Buscar alimento para agregar (ej: pollo, arroz, palta)" style="width:100%" autocomplete="off">
+      ${res.length ? `<div class="chips" style="flex-wrap:wrap">${res.map(a => `<button type="button" class="chip" data-rc="add" data-n="${esc(a.n)}" data-e="${esc(a.e)}" data-g="${a.pg || 100}">+ ${esc(N ? N.nombre(a.n, a.e) : a.n)}</button>`).join('')}</div>` : q.length ? '<div class="small muted">Sin resultados en la base de alimentos.</div>' : ''}</div>
+    <label class="f">Preparación (un paso por línea)<textarea class="rc-f" data-k="pasos" rows="4" placeholder="Cocina el pollo a la plancha…">${esc(e.pasos.join('\n'))}</textarea></label>
+    <label style="display:flex;gap:8px;align-items:center" class="small"><input type="checkbox" class="rc-f" data-k="activo" ${e.activo ? 'checked' : ''}> Visible para los alumnos</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn pri" data-rc="guardar" style="flex:2 1 160px">💾 Guardar receta</button>${e.id ? '<button type="button" class="btn ghost" data-rc="borrar" style="flex:1 1 100px;color:var(--crit)">🗑 Eliminar</button>' : ''}</div></div>`; }
+function rcLeer() { const e = RC.ed; if (!e) return; document.querySelectorAll('#rc-box .rc-f').forEach(i => { const k = i.dataset.k;
+  if (k === 'activo') e.activo = i.checked; else if (k === 'pasos') e.pasos = i.value.split('\n').map(s => s.trim()).filter(Boolean).slice(0, 15);
+  else if (k === 'minutos') { const v = parseInt(i.value, 10); e.minutos = v > 0 ? Math.min(600, v) : null; } else e[k] = i.value.trim(); }); }
+async function rcGuardar(el) { rcLeer(); const e = RC.ed;
+  if (!e.nombre) { toast('Ponle nombre a la receta', true); return; } if (!e.items.length) { toast('Agrega al menos un ingrediente', true); return; } if (!e.comidas.length) { toast('Elige para qué comida es', true); return; }
+  const id = e.id || (rcNorm(e.nombre).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) + '-' + Date.now().toString(36).slice(-4));
+  const row = { id, nombre: e.nombre.slice(0, 80), emoji: e.emoji || '🍽️', comidas: e.comidas, minutos: e.minutos, items: e.items, pasos: e.pasos, activo: e.activo, orden: e.orden ?? (Math.max(0, ...RC.list.map(r => r.orden || 0)) + 1), updated_at: new Date().toISOString() };
+  el.disabled = true; const { data, error } = await window.__sb.from('recetario').upsert(row).select().single(); el.disabled = false;
+  if (error) { toast('No se pudo guardar: ' + error.message, true); return; }
+  const i = RC.list.findIndex(r => r.id === id); if (i >= 0) RC.list[i] = data; else RC.list.push(data); RC.ed = null; RC.q = ''; rcPintar(); toast('Receta guardada ✓ Los alumnos la ven al abrir su app'); }
+document.addEventListener('click', async ev => { const el = ev.target.closest('[data-rc]'); if (!el) return; ev.preventDefault(); const a = el.dataset.rc;
+  if (a === 'abrir') { recetarioAbrir(); return; }
+  if (a === 'nueva') { RC.ed = { id: null, nombre: '', emoji: '🍽️', comidas: [], minutos: null, items: [], pasos: [], activo: true }; RC.q = ''; rcPintar(); return; }
+  if (a === 'edit') { const r = RC.list[+el.dataset.i]; RC.ed = JSON.parse(JSON.stringify({ id: r.id, nombre: r.nombre, emoji: r.emoji, comidas: r.comidas || [], minutos: r.minutos, items: r.items || [], pasos: r.pasos || [], activo: r.activo, orden: r.orden })); RC.q = ''; rcPintar(); return; }
+  if (a === 'volver') { RC.ed = null; rcPintar(); return; }
+  if (a === 'vis') { const r = RC.list[+el.dataset.i]; el.disabled = true; const { error } = await window.__sb.from('recetario').update({ activo: !r.activo, updated_at: new Date().toISOString() }).eq('id', r.id); el.disabled = false;
+    if (error) { toast('No se pudo guardar: ' + error.message, true); return; } r.activo = !r.activo; rcPintar(); toast(r.activo ? 'Visible en la app ✓' : 'Oculta para los alumnos'); return; }
+  rcLeer(); const e = RC.ed; if (!e) return;
+  if (a === 'com') { const k = el.dataset.v; e.comidas = e.comidas.includes(k) ? e.comidas.filter(x => x !== k) : [...e.comidas, k]; rcPintar(); return; }
+  if (a === 'quitar') { e.items.splice(+el.dataset.ii, 1); rcPintar(); return; }
+  if (a === 'add') { e.items.push({ n: el.dataset.n, e: el.dataset.e || '', g: Math.round(Number(el.dataset.g)) || 100 }); RC.q = ''; rcPintar(); return; }
+  if (a === 'guardar') { rcGuardar(el).catch(err => { el.disabled = false; toast('No se pudo guardar: ' + (err?.message || err), true); }); return; }
+  if (a === 'borrar') { if (!confirm(`¿Eliminar «${e.nombre}»? Si solo quieres que no la vean, mejor ocúltala.`)) return; el.disabled = true;
+    const { error } = await window.__sb.from('recetario').delete().eq('id', e.id); el.disabled = false; if (error) { toast('No se pudo eliminar: ' + error.message, true); return; }
+    RC.list = RC.list.filter(r => r.id !== e.id); RC.ed = null; rcPintar(); toast('Receta eliminada'); return; }
+});
+document.addEventListener('input', ev => { const t = ev.target;
+  if (t.id === 'rc-q') { rcLeer(); RC.q = t.value; const pos = t.selectionStart; rcPintar(); const n = document.getElementById('rc-q'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
+  if (t.classList?.contains('rc-g') && RC.ed) { const v = Math.round(Number(String(t.value).replace(',', '.'))); const it = RC.ed.items[+t.dataset.ii]; if (it && v > 0) { it.g = Math.min(2000, v); const tt = document.getElementById('rc-tot'); if (tt) tt.innerHTML = '<b>' + rcMac(rcTot(RC.ed.items)) + '</b>'; } } });
+// Enter dentro del recetario no debe cerrar el modal
+document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.closest?.('#rc-box') && ev.target.tagName !== 'TEXTAREA') ev.preventDefault(); }, true);
 // abre la ficha del alumno directo en la sección Nutrición
 function nuIr(code) { fichaAlumno(code, 'nutri'); }
 function nuPintarPanel(code) {
@@ -1857,7 +1928,7 @@ function nuPintarPanel(code) {
     ${pauta}
     ${registro}
     <input type="text" class="nu-nota" data-nu="${esc(code)}" maxlength="160" value="${esc(ed.nota)}" placeholder="📝 Nota para el alumno (opcional)" style="width:100%">
-    <button type="button" class="btn ghost sm" data-act="nu-off" data-id="${esc(code)}" style="justify-self:start;color:var(--muted)">Desactivar nutrición</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between"><button type="button" class="btn ghost sm" data-act="nu-off" data-id="${esc(code)}" style="color:var(--muted)">Desactivar nutrición</button><button type="button" class="btn sm" data-rc="abrir">🍲 Recetario</button></div>
     ${acciones}</div>`;
 }
 // las metas siguen al cálculo (objetivo, actividad, ajustes); la pauta se rehace solo cuando el profe toca «Nueva pauta»
