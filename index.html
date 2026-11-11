@@ -1745,7 +1745,7 @@ function nuPersona(code) { const a = S.alumnos.get(code) || {}; const d = NUC().
   return { nombre: String(a.nombre || '').replace(/\b\p{L}/gu, c => c.toUpperCase()), edad: nuEdad(a), estatura: a.perfil?.ficha?.estatura, peso: d.peso, pgc: d.pgc, mme: d.mme, coach: 'Franco Palavecino' }; }
 async function nuPanel(code) {
   const box = document.getElementById('fa-nu'); if (!box || box.dataset.alumno !== code || !window.__sb) return;
-  const lbl = document.getElementById('fa-nu-n'); if (!NUC()) { lbl.textContent = '· falta cargar el módulo'; return; }
+  const lbl = document.getElementById('fa-nu-n') || { textContent: '' }; if (!NUC()) { box.innerHTML = 'Falta cargar el módulo de nutrición: cierra y abre el panel.'; return; }
   const { data: n, error } = await window.__sb.from('nutricion').select('alumno,activo,meta,pauta,pauta_at,prefs').eq('alumno', code).maybeSingle();
   if (error) { lbl.textContent = '· no se pudo cargar'; return; }
   if (!n || !n.activo) { lbl.textContent = '· desactivada';
@@ -1757,7 +1757,6 @@ async function nuPanel(code) {
   ed.nota = ed.nota ?? (m.nota || ''); ed.excl = ed.excl || ((n.prefs || {}).excluir || []);
   if (!ed.pauta) ed.pauta = m.revisar && ed.metas ? NUC().generar(ed.metas, ed.o.nCom, ed.excl) : n.pauta ? JSON.parse(JSON.stringify(n.pauta)) : null;
   ed.enviada = n.pauta_at; ed.revisar = !!m.revisar; ed.fuente = m.fuente;
-  if (m.revisar) { const sec = document.getElementById('fa-nu-sec'); if (sec && !sec.open) sec.open = true; }
   // registro de los últimos 7 días
   const { data: lg } = await window.__sb.from('comidas_log').select('fecha,comida,nombre,gramos,estado,kcal,prot,carb,gras').eq('alumno', code).gte('fecha', addDays(today(), -6)).order('created_at');
   ed.log = lg || [];
@@ -1766,60 +1765,73 @@ async function nuPanel(code) {
   nuPintarPanel(code);
 }
 // abre la ficha del alumno directo en la sección Nutrición
-function nuIr(code) { fichaAlumno(code); let n = 0; const t = setInterval(() => { const s = document.getElementById('fa-nu-sec'); if (s || ++n > 20) { clearInterval(t); if (s) { s.open = true; s.scrollIntoView({ block: 'start', behavior: 'smooth' }); } } }, 100); }
+function nuIr(code) { fichaAlumno(code, 'nutri'); }
 function nuPintarPanel(code) {
   const box = document.getElementById('fa-nu'); if (!box) return; const ed = NU_ED[code]; const N = NUC(); const a = S.alumnos.get(code) || {}; const d = N.datos(a.inbody); const o = ed.o;
   const calc = d ? N.calcMetas(d, o) : null; const b = N.basal(d); const ob = N.OBJ[o.obj];
   const f1 = v => v == null ? '—' : String(Math.round(v * 10) / 10).replace('.', ',');
-  const ibTxt = d ? `Último InBody ${fmtD(d.f)}: <b>${f1(d.peso)} kg</b> · grasa ${f1(d.pgc)} % · masa libre de grasa ${f1(d.mlg)} kg${d.mme ? ' · músculo ' + f1(d.mme) + ' kg' : ''} · basal <b>${nuN(b?.v)} kcal</b> <span class="muted">(${b ? (b.src === 'InBody' ? 'del InBody' : 'Katch-McArdle') : 'falta % grasa o masa libre de grasa'})</span>` : 'Sin InBody con peso. Súbelo (foto o PDF) o escríbelo a mano en <b>InBody / bioimpedancia</b>.';
-  const metas = ed.metas; const P = ed.pauta;
-  const opTot = op => N.suma(op.items);
-  const pautaHTML = P ? P.comidas.map((c, ci) => `<div style="margin-top:12px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap"><b>${esc(c.l)}</b><span class="small muted">meta ≈ ${nuN(c.meta.kcal)} kcal · P ${nuN(c.meta.prot)} · C ${nuN(c.meta.carb)} · G ${nuN(c.meta.gras)}</span></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-top:6px">${c.ops.map((op, oi) => { const t = opTot(op); const dif = c.meta.kcal ? Math.round((t.kcal - c.meta.kcal) / c.meta.kcal * 100) : 0;
+  const metas = ed.metas; const P = ed.pauta; const opTot = op => N.suma(op.items);
+  const card = (inner, extra) => `<div style="border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 14px;display:grid;gap:10px;${extra || ''}">${inner}</div>`;
+  // 1 · resumen: metas grandes (editables) + objetivo
+  const box4 = [['kcal', 'kcal', 'var(--fg)'], ['prot', 'Proteína', 'var(--crit)'], ['carb', 'Carbos', 'var(--warn)'], ['gras', 'Grasas', 'var(--info)']].map(([k, l, c]) => `<label style="display:grid;gap:2px;text-align:center;background:var(--sunk);border-radius:10px;padding:8px 4px"><input type="text" inputmode="numeric" class="nu-m" data-k="${k}" data-nu="${esc(code)}" value="${esc(metas ? metas[k] : '')}" placeholder="—" style="border:0;background:none;text-align:center;font:800 24px/1.1 var(--display);color:${c};padding:0;width:100%;min-height:0;height:30px"><span class="small muted" style="font-size:12px">${l}${k === 'kcal' ? '' : ' (g)'}</span></label>`).join('');
+  const dsc = metas ? N.metasDescanso(metas) : null;
+  const resumen = card(`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b>Metas diarias</b><span class="small muted">${ob.ic} ${esc(ob.l)} · ${esc((N.ACT.find(x => x[0] === o.dias) || [])[2] || '')}${o.fisico ? ' · trabajo físico' : ''}</span></div>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px">${box4}</div>
+    ${dsc ? `<div class="small muted">😴 Día de descanso: ${nuN(dsc.kcal)} kcal · C ${nuN(dsc.carb)} g (el alumno lo elige en su app)</div>` : ''}
+    ${ed.cambio ? `<div class="small" style="color:var(--warn);font-weight:600">Las metas cambiaron: toca <b>↻ Nueva pauta</b> para rehacer las comidas.</div>` : ''}`);
+  // 2 · cálculo (plegado): InBody, evolución, objetivo, actividad y ajustes
+  const ev = N.evolucion(a.inbody, o.obj); const fs = v => v == null ? '—' : (v > 0 ? '+' : '') + String(Math.round(v * 10) / 10).replace('.', ',') + ' kg';
+  const calculo = `<details ${S.ui.nuCalc ? 'open' : ''} data-nucalc="1" style="border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 14px"><summary style="cursor:pointer;font-weight:700;display:flex;justify-content:space-between;gap:8px"><span>⚙️ Cálculo</span><span class="small muted" style="font-weight:500">${d ? 'InBody ' + fmtD(d.f) + ' · ' + f1(d.peso) + ' kg' : 'sin InBody'}</span></summary>
+    <div style="display:grid;gap:10px;margin-top:10px">
+      <div class="small">${d ? `Peso <b>${f1(d.peso)} kg</b> · grasa ${f1(d.pgc)} % · masa libre de grasa ${f1(d.mlg)} kg · basal <b>${nuN(b?.v)} kcal</b> <span class="muted">(${b ? (b.src === 'InBody' ? 'del InBody' : 'Katch-McArdle') : 'falta % grasa'})</span>` : 'Sube el InBody (foto, PDF o a mano) en la pestaña <b>Cuerpo</b>.'}</div>
+      ${ev ? `<div class="small" style="background:var(--sunk);border-radius:10px;padding:8px 10px">📈 Desde ${fmtD(ev.desde)}: peso ${fs(ev.peso)} · grasa ${fs(ev.grasa)} · músculo ${fs(ev.musc)}<br><b>${esc(ev.txt)}</b>${ev.dk && metas ? ` <button type="button" class="btn sm" data-act="nu-evo" data-id="${esc(code)}" data-v="${ev.dk}">Aplicar ${ev.dk > 0 ? '+' : ''}${ev.dk} kcal</button>` : ''}</div>` : ''}
+      <div><div class="small muted" style="margin-bottom:4px">Objetivo</div><div class="chips" style="flex-wrap:wrap">${Object.entries(N.OBJ).map(([k, x]) => `<button type="button" class="chip" data-act="nu-obj" data-id="${esc(code)}" data-v="${k}" aria-pressed="${o.obj === k}">${x.ic} ${esc(x.l)}</button>`).join('')}</div></div>
+      <div><div class="small muted" style="margin-bottom:4px">Actividad</div><div class="chips" style="flex-wrap:wrap">${N.ACT.map(([k, f, l]) => `<button type="button" class="chip" data-act="nu-dias" data-id="${esc(code)}" data-v="${k}" aria-pressed="${o.dias === k}">${esc(l)}</button>`).join('')}<button type="button" class="chip" data-act="nu-fisico" data-id="${esc(code)}" aria-pressed="${o.fisico}">🛠️ Trabajo físico</button></div></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">
+        <label class="f">Ajuste kcal (%)<input type="text" inputmode="numeric" class="nu-o" data-k="aj" data-nu="${esc(code)}" value="${esc(o.aj ?? ob.def)}" ${ob.aj[0] === ob.aj[1] ? 'disabled' : ''}><span class="small muted" style="font-weight:500">${ob.aj[0] === ob.aj[1] ? 'sin ajuste' : ob.aj[0] + ' a ' + ob.aj[1]}</span></label>
+        <label class="f">Proteína g/kg<input type="text" inputmode="decimal" class="nu-o" data-k="pkg" data-nu="${esc(code)}" value="${esc(String(calc ? calc.pkg : (o.pkg || '')).replace('.', ','))}"><span class="small muted" style="font-weight:500">${(o.aj ?? ob.def) < 0 ? '2,0 a 2,4' : '1,6 a 2,2'}</span></label>
+        <label class="f">Grasa g/kg<input type="text" inputmode="decimal" class="nu-o" data-k="gkg" data-nu="${esc(code)}" value="${esc(String(o.gkg || 0.9).replace('.', ','))}"><span class="small muted" style="font-weight:500">0,8 a 1</span></label>
+        <label class="f">Comidas<select class="nu-o" data-k="nCom" data-nu="${esc(code)}"><option value="4" ${o.nCom !== 5 ? 'selected' : ''}>4 al día</option><option value="5" ${o.nCom === 5 ? 'selected' : ''}>5 (+ colación)</option></select></label>
+      </div>
+      ${calc ? `<div class="small muted">Basal ${nuN(calc.basal)} × ${String(calc.factor).replace('.', ',')} = gasto ${nuN(calc.get)} kcal${calc.aj ? ' → ' + (calc.aj > 0 ? '+' : '') + calc.aj + ' %' : ''} → <b style="color:var(--fg)">${nuN(calc.kcal)} kcal</b>. Al cambiar algo aquí, las metas de arriba se actualizan solas.</div>` : ''}
+    </div></details>`;
+  // 3 · no come (plegado)
+  const nocome = `<details style="border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 14px"><summary style="cursor:pointer;font-weight:700;display:flex;justify-content:space-between;gap:8px"><span>🚫 No come</span><span class="small muted" style="font-weight:500">${ed.excl.length ? ed.excl.map(k => (N.EXCL[k] || [k])[0].split(' ')[0]).join(' ') : 'nada marcado'}</span></summary>
+    <div class="chips" style="flex-wrap:wrap;margin-top:10px">${Object.entries(N.EXCL).map(([k, [l]]) => `<button type="button" class="chip" data-act="nu-ex" data-id="${esc(code)}" data-v="${k}" aria-pressed="${ed.excl.includes(k)}">${esc(l)}</button>`).join('')}</div></details>`;
+  // 4 · pauta
+  const pauta = P ? P.comidas.map((c, ci) => `<div style="display:grid;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:6px"><b style="font:700 18px var(--display);letter-spacing:.04em;text-transform:uppercase">${esc(c.l)}</b><span class="small muted">≈ ${nuN(c.meta.kcal)} kcal · P ${nuN(c.meta.prot)} · C ${nuN(c.meta.carb)} · G ${nuN(c.meta.gras)}</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px">${c.ops.map((op, oi) => { const t = opTot(op); const dif = c.meta.kcal ? Math.round((t.kcal - c.meta.kcal) / c.meta.kcal * 100) : 0;
         const sw = ed.swap && ed.swap.ci === ci && ed.swap.oi === oi ? ed.swap : null; const alts = sw ? N.alternativas(op.items[sw.ii] || {}).filter(x => !N.excluido(x.n, ed.excl)) : [];
-        return `<div style="border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--surface);display:grid;gap:4px;align-content:start"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><span class="small" style="font-weight:700">Opción ${oi + 1}</span><button type="button" class="btn sm ghost" data-act="nu-var" data-id="${esc(code)}" data-k="${ci}|${oi}" title="Cambiar alimentos al azar manteniendo los macros">🎲 Variar</button></div>
-        ${op.items.map((it, ii) => `<div style="display:grid;grid-template-columns:62px minmax(0,1fr) 34px;gap:6px;align-items:center"><input type="text" inputmode="numeric" class="nu-g" data-nu="${esc(code)}|${ci}|${oi}|${ii}" value="${it.g}" style="height:32px;padding:0 6px;text-align:right" aria-label="gramos de ${esc(it.n)}"><span class="small" style="line-height:1.2">${esc(N.nombre(it.n, it.e))}<span class="muted" style="display:block;font-size:12px">${esc(N.medida(it.n, it.e, it.g))}</span></span><button type="button" class="btn sm ghost" data-act="nu-swap" data-id="${esc(code)}" data-k="${ci}|${oi}|${ii}" aria-label="Cambiar ${esc(it.n)}" aria-pressed="${!!(sw && sw.ii === ii)}" style="padding:0;min-width:32px;height:32px">🔄</button></div>`).join('')}
-        ${sw ? `<div style="border:1px dashed var(--line);border-radius:8px;padding:6px;display:grid;gap:6px"><div class="small" style="display:flex;justify-content:space-between;align-items:center"><b>Cambiar ${esc(N.nombre(op.items[sw.ii].n, op.items[sw.ii].e))} por… <span class="muted" style="font-weight:500">(${esc(N.CAT_L[N.rol(op.items[sw.ii])] || 'alimento')})</span></b><button type="button" class="btn sm ghost" data-act="nu-swapx" data-id="${esc(code)}">✕</button></div><div class="chips" style="flex-wrap:wrap">${alts.map((x, k) => `<button type="button" class="chip" data-act="nu-swapto" data-id="${esc(code)}" data-k="${k}">${esc(N.nombre(x.n, x.e))}</button>`).join('') || '<span class="small muted">Sin alternativas para este alimento</span>'}</div></div>` : ''}
-        <div class="small muted nu-tot" data-nut="${ci}|${oi}" style="border-top:1px dashed var(--line);padding-top:4px">${nuN(t.kcal)} kcal · P ${nuN(t.prot)} · C ${nuN(t.carb)} · G ${nuN(t.gras)}${Math.abs(dif) > 8 ? ` <b style="color:var(--warn)">${dif > 0 ? '+' : ''}${dif}%</b>` : ''}</div></div>`; }).join('')}</div></div>`).join('') : '';
+        return card(`<div style="display:flex;justify-content:space-between;align-items:center"><b class="small">Opción ${oi + 1}</b><button type="button" class="btn sm ghost" data-act="nu-var" data-id="${esc(code)}" data-k="${ci}|${oi}" title="Cambiar alimentos al azar manteniendo los macros">🎲 Variar</button></div>
+          <div style="display:grid;gap:4px">${op.items.map((it, ii) => `<div style="display:grid;grid-template-columns:58px minmax(0,1fr) 30px;gap:6px;align-items:center"><input type="text" inputmode="numeric" class="nu-g" data-nu="${esc(code)}|${ci}|${oi}|${ii}" value="${it.g}" style="height:32px;padding:0 6px;text-align:right" aria-label="gramos de ${esc(it.n)}"><span class="small" style="line-height:1.2">${esc(N.nombre(it.n, it.e))}<span class="muted" style="display:block;font-size:12px">${esc(N.medida(it.n, it.e, it.g))}</span></span><button type="button" data-act="nu-swap" data-id="${esc(code)}" data-k="${ci}|${oi}|${ii}" aria-label="Cambiar ${esc(it.n)}" title="Cambiar por otro alimento" style="border:0;background:none;font-size:16px;cursor:pointer;padding:0;opacity:${sw && sw.ii === ii ? 1 : .55}">🔄</button></div>`).join('')}</div>
+          ${sw ? `<div style="border:1px dashed var(--line);border-radius:8px;padding:8px;display:grid;gap:6px"><div class="small" style="display:flex;justify-content:space-between;align-items:center;gap:6px"><b>Cambiar ${esc(N.nombre(op.items[sw.ii].n, op.items[sw.ii].e))} por:</b><button type="button" class="btn sm ghost" data-act="nu-swapx" data-id="${esc(code)}">✕</button></div><div class="chips" style="flex-wrap:wrap">${alts.map((x, k) => `<button type="button" class="chip" data-act="nu-swapto" data-id="${esc(code)}" data-k="${k}">${esc(N.nombre(x.n, x.e))}</button>`).join('') || '<span class="small muted">Sin alternativas</span>'}</div></div>` : ''}
+          <div class="small muted nu-tot" data-nut="${ci}|${oi}" style="border-top:1px dashed var(--line);padding-top:6px">${nuN(t.kcal)} kcal · P ${nuN(t.prot)} · C ${nuN(t.carb)} · G ${nuN(t.gras)}${Math.abs(dif) > 8 ? ` <b style="color:var(--warn)">${dif > 0 ? '+' : ''}${dif}%</b>` : ''}</div>`, 'align-content:start;padding:10px'); }).join('')}</div></div>`).join('') : `<div class="small muted">Aún no hay pauta. Toca <b>📋 Crear pauta</b>.</div>`;
+  // 5 · registro (plegado)
   const reg = [...Array(7)].map((_, i) => addDays(today(), i - 6)); const tots = reg.map(f => nuSuma(ed.log.filter(r => r.fecha === f))); const conReg = tots.filter(t => t.kcal > 0);
-  const prom = k => conReg.length ? conReg.reduce((s, t) => s + t[k], 0) / conReg.length : 0; const hoy = ed.log.filter(r => r.fecha === today());
   const mm = metas || {}; const cel = (v, meta) => meta ? `<span class="${v > meta * 1.1 ? 'warn' : v >= meta * 0.9 ? 'ok' : ''}">${nuN(v)}</span>` : nuN(v);
-  const enMeta = mm.kcal ? conReg.filter(t => Math.abs(t.kcal - mm.kcal) <= mm.kcal * 0.1 && (!mm.prot || t.prot >= mm.prot * 0.9)).length : 0;
-  box.innerHTML = `
-    ${ed.revisar ? `<div class="notice" style="margin-bottom:10px">⚠️ <b>${esc(firstName(a.nombre))}</b> eligió <b>${esc(ob?.l || '')}</b> en su app. Revisa la pauta de abajo, ajusta lo que quieras y toca <b>Enviar al alumno</b>.</div>` : ''}
-    <div class="small" style="margin-bottom:10px">${ibTxt}</div>
-    ${(() => { const ev = N.evolucion(a.inbody, o.obj); if (!ev) return ''; const f1s = v => v == null ? '—' : (v > 0 ? '+' : '') + String(Math.round(v * 10) / 10).replace('.', ',') + ' kg';
-      return `<div class="notice" style="margin-bottom:10px;display:grid;gap:6px"><div><b>📈 Desde el InBody anterior</b> <span class="small muted">(${fmtD(ev.desde)} → ${fmtD(ev.hasta)}, ${ev.dias} días)</span></div><div class="small">Peso ${f1s(ev.peso)} · grasa ${f1s(ev.grasa)} · músculo ${f1s(ev.musc)}</div><div class="small"><b>${esc(ev.txt)}</b></div>${ev.dk && metas ? `<button type="button" class="btn sm" data-act="nu-evo" data-id="${esc(code)}" data-v="${ev.dk}" style="justify-self:start">Aplicar ${ev.dk > 0 ? '+' : ''}${ev.dk} kcal y rehacer pauta</button>` : ''}</div>`; })()}
-    <div style="font-weight:700;margin-bottom:6px">🚫 No come <span class="small muted" style="font-weight:500">· la pauta los evita${ed.excl.length ? '' : ' · el alumno también lo marca en su app'}</span></div>
-    <div class="chips" style="flex-wrap:wrap;margin-bottom:12px">${Object.entries(N.EXCL).map(([k, [l]]) => `<button type="button" class="chip" data-act="nu-ex" data-id="${esc(code)}" data-v="${k}" aria-pressed="${ed.excl.includes(k)}">${esc(l)}</button>`).join('')}</div>
-    <div style="font-weight:700;margin-bottom:6px">1 · Objetivo</div>
-    <div class="chips" style="flex-wrap:wrap">${Object.entries(N.OBJ).map(([k, x]) => `<button type="button" class="chip" data-act="nu-obj" data-id="${esc(code)}" data-v="${k}" aria-pressed="${o.obj === k}">${x.ic} ${esc(x.l)}</button>`).join('')}</div>
-    <div class="small muted" style="margin:4px 0 10px">${esc(ob.txt)}</div>
-    <div style="font-weight:700;margin-bottom:6px">2 · Actividad</div>
-    <div class="chips" style="flex-wrap:wrap">${N.ACT.map(([k, f, l]) => `<button type="button" class="chip" data-act="nu-dias" data-id="${esc(code)}" data-v="${k}" aria-pressed="${o.dias === k}">${esc(l)} <span class="muted">×${String(f).replace('.', ',')}</span></button>`).join('')}
-      <button type="button" class="chip" data-act="nu-fisico" data-id="${esc(code)}" aria-pressed="${o.fisico}">🛠️ Trabajo físico</button></div>
-    <div class="frow" style="margin-top:10px">
-      <label class="f">Ajuste calórico (%)<input type="text" inputmode="numeric" class="nu-o" data-k="aj" data-nu="${esc(code)}" value="${esc(o.aj ?? ob.def)}" ${ob.aj[0] === ob.aj[1] ? 'disabled' : ''}><span class="small muted" style="font-weight:500">${ob.aj[0] === ob.aj[1] ? 'sin ajuste' : 'entre ' + ob.aj[0] + ' y ' + ob.aj[1] + ' %'}</span></label>
-      <label class="f">Proteína (g/kg)<input type="text" inputmode="decimal" class="nu-o" data-k="pkg" data-nu="${esc(code)}" value="${esc(String(calc ? calc.pkg : (o.pkg || '')).replace('.', ','))}"><span class="small muted" style="font-weight:500">${(o.aj ?? ob.def) < 0 ? 'en déficit 2,0 a 2,4' : '1,6 a 2,2'}</span></label>
-      <label class="f">Grasa (g/kg)<input type="text" inputmode="decimal" class="nu-o" data-k="gkg" data-nu="${esc(code)}" value="${esc(String(o.gkg || 0.9).replace('.', ','))}"><span class="small muted" style="font-weight:500">0,8 a 1 · mínimo 20 % kcal</span></label>
-      <label class="f">Comidas al día<select class="nu-o" data-k="nCom" data-nu="${esc(code)}"><option value="4" ${o.nCom !== 5 ? 'selected' : ''}>4 (desayuno, almuerzo, once, cena)</option><option value="5" ${o.nCom === 5 ? 'selected' : ''}>5 (+ colación)</option></select></label>
-    </div>
-    ${calc ? `<div class="small" style="margin:8px 0">Basal ${nuN(calc.basal)} × ${String(calc.factor).replace('.', ',')} = gasto <b>${nuN(calc.get)} kcal</b> → ${calc.aj ? (calc.aj > 0 ? '+' : '') + calc.aj + ' % → ' : ''}<b>${nuN(calc.kcal)} kcal</b> · P ${nuN(calc.prot)} g · C ${nuN(calc.carb)} g · G ${nuN(calc.gras)} g</div>
-      <button type="button" class="btn" data-act="nu-usar" data-id="${esc(code)}">🧮 Usar este cálculo y generar la pauta</button>` : '<div class="small muted" style="margin:8px 0">Para calcular solo falta un InBody con peso y % de grasa (o masa libre de grasa / metabolismo basal).</div>'}
-    <div style="font-weight:700;margin:14px 0 6px">3 · Metas diarias</div>
-    <div class="frow">${[['kcal', 'Calorías'], ['prot', 'Proteína (g)'], ['carb', 'Carbohidratos (g)'], ['gras', 'Grasas (g)']].map(([k, l]) => `<label class="f">${l}<input type="text" inputmode="numeric" class="nu-m" data-k="${k}" data-nu="${esc(code)}" value="${esc(metas ? metas[k] : '')}"></label>`).join('')}</div>
-    ${metas ? (() => { const dsc = N.metasDescanso(metas); return `<div class="small muted" style="margin-top:6px">😴 Día de descanso (¾ de carbohidratos): <b style="color:var(--fg)">${nuN(dsc.kcal)} kcal</b> · C ${nuN(dsc.carb)} g. El alumno elige el tipo de día en su app.</div>`; })() : ''}
-    <label class="f" style="margin-top:6px">Nota para el alumno (opcional)<input type="text" class="nu-nota" data-nu="${esc(code)}" maxlength="160" value="${esc(ed.nota)}" placeholder="Ej: prioriza proteína en cada comida"></label>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="btn" data-act="nu-gen" data-id="${esc(code)}">${P ? '↻ Rehacer pauta con estas metas' : '📋 Generar pauta'}</button></div>
-    ${P ? `<div style="font-weight:700;margin:14px 0 0">4 · Pauta <span class="small muted" style="font-weight:500">· ajusta los gramos; los totales se recalculan · ${ed.enviada ? 'enviada ' + fmtD(String(ed.enviada).slice(0, 10)) : 'aún no enviada'}</span></div>${pautaHTML}` : ''}
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0">${P ? `<button type="button" class="btn pri" data-act="nu-enviar" data-id="${esc(code)}">📤 Enviar al alumno</button><button type="button" class="btn" data-act="nu-pdf" data-id="${esc(code)}">📄 Exportar PDF</button>` : `<button type="button" class="btn pri" data-act="nu-meta" data-id="${esc(code)}">Guardar metas</button>`}<button type="button" class="btn ghost" data-act="nu-off" data-id="${esc(code)}">Desactivar</button></div>
-    <div style="font-weight:700;margin-bottom:6px">Registro · últimos 7 días <span class="small muted" style="font-weight:500">· ${conReg.length}/7 registrados${mm.kcal ? ' · ' + enMeta + ' en meta (±10 % kcal y proteína)' : ''}</span></div>
-    <div class="tbl-wrap"><table class="small"><thead><tr><th>Día</th><th class="r">kcal</th><th class="r">Prot</th><th class="r">Carb</th><th class="r">Grasa</th></tr></thead><tbody>
+  const enMeta = mm.kcal ? conReg.filter(t => Math.abs(t.kcal - mm.kcal) <= mm.kcal * 0.1 && (!mm.prot || t.prot >= mm.prot * 0.9)).length : 0; const hoy = ed.log.filter(r => r.fecha === today());
+  const registro = `<details style="border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 14px"><summary style="cursor:pointer;font-weight:700;display:flex;justify-content:space-between;gap:8px"><span>📝 Lo que registró</span><span class="small muted" style="font-weight:500">${conReg.length}/7 días${mm.kcal ? ' · ' + enMeta + ' en meta' : ''}</span></summary>
+    <div class="tbl-wrap" style="margin-top:10px"><table class="small"><thead><tr><th>Día</th><th class="r">kcal</th><th class="r">Prot</th><th class="r">Carb</th><th class="r">Grasa</th></tr></thead><tbody>
       ${reg.map((f, i) => { const t = tots[i]; return `<tr><td>${esc(DSHORT[dayKey(f)] || '')} ${fmtD(f)}</td>${t.kcal ? `<td class="r num">${cel(t.kcal, mm.kcal)}</td><td class="r num">${cel(t.prot, mm.prot)}</td><td class="r num">${nuN(t.carb)}</td><td class="r num">${nuN(t.gras)}</td>` : '<td class="r muted" colspan="4">sin registro</td>'}</tr>`; }).join('')}
-      ${conReg.length ? `<tr><td><b>Promedio</b></td><td class="r num"><b>${nuN(prom('kcal'))}</b>${mm.kcal ? ` <span class="muted">/ ${nuN(mm.kcal)}</span>` : ''}</td><td class="r num"><b>${nuN(prom('prot'))}</b>${mm.prot ? ` <span class="muted">/ ${nuN(mm.prot)}</span>` : ''}</td><td class="r num">${nuN(prom('carb'))}</td><td class="r num">${nuN(prom('gras'))}</td></tr>` : ''}
     </tbody></table></div>
-    ${hoy.length ? `<details style="margin-top:10px"><summary class="small" style="cursor:pointer;font-weight:600">Lo que anotó hoy (${hoy.length})</summary>${NU_COMS.map(([k, l]) => { const rs = hoy.filter(r => r.comida === k); return rs.length ? `<div class="small" style="margin-top:6px"><b>${l}</b> <span class="muted">· ${nuN(nuSuma(rs).kcal)} kcal</span>${rs.map(r => `<div class="muted">${esc(r.nombre)}${r.estado ? ' (' + esc(r.estado) + ')' : ''} · ${nuN(r.gramos)} g · ${nuN(r.kcal)} kcal · P ${nuN(r.prot)}</div>`).join('')}</div>` : ''; }).join('')}</details>` : ''}`;
+    ${hoy.length ? `<div style="margin-top:8px">${NU_COMS.map(([k, l]) => { const rs = hoy.filter(r => r.comida === k); return rs.length ? `<div class="small" style="margin-top:6px"><b>Hoy · ${l}</b> <span class="muted">· ${nuN(nuSuma(rs).kcal)} kcal</span>${rs.map(r => `<div class="muted">${esc(r.nombre)} · ${nuN(r.gramos)} g · ${nuN(r.kcal)} kcal</div>`).join('')}</div>` : ''; }).join('')}</div>` : ''}</details>`;
+  // barra de acciones fija abajo
+  const acciones = `<div style="position:sticky;bottom:0;z-index:3;background:var(--bg);border-top:1px solid var(--line);padding:10px 0;display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+    ${P ? `<button type="button" class="btn pri" data-act="nu-enviar" data-id="${esc(code)}" style="flex:2 1 160px">📤 Enviar pauta al alumno</button><button type="button" class="btn" data-act="nu-pdf" data-id="${esc(code)}" style="flex:1 1 90px">📄 PDF</button><button type="button" class="btn" data-act="nu-gen" data-id="${esc(code)}" style="flex:1 1 120px">↻ Nueva pauta</button>`
+      : `<button type="button" class="btn pri" data-act="nu-gen" data-id="${esc(code)}" style="flex:2 1 160px">📋 Crear pauta</button><button type="button" class="btn" data-act="nu-meta" data-id="${esc(code)}" style="flex:1 1 120px">Guardar solo metas</button>`}</div>`;
+  box.innerHTML = `<div style="display:grid;gap:12px">
+    ${ed.revisar ? `<div class="notice">⚠️ ${esc(firstName(a.nombre))} eligió <b>${esc(ob?.l || '')}</b> en su app. Revisa la pauta y toca <b>📤 Enviar</b>.</div>` : ''}
+    ${resumen}${calculo}${nocome}
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:4px"><b style="font-size:17px">📋 Pauta</b><span class="small muted">${P ? (ed.enviada ? 'enviada ' + fmtD(String(ed.enviada).slice(0, 10)) : 'sin enviar') + ' · edita gramos, 🔄 o 🎲' : ''}</span></div>
+    ${pauta}
+    ${registro}
+    <input type="text" class="nu-nota" data-nu="${esc(code)}" maxlength="160" value="${esc(ed.nota)}" placeholder="📝 Nota para el alumno (opcional)" style="width:100%">
+    <button type="button" class="btn ghost sm" data-act="nu-off" data-id="${esc(code)}" style="justify-self:start;color:var(--muted)">Desactivar nutrición</button>
+    ${acciones}</div>`;
 }
+// las metas siguen al cálculo (objetivo, actividad, ajustes); la pauta se rehace solo cuando el profe toca «Nueva pauta»
+function nuRecalc(code) { const ed = NU_ED[code], N = NUC(); const d = N.datos((S.alumnos.get(code) || {}).inbody); const c = d && N.calcMetas(d, ed.o);
+  if (c) { ed.metas = { kcal: c.kcal, prot: c.prot, carb: c.carb, gras: c.gras }; ed.cambio = !!ed.pauta; } nuPintarPanel(code); }
 function nuLeerMetas(code) { const ed = NU_ED[code]; const v = {}; document.querySelectorAll(`#fa-nu .nu-m`).forEach(i => { v[i.dataset.k] = Math.round(Number(String(i.value).replace(',', '.')) || 0); });
   if (!v.kcal && (v.prot || v.carb || v.gras)) v.kcal = v.prot * 4 + v.carb * 4 + v.gras * 9; ed.metas = v.kcal ? v : null; const nt = document.querySelector('#fa-nu .nu-nota'); if (nt) ed.nota = nt.value.trim().slice(0, 160); return ed.metas; }
 async function nuGuardar(code, el, conPauta) { const ed = NU_ED[code]; const m = nuLeerMetas(code);
@@ -1838,12 +1850,12 @@ async function nuActivar(code, on, el) { const nom = firstName((S.alumnos.get(co
   el.disabled = true; const { error } = await window.__sb.from('nutricion').upsert({ alumno: code, activo: on, updated_at: new Date().toISOString() }, { onConflict: 'alumno' }); el.disabled = false;
   if (error) { toast('No se pudo guardar: ' + error.message, true); return; } toast(on ? 'Nutrición activada ✓ Que cierre y abra su app' : 'Nutrición desactivada'); S.nuRes = null; delete NU_ED[code]; nuPanel(code); }
 function nuAccion(act, code, el) { const ed = NU_ED[code]; if (!ed) { toast('Cierra y abre la ficha de nuevo', true); return; } const N = NUC();
-  if (act === 'nu-obj') { ed.o.obj = el.dataset.v; ed.o.aj = null; ed.o.pkg = null; nuPintarPanel(code); return; }
-  if (act === 'nu-dias') { ed.o.dias = el.dataset.v; nuPintarPanel(code); return; }
-  if (act === 'nu-fisico') { ed.o.fisico = !ed.o.fisico; nuPintarPanel(code); return; }
+  if (act === 'nu-obj') { ed.o.obj = el.dataset.v; ed.o.aj = null; ed.o.pkg = null; nuRecalc(code); return; }
+  if (act === 'nu-dias') { ed.o.dias = el.dataset.v; nuRecalc(code); return; }
+  if (act === 'nu-fisico') { ed.o.fisico = !ed.o.fisico; nuRecalc(code); return; }
   if (act === 'nu-usar') { const d = N.datos((S.alumnos.get(code) || {}).inbody); const c = d && N.calcMetas(d, ed.o); if (!c) return; nuLeerMetas(code);
     ed.metas = { kcal: c.kcal, prot: c.prot, carb: c.carb, gras: c.gras }; ed.pauta = N.generar(ed.metas, ed.o.nCom, ed.excl); nuPintarPanel(code); toast('Pauta generada: revísala y envíala'); return; }
-  if (act === 'nu-gen') { const m = nuLeerMetas(code); if (!m) { toast('Escribe las metas o usa el cálculo', true); return; } ed.pauta = N.generar(m, ed.o.nCom, ed.excl); nuPintarPanel(code); toast('Pauta generada'); return; }
+  if (act === 'nu-gen') { const m = nuLeerMetas(code); if (!m) { toast('Faltan las metas: sube el InBody o escríbelas', true); return; } if (ed.pauta && !confirm('¿Crear una pauta nueva? Se pierden los cambios hechos a mano en la actual.')) return; ed.pauta = N.generar(m, ed.o.nCom, ed.excl); ed.cambio = false; nuPintarPanel(code); toast('Pauta nueva lista: revísala y envíala'); return; }
   if (act === 'nu-ex') { const k = el.dataset.v; ed.excl = ed.excl.includes(k) ? ed.excl.filter(x => x !== k) : [...ed.excl, k];
     window.__sb.from('nutricion').update({ prefs: { excluir: ed.excl } }).eq('alumno', code).then(({ error }) => { if (error) toast('No se pudo guardar: ' + error.message, true); });
     if (ed.pauta && ed.excl.includes(k)) { let n = 0; ed.pauta.comidas.forEach(c => { c.ops = c.ops.map(op => { if (!op.items.some(it => N.excluido(it.n, ed.excl))) return op; n++; return N.limpiar({ items: op.items.map(x => Object.assign({}, x)) }, c.meta, c.k, ed.excl); }); }); if (n) toast(`Cambié ${n} ${n === 1 ? 'opción' : 'opciones'} de la pauta`); }
@@ -1859,10 +1871,13 @@ function nuAccion(act, code, el) { const ed = NU_ED[code]; if (!ed) { toast('Cie
   if (act === 'nu-pdf') { nuPdf(code); return; } }
 // cambios en los campos (opciones de cálculo y gramos de la pauta)
 document.addEventListener('change', e => { const t = e.target; if (!t.classList?.contains('nu-o')) return; const code = t.dataset.nu, ed = NU_ED[code]; if (!ed) return;
-  nuLeerMetas(code); const k = t.dataset.k, v = Number(String(t.value).replace(',', '.'));
+  const k = t.dataset.k, v = Number(String(t.value).replace(',', '.'));
   if (k === 'nCom') ed.o.nCom = v === 5 ? 5 : 4; else if (k === 'aj') { const r = NUC().OBJ[ed.o.obj].aj; ed.o.aj = isFinite(v) ? Math.min(r[1], Math.max(r[0], v)) : null; }
   else if (k === 'pkg') ed.o.pkg = isFinite(v) && v > 0 ? v : null; else if (k === 'gkg') ed.o.gkg = isFinite(v) && v > 0 ? Math.min(1, Math.max(0.8, v)) : 0.9;
-  nuPintarPanel(code); });
+  if (k === 'nCom') { ed.cambio = !!ed.pauta; nuPintarPanel(code); } else nuRecalc(code); });
+// metas editadas a mano: se marca que hay que rehacer la pauta
+document.addEventListener('change', e => { const t = e.target; if (!t.classList?.contains('nu-m')) return; const ed = NU_ED[t.dataset.nu]; if (!ed) return; nuLeerMetas(t.dataset.nu); ed.cambio = !!ed.pauta; nuPintarPanel(t.dataset.nu); });
+document.addEventListener('toggle', e => { if (e.target.dataset?.nucalc) S.ui.nuCalc = e.target.open; }, true);
 // Enter (o «Ir»/«Enviar» del teclado del iPhone) dentro de Nutrición no debe guardar ni cerrar la ficha
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.closest?.('#fa-nu')) { e.preventDefault(); e.stopPropagation(); e.target.blur(); } }, true);
 document.addEventListener('submit', e => { if (e.submitter && e.submitter.closest?.('#fa-nu')) { e.preventDefault(); e.stopPropagation(); } }, true);
@@ -1953,7 +1968,6 @@ function fichaAlumno(code, tabIni) {
     </div>
     </details>
     ${isNew ? '' : `<details class="sec" id="fa-hab-sec"><summary>⭐ Skills <span class="small muted" id="fa-hab-n" style="font-weight:500">· cargando…</span></summary><div class="small muted" style="margin:8px 0 6px">Toca para asignar o quitar. La pestaña Skills solo aparece en la app de quien tenga alguna asignada.</div><div class="chips" id="fa-hab" data-alumno="${esc(a.codigo)}"></div></details>`}
-    ${isNew ? '' : `<details class="sec" id="fa-nu-sec"><summary>🥗 Nutrición <span class="small muted" id="fa-nu-n" style="font-weight:500">· cargando…</span></summary><div id="fa-nu" data-alumno="${esc(a.codigo)}"></div></details>`}
     <details class="sec" ${isNew ? 'open' : ''}><summary>🗓 Horario fijo <span class="small muted" style="font-weight:500">· ${esc(bloquesTexto(a))}</span></summary>
       ${grid}
     </details>
@@ -1980,7 +1994,7 @@ function fichaAlumno(code, tabIni) {
     </details>
     <div id="del-zone"></div>
   `;
-  if (!isNew) setTimeout(() => { habPanel(a.codigo); nuPanel(a.codigo); }, 0);
+  if (!isNew) setTimeout(() => habPanel(a.codigo), 0);
   if (!isNew && window.__sb) setTimeout(async () => { try {
     const { data } = await window.__sb.from('actividades_hechas').select('fecha,minutos,rpe,nota,eventos(titulo,tipo)').eq('alumno', a.codigo).order('fecha', { ascending: false }).limit(20);
     const box = document.getElementById('fa-acts'); if (!box || !data || !data.length) return;
@@ -1993,7 +2007,7 @@ function fichaAlumno(code, tabIni) {
   openModal(isNew ? 'Nuevo alumno' : a.nombre, isNew ? fichaNueva() : `<div id="pf" data-id="${esc(a.codigo)}">
     ${pfHero(a)}
     <div class="pf-tabs" role="tablist" aria-label="Secciones del alumno">${PF_TABS.map(([k, ic, l]) => `<button type="button" role="tab" data-act="pf-tab" data-t="${k}" aria-selected="${k === tab0}"><span aria-hidden="true">${ic}</span> ${l}</button>`).join('')}</div>
-    ${['agenda', 'progreso', 'cuerpo'].map(k => `<section class="pf-p" data-p="${k}" ${k === tab0 ? '' : 'hidden'}></section>`).join('')}
+    ${['agenda', 'progreso', 'cuerpo', 'nutri'].map(k => `<section class="pf-p" data-p="${k}" ${k === tab0 ? '' : 'hidden'}></section>`).join('')}
     <section class="pf-p" data-p="ficha" ${tab0 === 'ficha' ? '' : 'hidden'}><div id="pf-pagos">${pfPagos(a)}</div><div class="pf-fi">${fichaExistente()}</div></section>
   </div>`, {
     wide: !isNew, cancel: isNew ? 'Cancelar' : 'Cerrar', submit: isNew ? 'Crear alumno' : 'Guardar ficha',
@@ -2373,7 +2387,7 @@ function progresoModal(code) {
    PERFIL DEL ALUMNO · vista del profe
    Encabezado resumen + 4 pestañas (Agenda · Progreso · Cuerpo · Ficha)
    ===================================================================== */
-const PF_TABS = [['agenda', '📅', 'Agenda'], ['progreso', '📈', 'Progreso'], ['cuerpo', '🧍', 'Cuerpo'], ['ficha', '🗂️', 'Ficha']];
+const PF_TABS = [['agenda', '📅', 'Agenda'], ['progreso', '📈', 'Progreso'], ['cuerpo', '🧍', 'Cuerpo'], ['nutri', '🥗', 'Nutri'], ['ficha', '🗂️', 'Ficha']];
 const PF_EV = { 'Clase': ['🏋️', 'Clase extra'], 'Evaluación': ['📋', 'Evaluación'], 'InBody': ['📊', 'InBody'], 'Reunión': ['👥', 'Reunión'], 'Actividad': ['🏃', 'Actividad'], 'Nutrición': ['🥗', 'Nutrición'], 'Documento': ['📄', 'Documento'], 'Evento': ['⭐', 'Evento'], 'Otro': ['📌', 'Otro'] };
 const PF_EV_ADD = ['Clase', 'Evaluación', 'InBody', 'Reunión', 'Actividad', 'Nutrición', 'Otro'];
 const DLETRA = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -2778,12 +2792,13 @@ function pfPanel(a, t) {
   if (t === 'agenda') return pfAgenda(a);
   if (t === 'progreso') return progresoHTML(a, { cuerpo: false });
   if (t === 'cuerpo') return pfCuerpo(a);
+  if (t === 'nutri') return `<div id="fa-nu" data-alumno="${esc(a.codigo)}"><div class="small muted">Cargando nutrición…</div></div>`;
   return '';
 }
 function pfPintar(code, t) { // vuelve a dibujar una pestaña (y el encabezado) sin tocar lo que estás escribiendo en la Ficha
   const box = pfOpen(code); if (!box) return; const a = S.alumnos.get(code); if (!a) return;
   const hero = box.querySelector('.pf-hero'); if (hero) { const tmp = document.createElement('div'); tmp.innerHTML = pfHero(a); hero.replaceWith(tmp.firstElementChild); pfRecup(code); }
-  const p = box.querySelector(`.pf-p[data-p="${t}"]`); if (p && t !== 'ficha') p.innerHTML = pfPanel(a, t);
+  const p = box.querySelector(`.pf-p[data-p="${t}"]`); if (p && t !== 'ficha' && t !== 'nutri') p.innerHTML = pfPanel(a, t);
   if (t === 'agenda' && !(S.ui.pfEv || {})[code + '|' + (S.ui.pfMes || today().slice(0, 7))]) pfCargarEventos(code, S.ui.pfMes || today().slice(0, 7)).then(() => { const q = pfOpen(code)?.querySelector('.pf-p[data-p="agenda"]'); if (q) q.innerHTML = pfAgenda(S.alumnos.get(code)); });
   if (t === 'ficha') { const pg = document.getElementById('pf-pagos'); if (pg) pg.innerHTML = pfPagos(a); }
 }
@@ -2809,6 +2824,9 @@ function pfTab(t) {
   const p = box.querySelector(`.pf-p[data-p="${t}"]`); const code = box.dataset.id;
   if (p && t !== 'ficha' && !p.dataset.ok) { p.dataset.ok = '1'; p.innerHTML = pfPanel(S.alumnos.get(code), t); if (t === 'agenda') { pfPintar(code, 'agenda'); pfCargarMensajes(code); } }
   if (t === 'ficha') { const pg = document.getElementById('pf-pagos'); if (pg) pg.innerHTML = pfPagos(S.alumnos.get(code)); }
+  if (t === 'nutri') nuPanel(code);
+  // en Nutri el botón principal es «Enviar pauta» (dentro de la pestaña): se esconde «Guardar ficha» para no confundir
+  const sbm = document.querySelector('#mform footer button[type=submit]'); if (sbm) sbm.hidden = t === 'nutri';
 }
 
 function msgModal(code, pid, tipo) {
