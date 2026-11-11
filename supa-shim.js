@@ -486,7 +486,7 @@
     const setMq = prog => { msjProg = prog; p.querySelectorAll('[data-mq]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.mq === 'prog') === prog)));
       $('tl-ms-cu').hidden = !prog; if (prog && !$('tl-ms-f').value) $('tl-ms-f').value = masDias(1); $('tl-ms-ok').textContent = prog ? '🗓️ Programar envío' : '📣 Enviar a todos'; };
     const listaMsj = async () => {
-      const { data } = await sb.from('mensajes').select('*').order('enviar_at', { ascending: false }).limit(30);
+      const { data } = await sb.from('mensajes').select('*').is('alumno', null).order('enviar_at', { ascending: false }).limit(30);
       const ms = data || [], prog = ms.filter(m => !m.enviado_at).reverse(), env = ms.filter(m => m.enviado_at).slice(0, 10);
       const it = (m, e) => `<div class="msj-it${e ? ' env' : ''}"><div class="tx"><b>${escA(m.titulo || 'Mensaje de tu profe')}</b><div class="mt">${e ? '✓ Enviado ' + escA(fHora(m.enviado_at)) : '🕒 Se envía ' + escA(fHora(m.enviar_at))}</div><p>${escA(m.cuerpo)}</p></div><button class="del" data-mdel="${m.id}" aria-label="${e ? 'Borrar mensaje' : 'Cancelar envío'}">✕</button></div>`;
       $('tl-ms-lst').innerHTML = (prog.length ? '<div class="day">Programados</div>' + prog.map(m => it(m, false)).join('') : '')
