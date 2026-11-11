@@ -448,6 +448,7 @@ i.mov,.pf-k.mov,.it.mov,i.quit,.pf-k.quit,.it.quit,i.pend,.pf-k.pend,.it.pend,i.
 /* día seleccionado */
 .pf-day{border:1px solid var(--line);border-left:4px solid var(--red);border-radius:12px;padding:12px 14px;display:grid;gap:10px;background:var(--surface)}
 .pf-day-h{display:flex;align-items:center;gap:8px}
+.pf-det{margin-top:2px;font-size:13px;color:var(--muted)}.pf-det summary{cursor:pointer;list-style:none}.pf-det summary::-webkit-details-marker{display:none}.pf-det[open] summary{display:none}.pf-det div{white-space:pre-line;line-height:1.45}
 .pf-k{flex:none;width:10px;height:10px;border-radius:3px;background:var(--c,var(--line))}
 .pf-add{display:grid;gap:10px;padding:12px;border-radius:10px;background:var(--sunk)}
 input[type=time]{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:15px;min-width:0}
@@ -2248,7 +2249,7 @@ function pfItemsDia(a, f, evs) {
     out.push({ c: 'cl', k, l, tt, h, r });
   });
   planes.forEach(p => { if (p.inicio === f) out.push({ c: 'pl', k: 'pl', l: '▶ Inicia plan', tt: `${p.clases || '—'} clases` }); if (p.fin === f) out.push({ c: 'pl', k: 'pl', l: '⟳ Renueva', tt: 'Fin del plan · ' + pagoEstado(p).l }); });
-  (evs || []).filter(e => e.fecha === f).forEach(e => { const ic = PF_EV[e.tipo]?.[0] || '📌'; out.push({ c: 'ev', k: 'ev', l: ic + ' ' + (e.titulo || e.tipo), tt: (e.hora ? e.hora.slice(0, 5) + ' · ' : '') + (e.alumno ? '' : 'Para todos · ') + (e.detalle || e.tipo), e }); });
+  (evs || []).filter(e => e.fecha === f).forEach(e => { const ic = PF_EV[e.tipo]?.[0] || '📌', tit = String(e.titulo || e.tipo).trim(); out.push({ c: 'ev', k: 'ev', l: (/^\p{Extended_Pictographic}/u.test(tit) ? '' : ic + ' ') + tit, tt: (e.hora ? e.hora.slice(0, 5) + ' · ' : '') + (e.alumno ? e.tipo : 'Para todos · ' + e.tipo), det: e.detalle || '', e }); });
   if (a.nacimiento && a.nacimiento.slice(5) === f.slice(5)) out.push({ c: 'cu', k: 'cu', l: '🎂 Cumpleaños', tt: '' });
   return out;
 }
@@ -2295,7 +2296,7 @@ function pfDia(a, f) {
   const hDef = fijo ? fijo.split('-')[1] : horasOpc[0];
   return `<div class="pf-day">
     <div class="pf-day-h"><h4>${esc(longDate(f))}</h4>${f === t ? '<span class="pill crit">Hoy</span>' : ''}</div>
-    ${its.length ? `<div class="list">${its.map(x => `<div class="li"><span class="pf-k ${x.k}"></span><span class="grow"><b>${esc(x.l)}</b>${x.tt ? `<span class="small muted"> · ${esc(x.tt)}</span>` : ''}${x.e?.link ? ` <a class="small" href="${esc(x.e.link)}" target="_blank" rel="noopener">abrir link ↗</a>` : ''}</span>
+    ${its.length ? `<div class="list">${its.map(x => `<div class="li"><span class="pf-k ${x.k}"></span><span class="grow"><b>${esc(x.l)}</b>${x.tt ? `<span class="small muted"> · ${esc(x.tt)}</span>` : ''}${x.det ? `<details class="pf-det"><summary>${esc(x.det.length > 90 ? x.det.slice(0, 90).trim() + '…' : x.det)}</summary>${x.det.length > 90 ? `<div>${esc(x.det)}</div>` : ''}</details>` : ''}${x.e?.link ? ` <a class="small" href="${esc(x.e.link)}" target="_blank" rel="noopener">abrir link ↗</a>` : ''}</span>
       ${x.c === 'cl' && x.h !== 'libre' && !x.r.quitado ? `<span class="acts"><button type="button" class="btn sm" data-act="pf-ir-clase" data-f="${f}" data-h="${esc(x.h)}">Abrir clase</button>${f >= t ? `<button type="button" class="btn sm ghost" data-act="reag" data-k="${esc(f + '|' + x.h + '|' + code)}">Reagendar</button>` : ''}</span>` : ''}
       ${x.c === 'ev' && x.e.alumno ? `<button type="button" class="btn sm ghost" data-act="pf-ev-del" data-id="${esc(code)}" data-ev="${esc(x.e.id)}" aria-label="Borrar evento" title="Borrar">✕</button>` : ''}</div>`).join('')}</div>` : '<p class="small muted" style="margin:0">Nada agendado este día.</p>'}
     ${f >= t ? `<div class="pf-add">
