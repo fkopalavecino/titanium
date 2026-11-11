@@ -158,6 +158,10 @@
       return ls.length ? ls[Math.floor(Math.random() * ls.length)] : null; };
     let o = { items: op.items.map(x => Object.assign({}, x, { r: rolDe(x) })) };
     ['p', 'c', 'g'].forEach(r => { if (r === 'g' && Math.random() < 0.5) return; const i = o.items.findIndex(x => x.r === r); if (i < 0) return; const nw = pick(r, o.items[i]); if (nw) o = cambiar(o, i, nw.n, nw.e, meta); });
+    // si la comida quedó sin proteína/carbo/grasa (algún alimento quedó en 0 g), se repone uno para volver a cuadrar los macros
+    let falta = false;
+    ['p', 'c', 'g'].forEach(r => { if (o.items.some(x => x.r === r)) return; const nw = pick(r, { n: '', e: '', r }); if (nw) { o.items.push({ n: nw.n, e: nw.e, g: 0, r }); falta = true; } });
+    if (falta) o = reajustar(o.items, meta);
     return limpiar(o, meta, comida, ex); }
   function generar(metas, nCom, ex) {
     const cs = COMIDAS[nCom === 5 ? 5 : 4];
