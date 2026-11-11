@@ -989,6 +989,9 @@ function route() {
 /* ---------- views ---------- */
 const VIEWS = {};
 
+// tarjeta de nutrición en Inicio: parte minimizada y recuerda si la abriste (en este equipo)
+const nuAbierta = () => { try { return localStorage.getItem('tl-nu-open') === '1'; } catch (_) { return false; } };
+document.addEventListener('toggle', e => { if (e.target.id === 'nu-card') try { localStorage.setItem('tl-nu-open', e.target.open ? '1' : '0'); } catch (_) {} }, true);
 VIEWS.inicio = () => {
   const c = cfg(), t = today();
   const al = activos();
@@ -1037,8 +1040,8 @@ VIEWS.inicio = () => {
   nuResumen(); const nuRev = S.nuRes ? [...S.nuRes].filter(([, x]) => x.revisar).map(([k]) => k).filter(k => S.alumnos.has(k)) : [];
   return `
   ${S.nuRes && S.nuRes.size ? (() => { const ls = [...S.nuRes].filter(([k]) => S.alumnos.has(k)).sort((x, y) => (y[1].revisar - x[1].revisar) || (x[1].dias - y[1].dias)); if (!ls.length) return '';
-    return `<section class="card pad" style="border-left:4px solid ${nuRev.length ? 'var(--warn)' : 'var(--ok)'};display:grid;gap:8px;margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap"><b>🥗 Nutrición · últimos 7 días</b>${nuRev.length ? `<span class="small" style="color:var(--warn);font-weight:700">${nuRev.length} pauta${nuRev.length > 1 ? 's' : ''} por revisar</span>` : ''}</div>
-      <div style="display:grid;gap:4px">${ls.slice(0, 10).map(([k, r]) => `<button type="button" data-act="nu-ir" data-id="${esc(k)}" style="display:flex;justify-content:space-between;align-items:center;gap:8px;border:0;border-top:1px solid var(--line);background:none;color:var(--fg);padding:8px 0;cursor:pointer;text-align:left;font:inherit"><span>${esc(firstName(S.alumnos.get(k).nombre))}${r.revisar ? ' <span class="pill" style="background:var(--warn-soft);color:var(--warn)">revisar pauta</span>' : ''}</span><span class="small"><b style="color:${r.dias >= 5 ? 'var(--ok)' : r.dias >= 3 ? 'var(--warn)' : 'var(--crit)'}">${r.dias}/7 días</b>${r.conMeta ? ` <span class="muted">· ${r.enMeta} en meta</span>` : ' <span class="muted">· sin metas</span>'} ›</span></button>`).join('')}</div></section>`; })() : ''}
+    return `<details class="sec" id="nu-card" ${nuAbierta() ? 'open' : ''} style="background:var(--surface);border:1px solid var(--line);border-left:4px solid ${nuRev.length ? 'var(--warn)' : 'var(--ok)'};margin-bottom:14px"><summary><span>🥗 Nutrición · últimos 7 días</span>${nuRev.length ? `<span class="small" style="color:var(--warn);font-weight:700">${nuRev.length} pauta${nuRev.length > 1 ? 's' : ''} por revisar</span>` : `<span class="small muted" style="font-weight:500">${ls.length} alumno${ls.length > 1 ? 's' : ''}</span>`}<span class="muted" style="margin-left:auto">▾</span></summary>
+      <div style="display:grid;gap:4px">${ls.slice(0, 10).map(([k, r]) => `<button type="button" data-act="nu-ir" data-id="${esc(k)}" style="display:flex;justify-content:space-between;align-items:center;gap:8px;border:0;border-top:1px solid var(--line);background:none;color:var(--fg);padding:8px 0;cursor:pointer;text-align:left;font:inherit"><span>${esc(firstName(S.alumnos.get(k).nombre))}${r.revisar ? ' <span class="pill" style="background:var(--warn-soft);color:var(--warn)">revisar pauta</span>' : ''}</span><span class="small"><b style="color:${r.dias >= 5 ? 'var(--ok)' : r.dias >= 3 ? 'var(--warn)' : 'var(--crit)'}">${r.dias}/7 días</b>${r.conMeta ? ` <span class="muted">· ${r.enMeta} en meta</span>` : ' <span class="muted">· sin metas</span>'} ›</span></button>`).join('')}</div></details>`; })() : ''}
   <section class="hero">
     <div class="grow">
       <div class="eyebrow">${esc(longDate(t))}</div>
