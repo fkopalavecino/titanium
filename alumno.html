@@ -497,18 +497,22 @@ const FKEY = () => DKEY() + '-foco';
 const getFoco = () => { try { return JSON.parse(localStorage.getItem(FKEY()) || 'null'); } catch (_) { return null; } };
 const putFoco = () => { if (S.foco == null) return; try { localStorage.setItem(FKEY(), JSON.stringify({ k: S.foco, cck: [...(S.cck || [])], vta: S.vta || {} })); } catch (_) {} };
 const clearFoco = () => { try { localStorage.removeItem(FKEY()); } catch (_) {} };
+// serie marcada con ✓ (se recuerda en el borrador para que un repintado no la desmarque)
+const okKey = i => (i.dataset.ap ? 'A|' : '') + i.dataset.n + '|' + i.dataset.i;
 const putDraft = d => { try { localStorage.setItem(DKEY(), JSON.stringify(d)); } catch (e) {} };
 const clearDraft = () => { try { localStorage.removeItem(DKEY()); Object.keys(localStorage).filter(k => k.startsWith('tl-draft-' + codigo + '-') && k !== DKEY() && k.slice(('tl-draft-' + codigo + '-').length, ('tl-draft-' + codigo + '-').length + 10) < addDays(today(), -30)).forEach(k => localStorage.removeItem(k)); } catch (e) {} };
 function applyDraft() { if (S.v !== 'rutina') return; const d = getDraft();
-  document.querySelectorAll('.set input').forEach(i => { const v = d[i.dataset.ap ? 'ap' : 'sets']?.[i.dataset.n]?.[i.dataset.i]?.[i.dataset.f]; if (v != null && v !== '') i.value = v; });
-  document.querySelectorAll('.set').forEach(box => box.classList.toggle('done', [...box.querySelectorAll('input')].some(i => i.value.trim() !== '')));
+  document.querySelectorAll('.set input').forEach(i => { const v = d[i.dataset.ap ? 'ap' : 'sets']?.[i.dataset.n]?.[i.dataset.i]?.[i.dataset.f]; const row = i.closest('.set');
+    if (v != null && v !== '' && v !== i.value) { i.value = v; if (!d.ok?.[okKey(i)]) row.classList.remove('done'); }
+    if (d.ok?.[okKey(i)] && row.querySelector('input') === i) row.classList.add('done'); });
+  document.querySelectorAll('.set').forEach(box => { if (![...box.querySelectorAll('input')].some(i => i.value.trim() !== '')) box.classList.remove('done'); });
   if (d.carga != null && $('#carga')) $('#carga').value = d.carga;
   document.querySelectorAll('.com-i').forEach(i => { const v = d.com?.[i.dataset.comn]; if (v != null) { i.value = v; if (v.trim()) { i.closest('.com-w').hidden = false; const b = document.querySelector(`[data-com="${CSS.escape(i.dataset.comn)}"]`); if (b) b.hidden = true; } } });
   if (d.rpe != null) { S.rpe = d.rpe; document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.rpe) === String(d.rpe))); } }
 document.addEventListener('focusout', ev => { const i = ev.target; if (!i.matches || !i.matches('.com-i') || i.value.trim()) return;
   const w = i.closest('.com-w'), b = document.querySelector(`[data-com="${CSS.escape(i.dataset.comn)}"]`); if (w && b) { w.hidden = true; b.hidden = false; } });
 document.addEventListener('input', ev => { const i = ev.target; const d = getDraft();
-  if (i.matches('.set input')) { const n = i.dataset.n; const g = i.dataset.ap ? (d.ap = d.ap || {}) : (d.sets = d.sets || {}); ((g[n] = g[n] || {})[i.dataset.i] = g[n][i.dataset.i] || {})[i.dataset.f] = i.value; i.closest('.set')?.classList.toggle('done', [...i.closest('.set').querySelectorAll('input')].some(x => x.value.trim() !== '')); putDraft(d); autoGuardar(2500); avisarTipeo(n); }
+  if (i.matches('.set input')) { const n = i.dataset.n; const g = i.dataset.ap ? (d.ap = d.ap || {}) : (d.sets = d.sets || {}); ((g[n] = g[n] || {})[i.dataset.i] = g[n][i.dataset.i] || {})[i.dataset.f] = i.value; i.closest('.set')?.classList.remove('done'); if (d.ok) delete d.ok[okKey(i)]; putDraft(d); autoGuardar(2500); avisarTipeo(n); }
   else if (i.matches('.com-i')) { (d.com = d.com || {})[i.dataset.comn] = i.value; putDraft(d); autoGuardar(2500); }
   else if (i.id === 'carga') { d.carga = i.value; putDraft(d); autoGuardar(2500); } });
 
@@ -1793,9 +1797,9 @@ document.addEventListener('click', async ev => {
     // desmarcar (si lo marcó por error): se vacía la serie, pero los números quedan de sugerencia para volver a marcar con un toque
     if (row.dataset.ok || row.classList.contains('done')) { delete row.dataset.ok; row.classList.remove('done');
       ins.forEach(i => { if (i.value.trim() !== '') { i.placeholder = i.value.trim(); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); } });
-      finDescanso(); autoGuardar(400); toast('Serie desmarcada'); return; }
+      const d0 = getDraft(); if (d0.ok && ins[0]) { delete d0.ok[okKey(ins[0])]; putDraft(d0); } finDescanso(); autoGuardar(400); toast('Serie desmarcada'); return; }
     ins.forEach(i => { if (i.value.trim() === '' && !/kg|reps|seg/.test(i.placeholder)) { i.value = i.placeholder; i.dispatchEvent(new Event('input', { bubbles: true })); } });
-    if (ins.some(i => i.value.trim() !== '')) { row.classList.add('done'); row.dataset.ok = '1'; iniciarDescanso(Number(chk.dataset.rest) || 90, row.querySelector('input')?.dataset.n || ''); autoGuardar(400); } else toast(row.querySelector('[data-f="t"]') ? 'Anota los segundos.' : 'Anota los kilos y las repeticiones.'); return; }
+    if (ins.some(i => i.value.trim() !== '')) { row.classList.add('done'); row.dataset.ok = '1'; { const d0 = getDraft(); (d0.ok = d0.ok || {})[okKey(ins[0])] = 1; putDraft(d0); } iniciarDescanso(Number(chk.dataset.rest) || 90, row.querySelector('input')?.dataset.n || ''); autoGuardar(400); } else toast(row.querySelector('[data-f="t"]') ? 'Anota los segundos.' : 'Anota los kilos y las repeticiones.'); return; }
   const dp = ev.target.closest('[data-dep]'); if (dp) { S.pfDeps = S.pfDeps || [...(S.perfil.deportes || [])]; const d = dp.dataset.dep; S.pfDeps = S.pfDeps.includes(d) ? S.pfDeps.filter(x => x !== d) : [...S.pfDeps, d]; dp.setAttribute('aria-pressed', S.pfDeps.includes(d)); return; }
   if (ev.target.id === 'pf-ok') { ev.target.disabled = true; const ig = $('#pf-ig').value.trim().replace(/^@+/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '');
     if (await guardarPerfil({ apodo: $('#pf-apodo').value.trim() || null, meta: $('#pf-meta').value.trim() || null, nac: $('#pf-nac').value || null, ig: ig || null, deportes: S.pfDeps || S.perfil.deportes || [] })) { S.pfDeps = null; toast('Perfil guardado ✓'); } else ev.target.disabled = false; return; }
