@@ -1879,7 +1879,8 @@ function nuMacG(it, g) { const f = (Number(g) || 0) / 100; return { kcal: nuR1(i
 async function cargarNutri() {
   try { const { data, error } = await sb.from('nutricion').select('*').eq('alumno', codigo).maybeSingle();
     if (!error) S.nu = data && data.activo ? data : null;
-    if (S.nu) { const { data: lg } = await sb.from('comidas_log').select('*').eq('alumno', codigo).gte('fecha', addDays(today(), -40)).order('created_at'); S.nuLog = lg || []; }
+    if (S.nu) { sb.from('recetario').select('*').eq('activo', true).order('orden').then(({ data: rc }) => { S.nuRecs = rc || []; if (S.v === 'nutri' && S.nuTab === 'rec') render(true); }, () => {});
+      const { data: lg } = await sb.from('comidas_log').select('*').eq('alumno', codigo).gte('fecha', addDays(today(), -40)).order('created_at'); S.nuLog = lg || []; }
   } catch (_) {}
   const b = document.querySelector('#tabs [data-v="nutri"]'); if (b) b.hidden = !S.nu; if (!S.nu && S.v === 'nutri') S.v = 'hoy'; tabsCols(); }
 function tabsCols() { const n = [...document.querySelectorAll('#tabs button')].filter(b => !b.hidden).length; const t = $('#tabs'); t.style.gridTemplateColumns = 'repeat(' + n + ',1fr)'; t.classList.toggle('n7', n >= 7); }
@@ -1979,14 +1980,51 @@ function nuPautaHTML() { const N = NUT(), P = S.nu.pauta, m0 = S.nu.meta || {};
           <div class="small muted" style="font-size:12px">${nuNf.format(tt.kcal)} kcal · P ${nuNf.format(tt.prot)} · C ${nuNf.format(tt.carb)} · G ${nuNf.format(tt.gras)}</div></div>`; }).join('')}</section>`; }).join('');
   return `${m0.revisar ? '<div class="note small">⏳ Tu profe está revisando tu nuevo objetivo; esta es tu pauta actual.</div>' : ''}${prog}
     <div class="small muted" style="padding:0 4px">Elige 1 opción por comida: todas aportan lo mismo. 🎲 cambia los alimentos manteniendo tus macros.</div>${meals}${nuNoComoHTML(false)}`; }
+/* ---------- recetario del profe: recetas con macros, porción a la medida y anotar con un toque ---------- */
+const NU_REP = { desayuno: .25, almuerzo: .35, once: .15, cena: .25, snack: .1 };
+function nuRecMeta(com) { const P = S.nu?.pauta; const c = P && (P.comidas || []).find(x => NU_COMLOG(x.k) === com);
+  const desc = nuTipoDia(today()) === 'descanso'; if (c && c.meta && c.meta.kcal) return desc ? NUT().metasDescanso(c.meta) : c.meta;
+  const m = nuMetaDia(today()); return m.kcal ? { kcal: m.kcal * (NU_REP[com] || .2) } : null; }
+function nuRecEsc(r, f) { return (r.items || []).map(it => ({ n: it.n, e: it.e || '', g: Math.max(1, Math.round(it.g * f)) })); }
+function nuRecFactor(r, com) { const sel = (S.nuRecPor || {})[r.id]; if (sel && sel !== 'medida') return Number(sel);
+  const mt = nuRecMeta(com), k = NUT().suma(r.items || []).kcal; if (sel === 'medida' && mt && k) return Math.min(2.5, Math.max(.5, Math.round(mt.kcal / k * 20) / 20)); return 1; }
+function nuRecCom(r) { const ok = r.comidas || []; return (S.nuRecCom || {})[r.id] || (ok.includes(nuComidaAhora()) ? nuComidaAhora() : ok[0] || nuComidaAhora()); }
+function nuRecetarioHTML() { const N = NUT(), rs = S.nuRecs || [], fil = S.nuRecFil || '', ex = nuExcl();
+  if (!rs.length) return `<section class="card"><h2>🍲 Recetario</h2><div class="small muted">Tu profe aún no carga recetas.</div></section>`;
+  const vis = rs.filter(r => !fil || (r.comidas || []).includes(fil));
+  const chips = `<div class="chips" style="flex-wrap:wrap"><button class="chip" data-nurecfil="" aria-pressed="${!fil}">Todas</button>${NU_COM.map(([k, l, ic]) => `<button class="chip" data-nurecfil="${k}" aria-pressed="${fil === k}">${ic} ${l}</button>`).join('')}</div>`;
+  const cards = vis.map(r => { const ab = S.nuRecAb === r.id, com = nuRecCom(r), f = ab ? nuRecFactor(r, com) : 1, its = nuRecEsc(r, f), t = N.suma(its); const malo = (r.items || []).some(it => N.excluido(it.n, ex));
+    const head = `<button data-nurecab="${esc(r.id)}" style="display:flex;gap:12px;align-items:center;border:0;background:none;color:var(--fg);padding:0;text-align:left;cursor:pointer;width:100%"><span style="font-size:30px;line-height:1">${esc(r.emoji || '🍽️')}</span><span style="min-width:0;flex:1"><b style="display:block;font-size:16px">${esc(r.nombre)}</b><span class="small muted">${nuNf.format(t.kcal)} kcal · P ${nuNf.format(t.prot)} · C ${nuNf.format(t.carb)} · G ${nuNf.format(t.gras)}${r.minutos ? ' · ⏱ ' + r.minutos + ' min' : ''}</span>${malo ? '<span class="small warn" style="display:block">⚠️ Tiene algo que no comes</span>' : ''}</span><span class="muted" style="font-size:20px">${ab ? '▴' : '▾'}</span></button>`;
+    if (!ab) return `<section class="card" style="gap:6px">${head}</section>`;
+    const sel = (S.nuRecPor || {})[r.id] || '1', mt = nuRecMeta(com);
+    const por = `<div class="seg" role="tablist" style="margin:0">${[['0.5', '½'], ['1', '1'], ['1.5', '1½'], ['2', '2']].map(([v, l]) => `<button role="tab" data-nurecpor="${esc(r.id)}|${v}" aria-selected="${sel === v}">${l}</button>`).join('')}${mt ? `<button role="tab" data-nurecpor="${esc(r.id)}|medida" aria-selected="${sel === 'medida'}">🎯 Mi medida</button>` : ''}</div>`;
+    const coms = (r.comidas || []).length > 1 ? `<div class="chips" style="flex-wrap:wrap">${r.comidas.map(k => { const x = NU_COM.find(c => c[0] === k); return x ? `<button class="chip" data-nureccom="${esc(r.id)}|${k}" aria-pressed="${com === k}">${x[2]} ${x[1]}</button>` : ''; }).join('')}</div>` : '';
+    const lbl = (NU_COM.find(c => c[0] === com) || [, 'comida'])[1];
+    return `<section class="card" style="gap:10px;border-color:var(--red)">${head}
+      <div class="small muted">Porciones</div>${por}${sel === 'medida' ? `<div class="small muted">Ajustada a tu ${esc(lbl.toLowerCase())} (≈ ${nuNf.format(mt.kcal)} kcal) · ×${nuNf1.format(f)}</div>` : ''}
+      <div style="display:grid;gap:3px">${its.map(it => `<div class="small"><b>${nuNf.format(it.g)} g</b> ${esc(N.nombre(it.n, it.e))} <span class="muted">${esc(N.medida(it.n, it.e, it.g) || '')}</span></div>`).join('')}</div>
+      ${(r.pasos || []).length ? `<ol class="small" style="margin:0;padding-left:20px;display:grid;gap:4px">${r.pasos.map(p => `<li>${esc(p)}</li>`).join('')}</ol>` : ''}
+      ${coms}<button class="btn pri" data-nurecan="${esc(r.id)}">+ Anotar en ${esc(lbl)} de hoy</button></section>`; }).join('');
+  return `<div class="small muted" style="padding:0 4px">Recetas de tu profe. Elige la porción (o 🎯 a tu medida) y anótala con un toque.</div>${chips}${cards || '<div class="small muted" style="padding:4px">No hay recetas para esta comida.</div>'}`; }
+document.addEventListener('click', async ev => { const t = ev.target;
+  const fl = t.closest('[data-nurecfil]'); if (fl) { S.nuRecFil = fl.dataset.nurecfil; render(true); return; }
+  const ab = t.closest('[data-nurecab]'); if (ab) { S.nuRecAb = S.nuRecAb === ab.dataset.nurecab ? null : ab.dataset.nurecab; render(true); return; }
+  const po = t.closest('[data-nurecpor]'); if (po) { const [id, v] = po.dataset.nurecpor.split('|'); S.nuRecPor = Object.assign({}, S.nuRecPor, { [id]: v }); render(true); return; }
+  const cm = t.closest('[data-nureccom]'); if (cm) { const [id, k] = cm.dataset.nureccom.split('|'); S.nuRecCom = Object.assign({}, S.nuRecCom, { [id]: k }); render(true); return; }
+  const an = t.closest('[data-nurecan]'); if (an) { const r = (S.nuRecs || []).find(x => x.id === an.dataset.nurecan); if (!r) return; const com = nuRecCom(r), f = nuRecFactor(r, com), its = nuRecEsc(r, f), m = NUT().suma(its);
+    const g = its.reduce((s, x) => s + x.g, 0); an.disabled = true;
+    const fila = { alumno: codigo, fecha: today(), comida: com, nombre: r.nombre.slice(0, 120), gramos: Math.min(5000, g), estado: null, kcal: nuR1(m.kcal), prot: nuR1(m.prot), carb: nuR1(m.carb), gras: nuR1(m.gras), ref: ('k:' + r.id).slice(0, 80) };
+    const { data, error } = await sb.from('comidas_log').insert(fila).select(); if (error) { an.disabled = false; toast('No se pudo anotar: ' + error.message); return; }
+    S.nuLog.push(...(data || [])); render(true); toast(`${r.nombre} anotada en ${(NU_COM.find(c => c[0] === com) || [, ''])[1]} ✓`); return; }
+});
 V.nutri = () => {
   if (!S.nu) return nuRegistroHTML();
-  const pide = nuPideObjetivo(); const tieneP = !!S.nu.pauta; const tab = tieneP ? (S.nuTab || 'pauta') : 'reg';
+  const pide = nuPideObjetivo(); const tieneP = !!S.nu.pauta; let tab = S.nuTab || (tieneP ? 'pauta' : 'reg'); if (tab === 'pauta' && !tieneP) tab = 'reg';
   const noIB = !nuDatosIB() && !(S.nu.meta || {}).kcal ? `<section class="card"><h2>🎯 Tu objetivo</h2><div class="small muted">Cuando tu profe suba tu InBody vas a poder elegir tu objetivo y la app calculará tus calorías y macros. Mientras, ya puedes registrar lo que comes.</div></section>` : '';
-  const seg = tieneP ? `<div class="seg" role="tablist"><button role="tab" data-nutab2="pauta" aria-selected="${tab === 'pauta'}">📋 Mi pauta</button><button role="tab" data-nutab2="reg" aria-selected="${tab === 'reg'}">📝 Registro</button></div>` : '';
+  const seg = `<div class="seg" role="tablist">${tieneP ? `<button role="tab" data-nutab2="pauta" aria-selected="${tab === 'pauta'}">📋 Pauta</button>` : ''}<button role="tab" data-nutab2="reg" aria-selected="${tab === 'reg'}">📝 Registro</button><button role="tab" data-nutab2="rec" aria-selected="${tab === 'rec'}">🍲 Recetas</button></div>`;
   if (pide && !(S.nu.meta || {}).kcal) return nuObjetivoHTML() + nuNoComoHTML(nuExcl().length > 0); // primera vez: objetivo (y lo que no come)
   const espera = !tieneP && (S.nu.meta || {}).revisar ? `<section class="card" style="border-color:var(--warn)"><h2>📋 Mi pauta</h2><div class="small muted">Tu profe está revisando tu objetivo (<b style="color:var(--fg)">${esc(NUT().OBJ[S.nu.meta.obj]?.l || '')}</b>). Cuando la envíe, aquí verás cada comida con 3 opciones y sus gramos. Mientras, ya tienes tu meta diaria abajo.</div></section>${nuNoComoHTML(false)}` : '';
-  return (pide ? nuObjetivoHTML() : noIB) + espera + seg + (tab === 'pauta' ? nuPautaHTML() : nuRegistroHTML());
+  return (pide ? nuObjetivoHTML() : noIB) + espera + seg + (tab === 'pauta' ? nuPautaHTML() : tab === 'rec' ? nuRecetarioHTML() : nuRegistroHTML());
 };
 document.addEventListener('click', async ev => { const t = ev.target;
   const tp = t.closest('[data-nutipo]'); if (tp) { nuSetTipoDia(S.nuDia || today(), tp.dataset.nutipo); render(true); return; }
