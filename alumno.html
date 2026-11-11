@@ -217,7 +217,7 @@ details.ses summary::-webkit-details-marker{display:none}
 <script src="inbody-ocr.js?v=20261111"></script>
 <script src="sonidos.js?v=2"></script>
 <script src="alimentos.js?v=20261111"></script>
-<script src="nutri-calc.js?v=20261111"></script>
+<script src="nutri-calc.js?v=20261111b"></script>
 <script>
 (async () => {
 const sb = window.__sb;
@@ -1940,7 +1940,7 @@ function nuPautaHTML() { const N = NUT(), P = S.nu.pauta, m = S.nu.meta || {};
     <div class="small muted">Elige 1 opción en cada comida: todas aportan lo mismo. Toca <b>Comí esta</b> y se anota sola en tu registro.</div>
     <button class="btn" data-nupdf="1">📄 Descargar PDF</button></section>
     ${P.comidas.map((c, ci) => `<section class="card" style="gap:8px"><div class="row"><h2 style="font-size:20px">${esc(c.l)}</h2><span class="small muted">≈ ${nuNf.format(c.meta.kcal)} kcal</span></div>
-      ${c.ops.map((op, oi) => { const t = N.suma(op.items); return `<div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--sunk);display:grid;gap:4px"><div class="row" style="align-items:center"><b>Opción ${oi + 1}</b><button class="btn" data-nucomi="${ci}|${oi}" style="width:auto;min-height:34px;padding:0 12px;font-size:14px">✓ Comí esta</button></div>
+      ${c.ops.map((op, oi) => { const t = N.suma(op.items); const hecha = (S.nuLog || []).some(r => r.fecha === today() && r.pauta_op === ci + '.' + oi); return `<div style="border:1px solid ${hecha ? 'var(--ok)' : 'var(--line)'};border-radius:12px;padding:10px 12px;background:var(--sunk);display:grid;gap:4px"><div class="row" style="align-items:center"><b>Opción ${oi + 1}${hecha ? ' <span class="ok small">✓ anotada hoy</span>' : ''}</b>${hecha ? `<button class="btn" data-nudeshacer="${ci}|${oi}" style="width:auto;min-height:34px;padding:0 12px;font-size:14px">↺ Deshacer</button>` : `<button class="btn" data-nucomi="${ci}|${oi}" style="width:auto;min-height:34px;padding:0 12px;font-size:14px">✓ Comí esta</button>`}</div>
         ${op.items.map(it => `<div class="small"><b>${nuNf.format(it.g)} g</b> ${esc(N.nombre(it.n, it.e))} <span class="muted">${esc(N.medida(it.n, it.e, it.g))}</span></div>`).join('')}
         <div class="small muted" style="font-size:12px">${nuNf.format(t.kcal)} kcal · P ${nuNf.format(t.prot)} · C ${nuNf.format(t.carb)} · G ${nuNf.format(t.gras)}</div></div>`; }).join('')}</section>`).join('')}`; }
 V.nutri = () => {
@@ -1967,9 +1967,12 @@ document.addEventListener('click', async ev => {
     const nom = String(S.a?.nombre || '').replace(/\b\p{L}/gu, x => x.toUpperCase()); const nac = S.a?.nacimiento || S.perfil?.ficha?.nac; let edad = null; if (nac) { const n0 = parseISO(nac), h = new Date(); edad = h.getFullYear() - n0.getFullYear() - (h < new Date(h.getFullYear(), n0.getMonth(), n0.getDate()) ? 1 : 0); }
     w.document.open(); w.document.write(N.pdfHTML(S.nu.pauta, m, { nombre: nom, edad, estatura: S.perfil?.ficha?.estatura, peso: d.peso, pgc: d.pgc, mme: d.mme, coach: S.cfg?.coach || 'Franco Palavecino' })); w.document.close(); return; }
   const cm = t.closest('[data-nucomi]'); if (cm) { const [ci, oi] = cm.dataset.nucomi.split('|').map(Number); const c = S.nu.pauta.comidas[ci], op = c.ops[oi]; const N = NUT(); cm.disabled = true;
-    const filas = op.items.map(it => { const f = N.food(it.n, it.e); const g = it.g, k = g / 100; return { alumno: codigo, fecha: today(), comida: NU_COMLOG(c.k), nombre: it.n.slice(0, 120), gramos: g, estado: it.e || null, kcal: nuR1(f.kcal * k), prot: nuR1(f.prot * k), carb: nuR1(f.carb * k), gras: nuR1(f.gras * k), ref: ('b:' + it.n + (it.e ? '|' + it.e : '')).slice(0, 80) }; });
+    const filas = op.items.map(it => { const f = N.food(it.n, it.e); const g = it.g, k = g / 100; return { alumno: codigo, fecha: today(), comida: NU_COMLOG(c.k), nombre: it.n.slice(0, 120), gramos: g, estado: it.e || null, kcal: nuR1(f.kcal * k), prot: nuR1(f.prot * k), carb: nuR1(f.carb * k), gras: nuR1(f.gras * k), ref: ('b:' + it.n + (it.e ? '|' + it.e : '')).slice(0, 80), pauta_op: ci + '.' + oi }; });
     const { data, error } = await sb.from('comidas_log').insert(filas).select(); if (error) { cm.disabled = false; toast('No se pudo anotar: ' + error.message); return; }
-    S.nuLog.push(...(data || [])); cm.textContent = '✓ Anotada'; toast(`${c.l} · opción ${oi + 1} anotada hoy ✓`); return; }
+    S.nuLog.push(...(data || [])); render(true); toast(`${c.l} · opción ${oi + 1} anotada hoy ✓`); return; }
+  const dh = t.closest('[data-nudeshacer]'); if (dh) { const op = dh.dataset.nudeshacer.replace('|', '.'); const ids = (S.nuLog || []).filter(r => r.fecha === today() && r.pauta_op === op).map(r => r.id); if (!ids.length) return; dh.disabled = true;
+    const { error } = await sb.from('comidas_log').delete().in('id', ids); if (error) { dh.disabled = false; toast('No se pudo deshacer: ' + error.message); return; }
+    S.nuLog = S.nuLog.filter(r => !ids.includes(r.id)); render(true); toast('Listo, la quité de tu registro'); return; }
 });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible' || !S.nu) return; cargarNutri().then(() => { if (S.v === 'nutri' && !document.getElementById('sheet') && !(document.activeElement && document.activeElement.matches('input,textarea'))) render(true); }); });
 /* ---------- hoja para agregar / editar ---------- */

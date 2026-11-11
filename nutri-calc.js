@@ -97,22 +97,64 @@
     for (let c = 0; c < n; c++) { let p = c; for (let i = c + 1; i < n; i++) if (Math.abs(a[i][c]) > Math.abs(a[p][c])) p = i; if (Math.abs(a[p][c]) < 1e-9) return null; [a[c], a[p]] = [a[p], a[c]];
       for (let i = 0; i < n; i++) if (i !== c) { const k = a[i][c] / a[c][c]; for (let j = c; j <= n; j++) a[i][j] -= k * a[c][j]; } }
     return a.map((row, i) => row[n] / row[i]); }
-  function opcion(tpl, meta) {
-    const esc = Math.min(1, meta.kcal / 550); // en comidas chicas los fijos (huevos, fruta) se achican
-    const fijos = tpl.fijo.map(([n, e, g]) => { const st = PASO(n); return { n, e: e || '', g: Math.max(st, Math.round(g * esc / st) * st) }; }); const fm = suma(fijos);
-    const fs = tpl.v.map(([n, e]) => food(n, e)); const obj = [meta.prot - fm.prot, meta.carb - fm.carb, meta.gras - fm.gras];
+  // reparte los gramos de los alimentos variables (con su rol p/c/g) para llegar a los macros de la comida
+  function ajustar(vs, fijos, meta) {
+    const fm = suma(fijos); const fs = vs.map(v => food(v.n, v.e)).filter(Boolean); const roles = vs.filter(v => food(v.n, v.e)).map(v => v.r);
+    while (fs.length < 3) { fs.push({ n: '_', e: '', prot: 0, carb: 0, gras: 0 }); roles.push(null); }
+    const obj = [meta.prot - fm.prot, meta.carb - fm.carb, meta.gras - fm.gras];
     const redo = (x, i) => { const st = PASO(fs[i].n); let g = Math.round(x / st) * st; if (g === 0 && x >= st * 0.35) g = st; return g; };
     let x = resolver(fs, obj);
     // 1º se redondean los alimentos por unidad (claras, pan) y se reajustan los demás para compensar
     const uni = fs.map((f, i) => !!UNI[f.n] && x[i] > 0);
-    if (uni.some(Boolean)) { const fijo = fs.map((f, i) => uni[i] ? redo(x[i], i) : null);
-      const rest = [0, 1, 2].map(k => obj[k] - fs.reduce((sm, f, i) => sm + (fijo[i] != null ? [f.prot, f.carb, f.gras][k] / 100 * fijo[i] : 0), 0));
+    if (uni.some(Boolean)) { const fijo = fs.map((f, i) => uni[i] ? redo(x[i], i) : f.n === '_' ? 0 : null);
+      const rest = [0, 1, 2].map(k => obj[k] - fs.reduce((sm, f, i) => sm + (fijo[i] ? [f.prot, f.carb, f.gras][k] / 100 * fijo[i] : 0), 0));
       const libres = fs.map((f, i) => fijo[i] == null ? i : -1).filter(i => i >= 0);
       if (libres.length) { const sub = resolver([...libres.map(i => fs[i]), ...Array(3 - libres.length).fill(null)].map(f => f || { n: '_', prot: 0, carb: 0, gras: 0 }), rest); libres.forEach((i, j) => { fijo[i] = sub[j]; }); }
       x = fijo; }
-    const vars = fs.map((f, i) => ({ n: f.n, e: f.e, g: redo(x[i], i) })).filter(it => it.g > 0);
-    return { items: [...vars, ...fijos] };
+    const vars = fs.map((f, i) => f.n === '_' ? null : { n: f.n, e: f.e, g: redo(x[i], i), r: roles[i] }).filter(it => it && it.g > 0);
+    return [...vars, ...fijos];
   }
+  function opcion(tpl, meta) {
+    const esc = Math.min(1, meta.kcal / 550); // en comidas chicas los fijos (huevos, fruta) se achican
+    const fijos = tpl.fijo.map(([n, e, g]) => { const st = PASO(n); return { n, e: e || '', g: Math.max(st, Math.round(g * esc / st) * st), r: rolFijo(n, e) }; });
+    return { items: ajustar(tpl.v.map(([n, e], i) => ({ n, e: e || '', r: 'pcg'[i] })), fijos, meta) };
+  }
+  /* ---------- variar: cambiar un alimento por otro del mismo tipo manteniendo los macros ---------- */
+  const CAT = {
+    p: [['Pechuga de pollo', 'cocido'], ['Pechuga de pavo', 'cocido'], ['Trutro de pollo sin piel', 'cocido'], ['Carne molida 5% grasa', 'cocido'], ['Vacuno magro (posta, lomo)', 'cocido'], ['Lomo de cerdo', 'cocido'], ['Merluza / reineta', 'cocido'], ['Salmón', 'cocido'], ['Atún en agua (escurrido)'], ['Jurel en lata'], ['Clara de huevo'], ['Huevo entero'], ['Yogur griego natural 0%'], ['Yogur proteico'], ['Queso cottage'], ['Quesillo'], ['Jamón de pavo'], ['Proteína whey (polvo)'], ['Tofu']],
+    c: [['Arroz blanco', 'cocido'], ['Arroz integral', 'cocido'], ['Fideos / pasta', 'cocido'], ['Fideos integrales', 'cocido'], ['Quínoa', 'cocido'], ['Papa', 'cocido'], ['Camote', 'cocido'], ['Choclo', 'cocido'], ['Lentejas', 'cocido'], ['Porotos', 'cocido'], ['Garbanzos', 'cocido'], ['Cuscús', 'cocido'], ['Mote de trigo', 'cocido'], ['Pan marraqueta'], ['Pan hallulla'], ['Pan de molde integral'], ['Pan pita integral'], ['Tortilla de trigo (wrap)'], ['Galletas de arroz'], ['Avena en hojuelas'], ['Plátano'], ['Manzana'], ['Pera'], ['Naranja'], ['Mandarina'], ['Kiwi'], ['Uvas'], ['Mango'], ['Piña'], ['Frutillas'], ['Arándanos'], ['Dátiles']],
+    g: [['Aceite de oliva'], ['Palta'], ['Almendras'], ['Nueces'], ['Maní tostado'], ['Mantequilla de maní'], ['Semillas de chía'], ['Linaza molida'], ['Aceitunas'], ['Queso gauda / mantecoso']],
+    v: [[ENS], ['Lechuga'], ['Tomate'], ['Pepino'], ['Zanahoria', 'crudo'], ['Brócoli', 'cocido'], ['Coliflor', 'cocido'], ['Zapallo italiano'], ['Espinaca'], ['Porotos verdes', 'cocido'], ['Betarraga', 'cocido'], ['Repollo'], ['Champiñones'], ['Pimentón']],
+    fr: [['Frutillas'], ['Arándanos'], ['Frambuesas'], ['Plátano'], ['Manzana'], ['Pera'], ['Naranja'], ['Mandarina'], ['Kiwi'], ['Durazno'], ['Uvas'], ['Piña'], ['Mango'], ['Melón'], ['Sandía']],
+  };
+  const CAT_L = { p: 'Proteína', c: 'Carbohidrato', g: 'Grasa', v: 'Verdura', fr: 'Fruta' };
+  const en = (k, n, e) => CAT[k].some(([a, b]) => a === n && (b || '') === (e || ''));
+  function rolFijo(n, e) { return en('v', n, e) ? 'v' : en('fr', n, e) ? 'fr' : 'f'; }
+  // rol de un alimento ya puesto (las pautas antiguas no lo traen guardado)
+  function rol(it) { if (it.r && CAT[it.r]) return it.r; if (en('v', it.n, it.e)) return 'v'; const f = food(it.n, it.e); if (!f) return 'f';
+    const k = [f.prot * 4, f.carb * 4, f.gras * 9]; const i = k.indexOf(Math.max(...k)); return 'pcg'[i]; }
+  function alternativas(it) { const r = rol(it); if (!CAT[r]) return []; return CAT[r].filter(([n, e]) => !(n === it.n && (e || '') === (it.e || ''))).map(([n, e]) => ({ n, e: e || '', r })); }
+  // cambia el alimento ii de la opción por (n, e) y reajusta los gramos para mantener los macros de la comida
+  function cambiar(op, ii, n, e, meta) {
+    const it = op.items[ii]; const r = rol(it); const nuevo = { n, e: e || '', r };
+    const items = op.items.map((x, i) => i === ii ? nuevo : Object.assign({}, x, { r: rol(x) }));
+    if (r === 'v' || r === 'fr' || r === 'f') { // fijos: verdura con los mismos gramos; fruta con las mismas kcal
+      const fo = food(it.n, it.e), fnw = food(n, e); const st = PASO(n);
+      nuevo.g = r === 'fr' && fo && fnw && fnw.kcal ? Math.max(st, Math.round(it.g * fo.kcal / fnw.kcal / st) * st) : it.g; }
+    const vs = items.filter(x => 'pcg'.includes(x.r) && x.r.length === 1).slice(0, 3); const fijos = items.filter(x => !vs.includes(x));
+    op.items = ajustar(vs, fijos, meta); return op; }
+  // variar toda la opción: proteína y carbohidrato al azar (y a veces la grasa)
+  const DES_P = /Clara|Huevo|Yogur|cottage|Atún|whey/, DES_C = /Pan|Avena|Galletas|Tortilla|Plátano/;
+  const COM_P = /Pechuga|Trutro|Carne molida|Vacuno|Lomo de cerdo|Merluza|Salmón|Atún|Jurel|Huevo|Clara/, COM_C = /Arroz|Fideos|Quínoa|Papa|Camote|Choclo|Lentejas|Porotos|Garbanzos|Cuscús|Mote/;
+  // variar toda la opción: proteína y carbohidrato al azar (y a veces la grasa), con alimentos que calcen con esa comida
+  function variar(op, meta, comida) {
+    const comidaFuerte = comida === 'almuerzo' || comida === 'cena';
+    const pick = (r, it) => { let ls = alternativas(it);
+      if (r === 'p') ls = ls.filter(x => (comidaFuerte ? COM_P : DES_P).test(x.n)); else if (r === 'c') ls = ls.filter(x => (comidaFuerte ? COM_C : DES_C).test(x.n)); else ls = ls.filter(x => (comidaFuerte ? /Aceite de oliva|Palta|Aceitunas/ : /Almendras|Nueces|Maní|Mantequilla de maní|Palta|chía|Linaza/).test(x.n));
+      return ls.length ? ls[Math.floor(Math.random() * ls.length)] : null; };
+    let o = { items: op.items.map(x => Object.assign({}, x, { r: rol(x) })) };
+    ['p', 'c', 'g'].forEach(r => { if (r === 'g' && Math.random() < 0.5) return; const i = o.items.findIndex(x => x.r === r); if (i < 0) return; const nw = pick(r, o.items[i]); if (nw) o = cambiar(o, i, nw.n, nw.e, meta); });
+    return o; }
   function generar(metas, nCom) {
     const cs = COMIDAS[nCom === 5 ? 5 : 4];
     return { fecha: new Date().toISOString().slice(0, 10), nCom: cs.length, comidas: cs.map(([k, l, p]) => {
@@ -167,5 +209,5 @@ ${pauta.comidas.map(c => `<div class="blk"><div class="ml"><h2>${esc(c.l)}</h2><
 <button class="noprint" onclick="window.print()">Guardar PDF / Imprimir</button></body></html>`;
   }
 
-  window.TL_NUTRI = { OBJ, ACT, COMIDAS, datos, basal, calcMetas, generar, suma, medida, nombre, food, pdfHTML, factor };
+  window.TL_NUTRI = { OBJ, ACT, COMIDAS, CAT_L, datos, basal, calcMetas, generar, suma, medida, nombre, food, pdfHTML, factor, rol, alternativas, cambiar, variar };
 })();
