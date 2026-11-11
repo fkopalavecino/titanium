@@ -570,7 +570,7 @@ async function compartirFotos(btn) {
     const ca = compDe(S.inbody, S.medidas, A.f), cb = compDe(S.inbody, S.medidas, B.f), p = [], sg = v => (v > 0 ? '+' : '') + n1(v);
     if (ca?.peso != null && cb?.peso != null) p.push(sg(cb.peso - ca.peso) + ' KG'); if (ca?.g != null && cb?.g != null) p.push(sg(cb.g - ca.g) + '% GRASA'); if (ca?.mm != null && cb?.mm != null) p.push(sg(cb.mm - ca.mm) + ' KG MÚSCULO');
     const dias = Math.round((parseISO(B.f) - parseISO(A.f)) / 864e5);
-    g.fillStyle = '#d71f30'; g.font = fnt(72); g.fillText(dias + ' DÍAS DE TRABAJO', W / 2, y); y += 70;
+    g.fillStyle = '#d71f30'; g.font = fnt(72); g.fillText(dias + (dias === 1 ? ' DÍA' : ' DÍAS') + ' DE TRABAJO', W / 2, y); y += 70;
     if (p.length) { g.fillStyle = '#f4f1f2'; g.font = fnt(50, 600); g.fillText(p.join('  ·  '), W / 2, y); }
     g.fillStyle = '#a79fa4'; g.font = fnt(36, 600); g.fillText('TITANIUM SPORT · ' + String(S.cfg?.lema || 'COMEBACK').toUpperCase(), W / 2, H - 70); g.fillStyle = '#d71f30'; g.fillRect(0, H - 16, W, 16);
     const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.9)); if (!blob) throw new Error('canvas');
@@ -1228,7 +1228,7 @@ V.progreso = () => {
     : S.fotos.length ? `<section class="card" id="fup-card"><div class="row"><h2>Fotos de progreso</h2><span class="small muted">${S.fotos.length === 1 ? '1 sesión' : S.fotos.length + ' sesiones'}</span></div>
     ${ses.length === 1 ? fila(fB, 'Tu punto de partida')
       : `<div class="ph-sel"><label>Antes<select data-fsel="A">${opts(fA)}</select></label><label>Ahora<select data-fsel="B">${opts(fB)}</select></label></div>
-      ${fila(fA, 'Antes')}${fila(fB, 'Ahora')}${fA.f !== fB.f ? `<div class="small muted" style="text-align:center">${Math.abs(diffDays(fA.f, fB.f))} días de diferencia${(() => { const ca = compDe(S.inbody, S.medidas, fA.f), cb = compDe(S.inbody, S.medidas, fB.f); if (!ca || !cb) return '';
+      ${fila(fA, 'Antes')}${fila(fB, 'Ahora')}${fA.f !== fB.f ? `<div class="small muted" style="text-align:center">${Math.abs(diffDays(fA.f, fB.f))} día${Math.abs(diffDays(fA.f, fB.f)) === 1 ? '' : 's'} de diferencia${(() => { const ca = compDe(S.inbody, S.medidas, fA.f), cb = compDe(S.inbody, S.medidas, fB.f); if (!ca || !cb) return '';
         const dd = (k, u, bajaBien) => ca[k] != null && cb[k] != null && ca[k] !== cb[k] ? (() => { const v = Math.round((cb[k] - ca[k]) * 10) / 10; return `<b class="${(v < 0) === bajaBien ? 'ok' : 'warn'}">${v > 0 ? '+' : ''}${String(v).replace('.', ',')}${u}</b>`; })() : '';
         const p = [dd('peso', ' kg', true), dd('g', '% grasa', true), dd('mm', ' kg músculo', false)].filter(Boolean); return p.length ? '<br>' + p.join(' · ') : ''; })()}</div>` : ''}`}
     ${ses.length > 2 ? `<details class="ses"><summary>Ver todas las sesiones (${ses.length})</summary><div style="display:grid;gap:14px;margin-top:10px">${ses.slice().reverse().map(x => fila(x, '')).join('')}</div></details>` : ''}

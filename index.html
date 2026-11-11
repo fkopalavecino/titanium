@@ -2132,7 +2132,7 @@ function fotosHTML(a, {sinCmp = false} = {}) {
           <figure>${A ? `<img src="${fotoURL(A[ang])}" data-act="foto-zoom" alt="Antes">` : ''}<figcaption><select id="foto-a" data-id="${esc(code)}" aria-label="Fecha antes">${opts(fa)}</select>${A ? `<div class="small muted">${compTxt(compDe(a.inbody, a.medidas, A.f), g => 'medido el ' + fmtD(g))}</div>` : ''}</figcaption></figure>
           <figure>${B ? `<img src="${fotoURL(B[ang])}" data-act="foto-zoom" alt="Después">` : ''}<figcaption><select id="foto-b" data-id="${esc(code)}" aria-label="Fecha después">${opts(fb)}</select>${B ? `<div class="small muted">${compTxt(compDe(a.inbody, a.medidas, B.f), g => 'medido el ' + fmtD(g))}</div>` : ''}</figcaption></figure>
         </div>
-        ${A && B && A.f !== B.f ? `<div class="small muted" style="text-align:center">${diffDays(A.f, B.f)} días entre ambas fotos${(() => { const med = a.medidas || []; const near = d => med.filter(m => m.peso).sort((x, y) => Math.abs(diffDays(x.f, d)) - Math.abs(diffDays(y.f, d)))[0]; const ma = near(A.f), mb = near(B.f); return ma && mb && ma !== mb ? ` · peso ${String(ma.peso).replace('.', ',')} → ${String(mb.peso).replace('.', ',')} kg` : ''; })()}</div>` : ''}
+        ${A && B && A.f !== B.f ? `<div class="small muted" style="text-align:center">${diffDays(A.f, B.f)} día${diffDays(A.f, B.f) === 1 ? '' : 's'} entre ambas fotos${(() => { const med = a.medidas || []; const near = d => med.filter(m => m.peso).sort((x, y) => Math.abs(diffDays(x.f, d)) - Math.abs(diffDays(y.f, d)))[0]; const ma = near(A.f), mb = near(B.f); return ma && mb && ma !== mb ? ` · peso ${String(ma.peso).replace('.', ',')} → ${String(mb.peso).replace('.', ',')} kg` : ''; })()}</div>` : ''}
       </div>
       <div class="f-hist"><b class="small">Historial</b>
         ${fs.slice().reverse().map(x => `<div class="row"><button type="button" class="btn sm ghost" data-act="foto-ir" data-id="${esc(code)}" data-f="${x.f}" title="Editar esta sesión">${fmtD(x.f)}${(() => { const r = compDe(a.inbody, a.medidas, x.f); return r ? `<span style="display:block;font-weight:500;font-size:11px;opacity:.8">${r.peso != null ? String(r.peso).replace('.', ',') + ' kg' : ''}${r.peso != null && r.g != null ? ' · ' : ''}${r.g != null ? String(r.g).replace('.', ',') + '%' : ''}</span>` : ''; })()}</button>${ANG.map(([k, l]) => x[k] ? `<img src="${fotoURL(x[k])}" alt="${l} ${fmtD(x.f)}" data-act="foto-zoom" loading="lazy">` : '<div class="vac"></div>').join('')}</div>`).join('')}
@@ -2530,7 +2530,7 @@ function pfComparador(a) {
   return `<div class="pf-fc">
     <div class="pf-sec-h"><h4>📷 Antes y después</h4><div class="chips">${[['tres', 'Las 3'], ...ANG].map(([k, l]) => `<button type="button" class="chip" data-act="pf-fang" data-id="${esc(code)}" data-v="${k}" aria-pressed="${ang === k}">${l}</button>`).join('')}</div></div>
     <div class="pf-fc-row">${col(A, 'Antes', fa, 'pf-fa')}${col(B, 'Ahora', fb, 'pf-fb')}</div>
-    ${fa !== fb ? `<div class="pf-fc-res"><b class="num">${diffDays(fa, fb)} días</b> de trabajo${dif('peso', 'kg') ? ' · peso ' + dif('peso', 'kg') : ''}${dif('g', '%') ? ' · grasa ' + dif('g', '%') : ''}${dif('mm', 'kg') ? ' · músculo ' + dif('mm', 'kg') : ''}</div>` : '<div class="small muted" style="text-align:center">Elige dos fechas distintas para comparar.</div>'}
+    ${fa !== fb ? `<div class="pf-fc-res"><b class="num">${diffDays(fa, fb)} día${diffDays(fa, fb) === 1 ? '' : 's'}</b> de trabajo${dif('peso', 'kg') ? ' · peso ' + dif('peso', 'kg') : ''}${dif('g', '%') ? ' · grasa ' + dif('g', '%') : ''}${dif('mm', 'kg') ? ' · músculo ' + dif('mm', 'kg') : ''}</div>` : '<div class="small muted" style="text-align:center">Elige dos fechas distintas para comparar.</div>'}
     <div class="tools" style="justify-content:center"><button type="button" class="btn pri" data-act="pf-share" data-id="${esc(code)}" ${fa === fb ? 'disabled' : ''}>📲 Compartir imagen Titanium</button><span class="small muted">Arma una imagen lista para historias o WhatsApp.</span></div>
   </div>`;
 }
@@ -2565,7 +2565,7 @@ async function pfCompartir(code, btn) {
     if (ca?.peso != null && cb?.peso != null) partes.push(`${(cb.peso - ca.peso) > 0 ? '+' : ''}${n1(cb.peso - ca.peso)} KG`);
     if (ca?.g != null && cb?.g != null) partes.push(`${(cb.g - ca.g) > 0 ? '+' : ''}${n1(cb.g - ca.g)}% GRASA`);
     if (ca?.mm != null && cb?.mm != null) partes.push(`${(cb.mm - ca.mm) > 0 ? '+' : ''}${n1(cb.mm - ca.mm)} KG MÚSCULO`);
-    g.textAlign = 'center'; g.fillStyle = '#d71f30'; g.font = fnt(72); g.fillText(`${diffDays(fa, fb)} DÍAS DE TRABAJO`, W / 2, y); y += 70;
+    g.textAlign = 'center'; g.fillStyle = '#d71f30'; g.font = fnt(72); g.fillText(`${diffDays(fa, fb)} ${diffDays(fa, fb) === 1 ? 'DÍA' : 'DÍAS'} DE TRABAJO`, W / 2, y); y += 70;
     if (partes.length) { g.fillStyle = '#f4f1f2'; g.font = fnt(50, 600); g.fillText(partes.join('  ·  '), W / 2, y); }
     g.fillStyle = '#a79fa4'; g.font = fnt(36, 600); g.fillText('TITANIUM SPORT · ' + (cfg().lema || 'COMEBACK').toUpperCase(), W / 2, H - 70);
     g.fillStyle = '#d71f30'; g.fillRect(0, H - 16, W, 16);
