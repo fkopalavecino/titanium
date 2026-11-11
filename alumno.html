@@ -1948,6 +1948,7 @@ V.nutri = () => {
   const pide = nuPideObjetivo(); const tieneP = !!S.nu.pauta; const tab = tieneP ? (S.nuTab || 'pauta') : 'reg';
   const noIB = !nuDatosIB() && !(S.nu.meta || {}).kcal ? `<section class="card"><h2>🎯 Tu objetivo</h2><div class="small muted">Cuando tu profe suba tu InBody vas a poder elegir tu objetivo y la app calculará tus calorías y macros. Mientras, ya puedes registrar lo que comes.</div></section>` : '';
   const seg = tieneP ? `<div class="seg" role="tablist"><button role="tab" data-nutab2="pauta" aria-selected="${tab === 'pauta'}">📋 Mi pauta</button><button role="tab" data-nutab2="reg" aria-selected="${tab === 'reg'}">📝 Registro</button></div>` : '';
+  if (pide && !(S.nu.meta || {}).kcal) return nuObjetivoHTML(); // primera vez: solo elegir objetivo; el registro aparece después
   return (pide ? nuObjetivoHTML() : noIB) + seg + (tab === 'pauta' ? nuPautaHTML() : nuRegistroHTML());
 };
 document.addEventListener('click', async ev => {
