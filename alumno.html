@@ -150,7 +150,9 @@ details.ses summary::-webkit-details-marker{display:none}
 .fup label input{position:absolute;inset:0;opacity:0;cursor:pointer}
 .fup label.busy{opacity:.5}
 .fup .fs{position:relative}.fup .fs>label{width:100%}
-.fup .fdel{position:absolute;top:6px;right:6px;z-index:3;min-width:34px;height:34px;padding:0 10px;border:0;border-radius:999px;background:rgba(0,0,0,.65);color:#fff;font:700 14px inherit;cursor:pointer}
+.fup label.con{border:0}
+.fup .fcap{text-align:center;font-size:12px;font-weight:600;color:var(--muted);margin-top:4px}
+.fup .fdel{position:absolute;top:6px;right:6px;z-index:3;min-width:28px;height:28px;padding:0 8px;border:0;border-radius:999px;background:rgba(0,0,0,.65);color:#fff;font-size:13px;font-weight:700;cursor:pointer}
 .fup .fdel.ok{background:#d71f30}
 .fmulti{position:relative;overflow:hidden}.fmulti input{position:absolute;inset:0;opacity:0;cursor:pointer}.fmulti.busy{opacity:.6;pointer-events:none}
 .av{width:48px;height:48px;border-radius:50%;object-fit:cover;background:var(--red);color:#fff;display:grid;place-items:center;font:700 20px 'Barlow Condensed',sans-serif;flex:none;overflow:hidden;border:2px solid var(--line)}
@@ -1183,10 +1185,12 @@ V.progreso = () => {
   const uploader = S.fotoUp ? `<div style="display:grid;gap:8px"><label class="field">Fecha de las fotos<input type="date" id="fu-f" value="${esc(fuF)}"></label>
     <label class="btn pri fmulti">📸 Elegir las 3 de una vez<input type="file" accept="image/*" multiple data-fmulti="1" aria-label="Elegir tus 3 fotos: frente, perfil y espalda"></label>
     <div class="small muted" style="margin-top:-2px">Elígelas en este orden: <b>frente, perfil y espalda</b>. O toca cada recuadro para subir o cambiar una sola.</div>
-    <div class="fup">${ANG.map(([k, l]) => `<div class="fs"><label>${fuRow[k] && S.urls[fuRow[k]] ? `<img src="${esc(S.urls[fuRow[k]])}" alt="${l}">` : `＋<br>${l}`}<input type="file" accept="image/*" data-fang2="${k}" aria-label="Subir foto ${l}"></label>${fuRow[k] ? `<button type="button" class="fdel" data-fdel="${k}" aria-label="Borrar foto ${l}">✕</button>` : ''}</div>`).join('')}</div>
+    <div class="fup">${ANG.map(([k, l]) => `<div class="fs"><label class="${fuRow[k] && S.urls[fuRow[k]] ? 'con' : ''}">${fuRow[k] && S.urls[fuRow[k]] ? `<img src="${esc(S.urls[fuRow[k]])}" alt="${l}">` : `＋<br>${l}`}<input type="file" accept="image/*" data-fang2="${k}" aria-label="${fuRow[k] ? 'Cambiar' : 'Subir'} foto ${l}"></label>${fuRow[k] ? `<button type="button" class="fdel" data-fdel="${k}" aria-label="Borrar foto ${l}">✕</button>` : ''}<div class="fcap">${l}${fuRow[k] ? ' · toca para cambiar' : ''}</div></div>`).join('')}</div>
     <div class="small muted">Misma luz, misma distancia y ropa ajustada en cada sesión. Si subes otra foto del mismo ángulo y fecha, reemplaza la anterior.</div></div>` : '';
   const fuBtn = `<button class="btn ${S.fotos.length ? '' : 'pri'}" id="fup-open">${S.fotoUp ? 'Listo' : '＋ Subir mis fotos'}</button>`;
-  const fotosCard = S.fotos.length ? `<section class="card" id="fup-card"><div class="row"><h2>Fotos de progreso</h2><span class="small muted">${S.fotos.length === 1 ? '1 sesión' : S.fotos.length + ' sesiones'}</span></div>
+  // mientras sube fotos se muestra solo el cargador (sin repetir la galería de arriba)
+  const fotosCard = S.fotoUp ? `<section class="card" id="fup-card"><div class="row"><h2>Subir fotos</h2><span class="small muted">Frente · perfil · espalda</span></div>${uploader}${fuBtn}<div class="small muted">Solo tú y Franco pueden ver tus fotos.</div></section>`
+    : S.fotos.length ? `<section class="card" id="fup-card"><div class="row"><h2>Fotos de progreso</h2><span class="small muted">${S.fotos.length === 1 ? '1 sesión' : S.fotos.length + ' sesiones'}</span></div>
     ${ses.length === 1 ? fila(fB, 'Tu punto de partida')
       : `<div class="ph-sel"><label>Antes<select data-fsel="A">${opts(fA)}</select></label><label>Ahora<select data-fsel="B">${opts(fB)}</select></label></div>
       ${fila(fA, 'Antes')}${fila(fB, 'Ahora')}${fA.f !== fB.f ? `<div class="small muted" style="text-align:center">${Math.abs(diffDays(fA.f, fB.f))} días de diferencia${(() => { const ca = compDe(S.inbody, S.medidas, fA.f), cb = compDe(S.inbody, S.medidas, fB.f); if (!ca || !cb) return '';
