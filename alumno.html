@@ -2220,9 +2220,11 @@ async function avisoPendiente() { if (!('caches' in window)) return null;
 async function irAClase(k, r) { if (!/^\d{4}-\d\d-\d\d_\d\d:\d\d$/.test(k || '')) return; const [f] = k.split('_');
   document.getElementById('sheet')?.remove(); S.v = 'agenda'; S.dia = f; S.wk = lunesDe(f); render();
   const est = r === 'voy' ? 'voy' : r === 'no' ? 'no_voy' : null; if (est && S.conf?.get(k) !== est && await confirmarAsis(k, est)) await confirmar(k, est); }
-const revisarAviso = async () => { const id = await avisoPendiente(); if (!id) return; if (String(id).startsWith('clase|')) { const [, k, r] = String(id).split('|'); irAClase(k, r); } else irAEvento(id); };
+// aviso «tu pauta está lista»: recarga la nutrición (la pauta recién enviada) y abre Mi pauta
+async function irANutri() { document.getElementById('sheet')?.remove(); document.getElementById('tl-pdfv')?.remove(); await cargarNutri(); S.v = S.nu ? 'nutri' : 'hoy'; S.nuTab = 'pauta'; S.nuDia = null; render(); window.scrollTo({ top: 0 }); }
+const revisarAviso = async () => { const id = await avisoPendiente(); if (!id) return; if (id === 'nutri') irANutri(); else if (String(id).startsWith('clase|')) { const [, k, r] = String(id).split('|'); irAClase(k, r); } else irAEvento(id); };
 const qs0 = new URLSearchParams(location.search); const evq = qs0.get('ev'), clq = qs0.get('clase'); if (qs0.get('msg')) { history.replaceState(null, '', location.pathname); S.v = 'hoy'; }
-if (qs0.get('nutri')) { history.replaceState(null, '', location.pathname); S.v = S.nu ? 'nutri' : 'hoy'; S.nuTab = 'pauta'; render(); }
+if (qs0.get('nutri')) { history.replaceState(null, '', location.pathname); avisoPendiente(); irANutri(); }
 if (qs0.get('pago')) { history.replaceState(null, '', location.pathname); secAbiertos.add('pagos'); S.v = 'plan'; render(); }
 if (evq) { history.replaceState(null, '', location.pathname); avisoPendiente(); irAEvento(evq); }
 else if (clq) { history.replaceState(null, '', location.pathname); avisoPendiente(); irAClase(clq, qs0.get('r')); }

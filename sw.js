@@ -26,7 +26,7 @@ self.addEventListener('notificationclick', e => {
   const r = e.action === 'voy' ? 'voy' : e.action === 'no' ? 'no' : '';
   if (nd.clase && r) { const u = new URL(url); u.searchParams.set('r', r); url = u.href; }
   const sp = new URL(url).searchParams;
-  const ev = sp.get('ev') || (sp.get('clase') ? 'clase|' + sp.get('clase') + '|' + r : null);
+  const ev = sp.get('ev') || (sp.get('clase') ? 'clase|' + sp.get('clase') + '|' + r : null) || (sp.get('nutri') ? 'nutri' : null);
   e.waitUntil((async () => {
     // deja anotado a qué ir: la app lo lee al abrirse o al volver a primer plano
     if (ev) { const c = await caches.open('tl-push'); await c.put('pending', new Response(JSON.stringify({ ev, t: Date.now() }))); }
