@@ -582,7 +582,7 @@ td.crit{color:var(--crit);font-weight:700}
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supa-shim.js"></script><script src="inbody-ocr.js?v=20261111"></script><script src="alimentos.js?v=20261111"></script><script src="nutri-calc.js?v=20261111c"></script><script src="sonidos.js?v=2"></script>
+<script src="supa-shim.js"></script><script src="inbody-ocr.js?v=20261111"></script><script src="alimentos.js?v=20261111"></script><script src="nutri-calc.js?v=20261111d"></script><script src="sonidos.js?v=2"></script>
 <script>
 (() => {
 'use strict';
@@ -1826,15 +1826,13 @@ async function nuGuardar(code, el, conPauta) { const ed = NU_ED[code]; const m =
   if (!m) { toast('Faltan las metas', true); return; } if (m.kcal < 800 || m.kcal > 6000) { toast('Revisa las calorías', true); return; }
   const meta = Object.assign({}, m, { obj: ed.o.obj, aj: ed.o.aj ?? NUC().OBJ[ed.o.obj].def, dias: ed.o.dias, fisico: ed.o.fisico, pkg: ed.o.pkg, gkg: ed.o.gkg, nota: ed.nota, fuente: 'coach', revisar: false, desde: today() });
   const d = NUC().datos((S.alumnos.get(code) || {}).inbody); if (d) meta.ib = d.f;
-  const upd = { meta, updated_at: new Date().toISOString() }; if (conPauta && ed.pauta) { ed.pauta.nCom = ed.pauta.comidas.length; ed.pauta.fecha = today(); upd.pauta = ed.pauta; upd.pauta_at = new Date().toISOString(); }
+  const upd = { meta, updated_at: new Date().toISOString() }; if (conPauta && ed.pauta) { ed.pauta.nCom = ed.pauta.comidas.length; ed.pauta.fecha = today(); delete ed.pauta.base; upd.pauta = ed.pauta; upd.pauta_at = new Date().toISOString(); }
   el.disabled = true; const { error } = await window.__sb.from('nutricion').update(upd).eq('alumno', code); el.disabled = false;
   if (error) { toast('No se pudo guardar: ' + error.message, true); return; }
   toast(conPauta ? 'Pauta enviada ✓ Le llega un aviso a su celular' : 'Metas guardadas ✓'); S.nuRes = null; delete NU_ED[code]; nuPanel(code);
   if (conPauta) try { fetch(CP_FN, { method: 'POST', headers: CP_H, body: JSON.stringify({ modo: 'nutri_pauta', alumno: code }) }).catch(() => {}); } catch (_) {} }
 function nuPdf(code) { const ed = NU_ED[code]; const m = nuLeerMetas(code); if (!ed.pauta || !m) { toast('Primero genera la pauta', true); return; }
-  const w = window.open('', '_blank'); if (!w) { toast('Permite las ventanas emergentes para exportar', true); return; }
-  w.document.open(); w.document.write(NUC().pdfHTML(ed.pauta, Object.assign({}, m, { obj: ed.o.obj }), Object.assign(nuPersona(code), { excluir: ed.excl }))); w.document.close();
-  setTimeout(() => { try { w.focus(); w.print(); } catch (_) {} }, 900); }
+  NUC().verPDF(NUC().pdfHTML(ed.pauta, Object.assign({}, m, { obj: ed.o.obj }), Object.assign(nuPersona(code), { excluir: ed.excl }))); }
 async function nuActivar(code, on, el) { const nom = firstName((S.alumnos.get(code) || {}).nombre || '');
   if (!on && !confirm(`¿Desactivar nutrición para ${nom}? Se oculta la pestaña en su app; su registro, metas y pauta quedan guardados.`)) return;
   el.disabled = true; const { error } = await window.__sb.from('nutricion').upsert({ alumno: code, activo: on, updated_at: new Date().toISOString() }, { onConflict: 'alumno' }); el.disabled = false;

@@ -237,7 +237,7 @@
     return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Pauta nutricional · ${esc(per.nombre)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
 <style>@page{size:A4;margin:9mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}html,body{background:#0e0c0f;color:#f2eef0;margin:0;font:13px/1.4 Barlow,system-ui,sans-serif}
-.pg{max-width:900px;margin:0 auto;padding:22px}.hd{display:flex;align-items:center;gap:14px;border-bottom:2px solid #d71f30;padding-bottom:12px;margin-bottom:14px}
+.pg{max-width:900px;min-width:860px;margin:0 auto;padding:22px}@media print{.pg{min-width:0}}.hd{display:flex;align-items:center;gap:14px;border-bottom:2px solid #d71f30;padding-bottom:12px;margin-bottom:14px}
 h1{font:800 30px/1 'Barlow Condensed',sans-serif;margin:0;letter-spacing:.02em;text-transform:uppercase}.sub{color:#a69ea3;font:600 12px 'Barlow Condensed',sans-serif;letter-spacing:.2em;text-transform:uppercase}
 h2{font:700 15px 'Barlow Condensed',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#ff5a68;margin:16px 0 8px}
 table{width:100%;border-collapse:collapse;table-layout:fixed}td,th{border:1px solid #2f2a2e;padding:7px 9px;vertical-align:top;text-align:left}th{background:#1b181c;font:700 13px 'Barlow Condensed',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#cbcbcb}
@@ -258,5 +258,19 @@ ${pauta.comidas.map(c => `<div class="blk"><div class="ml"><h2>${esc(c.l)}</h2><
 <button class="noprint" onclick="window.print()">Guardar PDF / Imprimir</button></body></html>`;
   }
 
-  window.TL_NUTRI = { EXCL, excluido, limpiar, metasDescanso, opDescanso, evolucion, OBJ, ACT, COMIDAS, CAT_L, datos, basal, calcMetas, generar, suma, medida, nombre, food, pdfHTML, factor, rol, rolDe, alternativas, cambiar, quitar, variar };
+  // muestra la pauta dentro de la app (sin abrir otra ventana): así siempre se puede volver
+  function verPDF(html) {
+    document.getElementById('tl-pdfv')?.remove();
+    const v = document.createElement('div'); v.id = 'tl-pdfv';
+    v.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#0e0c0f;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)';
+    v.innerHTML = '<div style="display:flex;gap:8px;padding:10px 12px;border-bottom:1px solid #2f2a2e;align-items:center"><button data-pv="x" style="height:44px;padding:0 16px;border-radius:12px;border:1px solid #2f2a2e;background:#1b181c;color:#f2eef0;font:600 16px Barlow,sans-serif">‹ Volver</button><span style="flex:1"></span><button data-pv="p" style="height:44px;padding:0 16px;border-radius:12px;border:0;background:#d71f30;color:#fff;font:700 16px Barlow,sans-serif">Guardar PDF / Compartir</button></div><iframe title="Pauta nutricional" style="flex:1;border:0;width:100%;background:#0e0c0f"></iframe>';
+    document.body.appendChild(v); const fr = v.querySelector('iframe'); fr.srcdoc = html.replace('<button class="noprint" onclick="window.print()">Guardar PDF / Imprimir</button>', '');
+    // en el celular se ve como la hoja completa (achicada), igual que el PDF
+    const zoom = z => { try { const b = fr.contentDocument.body; b.style.zoom = z; } catch (_) {} };
+    const ajustar = () => zoom(Math.min(1, (fr.clientWidth - 4) / 900));
+    fr.addEventListener('load', ajustar); addEventListener('resize', ajustar);
+    v.addEventListener('click', e => { const b = e.target.closest('[data-pv]'); if (!b) return; if (b.dataset.pv === 'x') { removeEventListener('resize', ajustar); v.remove(); return; }
+      zoom(1); try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (_) { window.print(); } setTimeout(ajustar, 500); });
+  }
+  window.TL_NUTRI = { verPDF, EXCL, excluido, limpiar, metasDescanso, opDescanso, evolucion, OBJ, ACT, COMIDAS, CAT_L, datos, basal, calcMetas, generar, suma, medida, nombre, food, pdfHTML, factor, rol, rolDe, alternativas, cambiar, quitar, variar };
 })();

@@ -217,7 +217,7 @@ details.ses summary::-webkit-details-marker{display:none}
 <script src="inbody-ocr.js?v=20261111"></script>
 <script src="sonidos.js?v=2"></script>
 <script src="alimentos.js?v=20261111"></script>
-<script src="nutri-calc.js?v=20261111c"></script>
+<script src="nutri-calc.js?v=20261111d"></script>
 <script>
 (async () => {
 const sb = window.__sb;
@@ -1954,7 +1954,7 @@ function nuPautaHTML() { const N = NUT(), P = S.nu.pauta, m0 = S.nu.meta || {};
     ${nuBar(t.kcal, m.kcal, 'var(--red)')}
     <div class="grid3">${NU_MAC.map(([k, l, c]) => `<div style="display:grid;gap:3px"><span class="small muted" style="font-size:12px">${l}</span><b style="font:800 18px 'Barlow Condensed',sans-serif">${nuNf.format(t[k])}<span class="muted" style="font-size:13px"> / ${nuNf.format(m[k] || 0)} g</span></b>${nuBar(t[k], m[k], c)}</div>`).join('')}</div>
     <div class="small" style="color:${falta('prot') > 0 ? 'var(--fg)' : 'var(--ok)'}">${falta('prot') > 0 ? `💪 Te faltan <b>${nuNf.format(falta('prot'))} g de proteína</b> hoy.` : '✅ Proteína del día cumplida.'}${desc ? ' <span class="muted">· Descanso: porciones de carbohidrato a ¾.</span>' : ''}</div>
-    <button class="btn" data-nupdf="1" style="min-height:40px">📄 Descargar PDF</button></section>`;
+    <div style="display:grid;grid-template-columns:${P.base ? '1fr 1fr' : '1fr'};gap:8px"><button class="btn" data-nupdf="1" style="min-height:40px">📄 Ver / descargar PDF</button>${P.base ? '<button class="btn" data-nubase="1" style="min-height:40px">↺ Pauta original</button>' : ''}</div></section>`;
   const meals = P.comidas.map((c, ci) => { const ck = NU_COMLOG(c.k); const lista = hoy.filter(r => r.comida === ck); const okC = lista.length > 0;
     return `<section class="card" style="gap:8px${okC ? ';border-color:var(--ok)' : ''}"><div class="row"><h2 style="font-size:20px">${okC ? '✅ ' : ''}${esc(c.l)}</h2><span class="small muted">≈ ${nuNf.format(desc ? N.metasDescanso(c.meta).kcal : c.meta.kcal)} kcal${okC ? ' · anotaste ' + nuNf.format(nuTot(lista).kcal) : ''}</span></div>
       ${c.ops.map((op0, oi) => { const op = desc ? N.opDescanso(op0) : op0; const tt = N.suma(op.items); const hecha = hoy.some(r => r.pauta_op === ci + '.' + oi); const malo = op.items.some(it => N.excluido(it.n, ex));
@@ -1975,14 +1975,17 @@ V.nutri = () => {
 };
 document.addEventListener('click', async ev => { const t = ev.target;
   const tp = t.closest('[data-nutipo]'); if (tp) { nuSetTipoDia(S.nuDia || today(), tp.dataset.nutipo); render(true); return; }
+  if (t.closest('[data-nubase]')) { if (!confirm('¿Volver a la pauta original que te envió tu profe? Se pierden los cambios hechos con 🎲.')) return; const P = S.nu.pauta, ant = P.comidas; P.comidas = JSON.parse(JSON.stringify(P.base)); delete P.base; render(true);
+    const { error } = await sb.rpc('nutri_set_pauta', { p_pauta: P }); if (error) { P.base = P.comidas; P.comidas = ant; render(true); toast('No se pudo guardar: ' + error.message); return; } toast('Volviste a tu pauta original ✓'); return; }
   const vr = t.closest('[data-nuvar]'); if (vr) { const [ci, oi] = vr.dataset.nuvar.split('|').map(Number); const N = NUT(); const c = S.nu.pauta.comidas[ci]; const ant = c.ops[oi];
+    if (!S.nu.pauta.base) S.nu.pauta.base = JSON.parse(JSON.stringify(S.nu.pauta.comidas));
     c.ops[oi] = N.variar(ant, c.meta, c.k, nuExcl()); render(true); vr.disabled = true;
     const { error } = await sb.rpc('nutri_set_pauta', { p_pauta: S.nu.pauta }); if (error) { c.ops[oi] = ant; render(true); toast('No se pudo guardar: ' + error.message); } return; }
   const ex = t.closest('[data-nuex]'); if (ex) { const k = ex.dataset.nuex; const cur = nuExcl(); const nw = cur.includes(k) ? cur.filter(x => x !== k) : [...cur, k];
     ex.disabled = true; const { error } = await sb.rpc('nutri_prefs', { p_excluir: nw }); if (error) { ex.disabled = false; toast('No se pudo guardar: ' + error.message); return; }
     S.nu.prefs = Object.assign({}, S.nu.prefs, { excluir: nw });
     // si la pauta trae algo que ya no come, se cambia solo (mismos macros)
-    let cambios = 0; if (S.nu.pauta && !cur.includes(k)) { const N = NUT(); S.nu.pauta.comidas.forEach(c => { c.ops = c.ops.map(op => { if (!op.items.some(it => N.excluido(it.n, nw))) return op; cambios++; return N.limpiar({ items: op.items.map(x => Object.assign({}, x)) }, c.meta, c.k, nw); }); });
+    let cambios = 0; if (S.nu.pauta && !cur.includes(k)) { const N = NUT(); if (!S.nu.pauta.base) S.nu.pauta.base = JSON.parse(JSON.stringify(S.nu.pauta.comidas)); S.nu.pauta.comidas.forEach(c => { c.ops = c.ops.map(op => { if (!op.items.some(it => N.excluido(it.n, nw))) return op; cambios++; return N.limpiar({ items: op.items.map(x => Object.assign({}, x)) }, c.meta, c.k, nw); }); });
       if (cambios) await sb.rpc('nutri_set_pauta', { p_pauta: S.nu.pauta }); }
     render(true); toast(cambios ? `Listo: cambié ${cambios} ${cambios === 1 ? 'opción' : 'opciones'} de tu pauta` : 'Guardado ✓'); return; }
 });
@@ -1998,9 +2001,9 @@ document.addEventListener('click', async ev => {
     const { data, error } = await sb.rpc('nutri_set_meta', { p_meta: c }); if (error) { b.disabled = false; toast('No se pudo guardar: ' + error.message); return; }
     S.nu.meta = data || c; S.nuObj = false; S.nuObjSel = null; render(); toast('¡Listo! Tu profe revisará tu pauta 💪');
     fetch(PUSH_FN, { method: 'POST', headers: PUSH_H, body: JSON.stringify({ modo: 'nutri_objetivo', alumno: codigo }) }).catch(() => {}); return; }
-  if (t.closest('[data-nupdf]')) { const N = NUT(); const d = nuDatosIB() || {}; const m = S.nu.meta || {}; const w = window.open('', '_blank'); if (!w) { toast('Permite abrir ventanas para descargar'); return; }
+  if (t.closest('[data-nupdf]')) { const N = NUT(); const d = nuDatosIB() || {}; const m = S.nu.meta || {};
     const nom = String(S.a?.nombre || '').replace(/\b\p{L}/gu, x => x.toUpperCase()); const nac = S.a?.nacimiento || S.perfil?.ficha?.nac; let edad = null; if (nac) { const n0 = parseISO(nac), h = new Date(); edad = h.getFullYear() - n0.getFullYear() - (h < new Date(h.getFullYear(), n0.getMonth(), n0.getDate()) ? 1 : 0); }
-    w.document.open(); w.document.write(N.pdfHTML(S.nu.pauta, m, { nombre: nom, edad, estatura: S.perfil?.ficha?.estatura, peso: d.peso, pgc: d.pgc, mme: d.mme, coach: S.cfg?.coach || 'Franco Palavecino' })); w.document.close(); return; }
+    N.verPDF(N.pdfHTML(S.nu.pauta, m, { nombre: nom, edad, estatura: S.perfil?.ficha?.estatura, peso: d.peso, pgc: d.pgc, mme: d.mme, coach: S.cfg?.coach || 'Franco Palavecino', excluir: nuExcl() })); return; }
   const cm = t.closest('[data-nucomi]'); if (cm) { const [ci, oi] = cm.dataset.nucomi.split('|').map(Number); const N = NUT(); const c = S.nu.pauta.comidas[ci], op = nuTipoDia(today()) === 'descanso' ? N.opDescanso(c.ops[oi]) : c.ops[oi]; cm.disabled = true;
     const filas = op.items.map(it => { const f = N.food(it.n, it.e); const g = it.g, k = g / 100; return { alumno: codigo, fecha: today(), comida: NU_COMLOG(c.k), nombre: it.n.slice(0, 120), gramos: g, estado: it.e || null, kcal: nuR1(f.kcal * k), prot: nuR1(f.prot * k), carb: nuR1(f.carb * k), gras: nuR1(f.gras * k), ref: ('b:' + it.n + (it.e ? '|' + it.e : '')).slice(0, 80), pauta_op: ci + '.' + oi }; });
     const { data, error } = await sb.from('comidas_log').insert(filas).select(); if (error) { cm.disabled = false; toast('No se pudo anotar: ' + error.message); return; }
