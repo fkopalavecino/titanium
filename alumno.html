@@ -403,7 +403,10 @@ const ONL = () => !!S.a?.online;
 const esHora = h => /^\d\d:\d\d$/.test(h) || (h === 'online' && ONL());
 const horaTxt = h => h === 'online' ? 'Online' : h;
 function bloquesDe(f) {
-  if (ONL()) return ((S.a.dias_online || []).includes(dayKey(f)) || S.clases.some(r => r.fecha === f && r.hora === 'online' && !r.quitado)) ? ['online'] : [];
+  // online: sus clases ya agendadas en el centro (con hora) se respetan; si ese día no tiene, va la sesión online sugerida
+  if (ONL()) { const ag = [...new Set(S.clases.filter(r => r.fecha === f && r.extra && !r.quitado && /^\d\d:\d\d$/.test(r.hora)).map(r => r.hora))].sort();
+    const onl = S.clases.some(r => r.fecha === f && r.hora === 'online' && !r.quitado) || (!ag.length && (S.a.dias_online || []).includes(dayKey(f)));
+    return onl ? [...ag, 'online'] : ag; }
   const base = (S.a.bloques || []).filter(k => k.startsWith(dayKey(f) + '-')).map(k => k.split('-')[1]);
   const extra = S.clases.filter(r => r.fecha === f && r.extra).map(r => r.hora);
   const quit = new Set(S.clases.filter(r => r.fecha === f && r.quitado).map(r => r.hora));
