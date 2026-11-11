@@ -2277,5 +2277,28 @@ sb.channel('al-' + codigo)
   .subscribe();
 })();
 </script>
+<script>
+/* Fija la barra de abajo: iOS a veces deja el viewport descuadrado (tras teclado o scroll) y la barra "flota" a media pantalla */
+(() => {
+  const vv = window.visualViewport, nav = document.getElementById('tabs');
+  if (!vv || !nav) return;
+  const esInput = el => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+  let raf = 0;
+  const ajustar = () => {
+    raf = 0;
+    if (esInput(document.activeElement)) { nav.style.visibility = 'hidden'; return; }
+    nav.style.visibility = '';
+    const off = Math.round(window.innerHeight - vv.height - vv.offsetTop);
+    nav.style.bottom = Math.abs(off) > 1 ? off + 'px' : '0px';
+  };
+  const pedir = () => { if (!raf) raf = requestAnimationFrame(ajustar); };
+  vv.addEventListener('resize', pedir); vv.addEventListener('scroll', pedir);
+  window.addEventListener('scroll', pedir, { passive: true }); window.addEventListener('resize', pedir);
+  document.addEventListener('focusin', pedir);
+  document.addEventListener('focusout', () => setTimeout(() => { if (!esInput(document.activeElement)) window.scrollTo(window.scrollX, window.scrollY); pedir(); }, 60));
+  document.addEventListener('visibilitychange', pedir);
+  pedir();
+})();
+</script>
 </body>
 </html>
