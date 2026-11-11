@@ -2062,7 +2062,7 @@ function inbodyHTML(a) {
     <div style="display:grid;gap:10px;margin-top:10px">
       ${!assets ? '<div class="notice">Para subir el InBody abre el Control con tu cuenta.</div>' : `
       <div class="tools inb-up" style="gap:10px;align-items:end"><label class="f" style="flex-direction:row;align-items:center;gap:6px">Fecha <input type="date" id="inb-fecha" value="${today()}"></label>
-        <label class="f" style="flex-direction:row;align-items:center;gap:6px">Cintura <input type="text" inputmode="decimal" id="inb-cint" placeholder="cm" style="width:70px"></label>
+        <label class="f" style="flex-direction:row;align-items:center;gap:6px">Cintura (mídela al subirlo) <input type="text" inputmode="decimal" id="inb-cint" placeholder="cm" style="width:70px"></label>
         <label class="btn sm" style="position:relative;overflow:hidden;cursor:pointer">＋ Subir pantallazo<input type="file" accept="image/*" class="inb-in" data-id="${esc(code)}" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label></div>`}
       ${ls.length ? (() => { const C = (window.TL_INBODY_CAMPOS || []).filter(([k]) => k === 'cintura' || ls.some(x => x[k] != null)); const f1 = (v, d) => v == null ? '—' : (d ? (Math.round(v * 10) / 10).toFixed(1) : String(Math.round(v))).replace('.', ',');
         return `<div class="tbl-wrap"><table><thead><tr><th>Fecha</th>${C.map(([, l, u]) => `<th class="r">${esc(l)}${u && u !== 'nivel' && u !== 'pts' ? ' <span class="muted">' + esc(u) + '</span>' : ''}</th>`).join('')}<th>Informe</th><th></th></tr></thead><tbody>${ls.map((x, i) => ({ x, i })).reverse().map(({ x, i }) => `<tr><td class="num">${fmtDY(x.f)}${x.por === 'alumno' ? ' <span class="pill muted">alumno</span>' : ''}</td>${C.map(([k, , , , , d]) => k === 'cintura' ? `<td class="r"><input type="text" inputmode="decimal" class="inb-cint-ed" data-id="${esc(code)}" data-i="${i}" value="${x.cintura != null ? f1(x.cintura, 1) : ''}" placeholder="cm" aria-label="Cintura ${fmtD(x.f)}" style="width:62px;text-align:right"></td>` : `<td class="r num">${f1(x[k], d)}</td>`).join('')}<td>${x.img ? `<img src="${fotoURL(x.img)}" alt="InBody ${fmtD(x.f)}" data-act="foto-zoom" style="width:36px;height:48px;object-fit:cover;border-radius:6px;cursor:zoom-in">` : ''}</td><td><button type="button" class="btn sm ghost" data-act="inb-del" data-id="${esc(code)}" data-i="${i}" aria-label="Borrar InBody ${fmtD(x.f)}">✕</button></td></tr>`).join('')}</tbody></table></div><div class="small muted">Los datos se leen solos de la imagen. Si alguno no calza, revísalo en el informe original.</div>`; })() : '<div class="small muted">Sube la foto o pantallazo del informe InBody. El alumno también puede subirlo desde su app.</div>'}
@@ -2427,12 +2427,11 @@ function serieCorporal(a) { // une InBody y medidas por fecha (InBody manda si h
 function pfCuerpo(a) {
   const code = a.codigo, ser = serieCorporal(a), obj = Number(a.ingreso?.pesoObj) || null;
   const MET = [['peso', 'Peso', 'kg', -1], ['pgc', '% grasa', '%', -1], ['mme', 'Músculo', 'kg', 1], ['mgc', 'Masa grasa', 'kg', -1], ['cintura', 'Cintura', 'cm', -1], ['tmb', 'Metabolismo basal', 'kcal', 1]];
-  const cintIn = `<div class="tools" style="margin-top:4px;gap:6px"><input type="text" inputmode="decimal" id="pf-cint" placeholder="cm" style="width:74px;padding:5px 8px" aria-label="Cintura en cm"><button type="button" class="btn sm" data-act="pf-cint" data-id="${esc(code)}">Anotar</button></div>`;
   const card = ([k, l, u, bueno]) => { const xs = ser.filter(x => x[k] != null);
-    if (!xs.length) return k === 'cintura' ? `<div class="pf-m"><span class="l">${l}</span><b class="num muted">—</b><span class="s muted">Aún sin medir · huincha a la altura del ombligo</span>${cintIn}</div>` : '';
+    if (!xs.length) return k === 'cintura' ? `<div class="pf-m"><span class="l">${l}</span><b class="num muted">—</b><span class="s muted">Se anota al subir el próximo InBody</span></div>` : '';
     const fi = xs[0], la = xs[xs.length - 1], d = la[k] - fi[k], col = Math.abs(d) < 0.05 ? 'muted' : (d * bueno > 0 ? 'up' : 'down');
     return `<div class="pf-m"><span class="l">${l}</span><b class="num">${k === 'tmb' ? Math.round(la[k]) : n1(la[k])}<small> ${u}</small></b>
-      <span class="s ${col}">${xs.length > 1 ? (d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= ') + (k === 'tmb' ? Math.round(d) : n1(d)) + ' ' + u + ' desde ' + fmtD(fi.f) : 'Primera medición ' + fmtD(la.f)}</span>${spark(xs.map(x => x[k]), 150, 30)}${k === 'cintura' ? `<details class="pf-det"><summary><span class="v1" style="color:var(--red);font-weight:700">＋ anotar nueva</span><span class="v2">▲ cerrar</span></summary>${cintIn}</details>` : ''}</div>`; };
+      <span class="s ${col}">${xs.length > 1 ? (d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= ') + (k === 'tmb' ? Math.round(d) : n1(d)) + ' ' + u + ' desde ' + fmtD(fi.f) : 'Primera medición ' + fmtD(la.f)}</span>${spark(xs.map(x => x[k]), 150, 30)}</div>`; };
   const pesos = ser.filter(x => x.peso != null), p0 = pesos[0]?.peso, pN = pesos[pesos.length - 1]?.peso;
   const fP = pesos[0]?.f, fN = pesos[pesos.length - 1]?.f;
   const objHTML = `<div class="pf-obj">
@@ -2455,8 +2454,7 @@ function pfCuerpo(a) {
     ${objHTML}
     ${pfComparador(a)}
     ${fotosHTML(a, { sinCmp: true })}
-    ${inbodyHTML(a)}
-    ${medidasHTML(a)}`;
+    ${inbodyHTML(a)}`;
 }
 function pfComparador(a) {
   const code = a.codigo, fs = (a.fotos || []).filter(x => ANG.some(([k]) => x[k]));
