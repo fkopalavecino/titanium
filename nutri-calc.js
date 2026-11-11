@@ -133,33 +133,37 @@
   // rol de un alimento ya puesto (las pautas antiguas no lo traen guardado)
   function rol(it) { if (it.r && CAT[it.r]) return it.r; if (en('v', it.n, it.e)) return 'v'; const f = food(it.n, it.e); if (!f) return 'f';
     const k = [f.prot * 4, f.carb * 4, f.gras * 9]; const i = k.indexOf(Math.max(...k)); return 'pcg'[i]; }
-  function alternativas(it) { const r = rol(it); if (!CAT[r]) return []; return CAT[r].filter(([n, e]) => !(n === it.n && (e || '') === (it.e || ''))).map(([n, e]) => ({ n, e: e || '', r })); }
+  function alternativas(it) { const r = it.r && CAT[it.r] ? it.r : rol(it); if (!CAT[r]) return []; return CAT[r].filter(([n, e]) => !(n === it.n && (e || '') === (it.e || ''))).map(([n, e]) => ({ n, e: e || '', r })); }
+  // cambia el alimento ii de la opción por (n, e) y reajusta los gramos para mantener los macros de la comida
+  const rolDe = x => (x.r && (CAT[x.r] || x.r === 'f')) ? x.r : rol(x);
+  // separa variables (una por rol p/c/g) y fijos, y reajusta
+  function reajustar(items, meta) { const vs = [], fijos = [], vistos = new Set();
+    items.forEach(x => { const r = rolDe(x); if ('pcg'.includes(r) && r.length === 1 && !vistos.has(r)) { vistos.add(r); vs.push(Object.assign({}, x, { r })); } else fijos.push(Object.assign({}, x, { r })); });
+    return { items: ajustar(vs, fijos.filter(x => x.g > 0), meta) }; }
   // cambia el alimento ii de la opción por (n, e) y reajusta los gramos para mantener los macros de la comida
   function cambiar(op, ii, n, e, meta) {
-    const it = op.items[ii]; const r = rol(it); const nuevo = { n, e: e || '', r };
-    const items = op.items.map((x, i) => i === ii ? nuevo : Object.assign({}, x, { r: rol(x) }));
+    const it = op.items[ii]; const r = rolDe(it); const nuevo = { n, e: e || '', r };
     if (r === 'v' || r === 'fr' || r === 'f') { // fijos: verdura con los mismos gramos; fruta con las mismas kcal
       const fo = food(it.n, it.e), fnw = food(n, e); const st = PASO(n);
-      nuevo.g = r === 'fr' && fo && fnw && fnw.kcal ? Math.max(st, Math.round(it.g * fo.kcal / fnw.kcal / st) * st) : it.g; }
-    const vs = items.filter(x => 'pcg'.includes(x.r) && x.r.length === 1).slice(0, 3); const fijos = items.filter(x => !vs.includes(x));
-    op.items = ajustar(vs, fijos, meta); return op; }
-  // variar toda la opción: proteína y carbohidrato al azar (y a veces la grasa)
+      nuevo.g = r !== 'v' && fo && fnw && fnw.kcal ? Math.max(st, Math.round(it.g * fo.kcal / fnw.kcal / st) * st) : it.g; }
+    const o = reajustar(op.items.map((x, i) => i === ii ? nuevo : x), meta); op.items = o.items; return op; }
+  function quitar(op, ii, meta) { const o = reajustar(op.items.filter((_, i) => i !== ii), meta); op.items = o.items; return op; }
   const DES_P = /Clara|Huevo|Yogur|cottage|Atún|whey/, DES_C = /Pan|Avena|Galletas|Tortilla|Plátano/;
   const COM_P = /Pechuga|Trutro|Carne molida|Vacuno|Lomo de cerdo|Merluza|Salmón|Atún|Jurel|Huevo|Clara/, COM_C = /Arroz|Fideos|Quínoa|Papa|Camote|Choclo|Lentejas|Porotos|Garbanzos|Cuscús|Mote/;
   // variar toda la opción: proteína y carbohidrato al azar (y a veces la grasa), con alimentos que calcen con esa comida
-  function variar(op, meta, comida) {
+  function variar(op, meta, comida, ex) {
     const comidaFuerte = comida === 'almuerzo' || comida === 'cena';
-    const pick = (r, it) => { let ls = alternativas(it);
+    const pick = (r, it) => { let ls = alternativas(it).filter(x => !excluido(x.n, ex));
       if (r === 'p') ls = ls.filter(x => (comidaFuerte ? COM_P : DES_P).test(x.n)); else if (r === 'c') ls = ls.filter(x => (comidaFuerte ? COM_C : DES_C).test(x.n)); else ls = ls.filter(x => (comidaFuerte ? /Aceite de oliva|Palta|Aceitunas/ : /Almendras|Nueces|Maní|Mantequilla de maní|Palta|chía|Linaza/).test(x.n));
       return ls.length ? ls[Math.floor(Math.random() * ls.length)] : null; };
-    let o = { items: op.items.map(x => Object.assign({}, x, { r: rol(x) })) };
+    let o = { items: op.items.map(x => Object.assign({}, x, { r: rolDe(x) })) };
     ['p', 'c', 'g'].forEach(r => { if (r === 'g' && Math.random() < 0.5) return; const i = o.items.findIndex(x => x.r === r); if (i < 0) return; const nw = pick(r, o.items[i]); if (nw) o = cambiar(o, i, nw.n, nw.e, meta); });
-    return o; }
-  function generar(metas, nCom) {
+    return limpiar(o, meta, comida, ex); }
+  function generar(metas, nCom, ex) {
     const cs = COMIDAS[nCom === 5 ? 5 : 4];
     return { fecha: new Date().toISOString().slice(0, 10), nCom: cs.length, comidas: cs.map(([k, l, p]) => {
       const meta = { kcal: r(metas.kcal * p), prot: r(metas.prot * p), carb: r(metas.carb * p), gras: r(metas.gras * p) };
-      return { k, l, p, meta, ops: T[k].map(t => opcion(t, meta)) }; }) };
+      return { k, l, p, meta, ops: T[k].map(t => limpiar(opcion(t, meta), meta, k, ex)) }; }) };
   }
   // medida casera para mostrar junto a los gramos
   const FR = q => { const e = Math.floor(q), f = q - e; const s = f >= 0.875 ? '' : f >= 0.625 ? '¾' : f >= 0.375 ? '½' : f >= 0.125 ? '¼' : ''; const ee = f >= 0.875 ? e + 1 : e; return (ee ? ee : '') + s || '¼'; };
@@ -175,6 +179,50 @@
   }
   const nombre = (n, e) => n.replace(' (escurrido)', '') + (e === 'cocido' ? ' (cocido)' : e === 'crudo' ? ' (crudo)' : '');
 
+
+  /* ---------- alimentos que no come ---------- */
+  const EXCL = {
+    lacteos: ['🥛 Lácteos', /Yogur|Leche|Quesillo|cottage|Queso|Crema de leche|whey|^Mantequilla$/],
+    huevo: ['🥚 Huevo', /Huevo|Clara/],
+    pescado: ['🐟 Pescados y mariscos', /Atún|Jurel|Salmón|Merluza/],
+    pollo: ['🍗 Pollo y pavo', /pollo|pavo/i],
+    carne: ['🥩 Carne de vacuno', /Carne molida|Vacuno/],
+    cerdo: ['🐖 Cerdo', /cerdo|Vienesa/i],
+    gluten: ['🌾 Gluten (pan, fideos, avena)', /Pan |Pan$|Fideos|Avena|Cuscús|Tortilla|Galletas de agua|Mote|Harina|Cereal|Granola|Pizza|Empanada|Sopaipilla/],
+    frutos_secos: ['🌰 Frutos secos', /Almendras|Nueces/],
+    mani: ['🥜 Maní', /Maní/],
+    legumbres: ['🫘 Legumbres', /Lentejas|Porotos|Garbanzos|Hummus|Arvejas/],
+    soya: ['🌱 Soya / tofu', /Tofu/],
+  };
+  const excluido = (n, ex) => (ex || []).some(k => EXCL[k] && EXCL[k][1].test(n));
+  const DES_OK = { p: /Clara|Huevo|Yogur|cottage|Atún|whey|Quesillo|Pechuga de pavo/, c: /Pan|Avena|Galletas|Tortilla|Plátano|Manzana|Pera|Kiwi|Mandarina|Naranja/, g: /Almendras|Nueces|Maní|Mantequilla de maní|Palta|chía|Linaza/ };
+  const COM_OK = { p: /Pechuga|Trutro|Carne molida|Vacuno|Lomo de cerdo|Merluza|Salmón|Atún|Jurel|Huevo|Clara|Tofu/, c: /Arroz|Fideos|Quínoa|Papa|Camote|Choclo|Lentejas|Porotos|Garbanzos|Cuscús|Mote/, g: /Aceite de oliva|Palta|Aceitunas/ };
+  // cambia los alimentos que no come por otros del mismo tipo que sí calcen con esa comida
+  function limpiar(op, meta, comida, ex) { if (!(ex || []).length) return op;
+    const fuerte = comida === 'almuerzo' || comida === 'cena';
+    for (let vuelta = 0; vuelta < 8; vuelta++) { const i = op.items.findIndex(x => excluido(x.n, ex)); if (i < 0) break; const r = rolDe(op.items[i]);
+      if (r === 'f') { op = quitar(op, i, meta); continue; }
+      const ok = (fuerte ? COM_OK : DES_OK)[r]; let ls = CAT[r] ? alternativas(Object.assign({}, op.items[i], { r })).filter(x => !excluido(x.n, ex)) : []; const pref = ok ? ls.filter(x => ok.test(x.n)) : []; if (pref.length) ls = pref;
+      if (!ls.length) { op = quitar(op, i, meta); continue; }
+      const elegido = ls[Math.floor(Math.random() * ls.length)]; op = cambiar(op, i, elegido.n, elegido.e, meta); }
+    return op; }
+  /* ---------- día de descanso: ¾ de los carbohidratos ---------- */
+  const DESC = 0.75;
+  const metasDescanso = m => m && m.kcal ? { kcal: Math.round((m.kcal - m.carb * (1 - DESC) * 4) / 10) * 10, prot: m.prot, carb: Math.round(m.carb * DESC), gras: m.gras } : m;
+  function opDescanso(op) { return { items: op.items.map(x => { if (rol(x) !== 'c') return x; const st = PASO(x.n); return Object.assign({}, x, { g: Math.max(st, Math.round(x.g * DESC / st) * st) }); }) }; }
+  /* ---------- evolución entre los dos últimos InBody y sugerencia ---------- */
+  function evolucion(inbody, obj) {
+    const ls = (inbody || []).filter(x => x && Number(x.peso)).slice().sort((a, b) => String(a.f).localeCompare(String(b.f))); if (ls.length < 2) return null;
+    const a = ls[ls.length - 2], b = ls[ls.length - 1]; const n = v => (v == null || v === '' || isNaN(+v)) ? null : +v;
+    const dias = Math.max(1, Math.round((new Date(b.f) - new Date(a.f)) / 864e5)); const mes = 30 / dias;
+    const gA = n(a.mgc) ?? (n(a.pgc) != null ? a.peso * a.pgc / 100 : null), gB = n(b.mgc) ?? (n(b.pgc) != null ? b.peso * b.pgc / 100 : null);
+    const d = { dias, peso: b.peso - a.peso, grasa: gA != null && gB != null ? gB - gA : null, musc: n(a.mme) != null && n(b.mme) != null ? b.mme - a.mme : null };
+    const gm = d.grasa != null ? d.grasa * mes : null, mm = d.musc != null ? d.musc * mes : null; let dk = 0, txt = '';
+    if (obj === 'bajar') { if (gm == null) txt = 'Falta % de grasa para evaluar.'; else if (gm > -0.5) { dk = -150; txt = 'La grasa casi no bajó: resta ~150 kcal.'; } else if (mm != null && mm < -0.5) { dk = 100; txt = 'Bajó grasa pero también músculo: suma ~100 kcal y mantén la proteína alta.'; } else if (gm < -2.5) { dk = 100; txt = 'Baja muy rápido: suma ~100 kcal para cuidar el músculo.'; } else txt = 'Va bien: mantén la pauta.'; }
+    else if (obj === 'subir') { if (mm == null) txt = 'Falta músculo esquelético para evaluar.'; else if (mm < 0.25) { dk = 150; txt = 'El músculo casi no subió: suma ~150 kcal.'; } else if (gm != null && gm > 1) { dk = -100; txt = 'Sube mucha grasa: resta ~100 kcal.'; } else txt = 'Va bien: mantén la pauta.'; }
+    else if (obj === 'recomp') { if (gm == null) txt = 'Falta % de grasa para evaluar.'; else if (gm > 0.3 && (mm == null || mm < 0.2)) { dk = -100; txt = 'Sube grasa sin subir músculo: resta ~100 kcal.'; } else if (mm != null && mm < -0.3) { dk = 100; txt = 'Está perdiendo músculo: suma ~100 kcal.'; } else txt = 'Va bien: mantén la pauta.'; }
+    else { if (Math.abs(d.peso * mes) > 1) { dk = d.peso > 0 ? -100 : 100; txt = d.peso > 0 ? 'Está subiendo de peso: resta ~100 kcal.' : 'Está bajando de peso: suma ~100 kcal.'; } else txt = 'Peso estable: mantén la pauta.'; }
+    return Object.assign(d, { desde: a.f, hasta: b.f, dk, txt }); }
   /* ---------- PDF (HTML negro listo para imprimir / guardar como PDF) ---------- */
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const nf = x => r(x).toLocaleString('es-CL');
@@ -205,9 +253,10 @@ ul{margin:0;padding:0;list-style:none}li{padding:2px 0}li span{color:#a69ea3}.tt
 <h2>Metas diarias</h2><div class="mt"><div><b>${nf(metas.kcal)}</b><span>kcal</span></div><div><b style="color:#ff5a68">${nf(metas.prot)} g</b><span>Proteína</span></div><div><b style="color:#f3b45b">${nf(metas.carb)} g</b><span>Carbohidratos</span></div><div><b style="color:#7cc0ff">${nf(metas.gras)} g</b><span>Grasas</span></div></div>
 ${pauta.comidas.map(c => `<div class="blk"><div class="ml"><h2>${esc(c.l)}</h2><span>≈ ${nf(c.meta.kcal)} kcal · P ${nf(c.meta.prot)} · C ${nf(c.meta.carb)} · G ${nf(c.meta.gras)} — elige 1 opción</span></div>
 <table><tr><th>Opción 1</th><th>Opción 2</th><th>Opción 3</th></tr><tr>${c.ops.map(cel).join('')}</tr></table></div>`).join('')}
+<div class="ft" style="color:#a69ea3;font-size:12px">😴 Días de descanso: come ¾ de la porción de carbohidratos (arroz, papa, pan, avena, fruta) ≈ ${nf(metasDescanso(metas).kcal)} kcal · C ${nf(metasDescanso(metas).carb)} g.${per.excluir && per.excluir.length ? ' · No incluye: ' + esc(per.excluir.map(k => (EXCL[k] || [k])[0].replace(/^\S+\s/, '')).join(', ')) + '.' : ''}</div>
 <div class="ft">Pesos en gramos según se indica (cocido o crudo). Verduras libres. Agua 2–3 litros al día. · Titanium Sport Center · ${esc(per.coach || 'Franco Palavecino')}</div></div>
 <button class="noprint" onclick="window.print()">Guardar PDF / Imprimir</button></body></html>`;
   }
 
-  window.TL_NUTRI = { OBJ, ACT, COMIDAS, CAT_L, datos, basal, calcMetas, generar, suma, medida, nombre, food, pdfHTML, factor, rol, alternativas, cambiar, variar };
+  window.TL_NUTRI = { EXCL, excluido, limpiar, metasDescanso, opDescanso, evolucion, OBJ, ACT, COMIDAS, CAT_L, datos, basal, calcMetas, generar, suma, medida, nombre, food, pdfHTML, factor, rol, rolDe, alternativas, cambiar, quitar, variar };
 })();

@@ -187,6 +187,27 @@ Deno.serve(async (req) => {
         body: partes.join(' · ') + (alertas.length ? ` · ⚠️ Revisa su ficha: ${alertas.join(', ')}` : ''),
         url: './index.html#alumnos', tag: 'ing-' + b.alumno }));
     }
+    if (b.modo === 'nutri_objetivo') {
+      // el alumno eligió su objetivo en la app: aviso al profe para revisar y enviar la pauta (una vez por cambio)
+      const { data: n } = await sb.from('nutricion').select('alumno,meta,updated_at,aviso_obj_at').eq('alumno', String(b.alumno)).eq('activo', true).maybeSingle();
+      if (!n || !n.meta?.revisar || (n.aviso_obj_at && n.aviso_obj_at >= n.updated_at)) return json({ skip: true });
+      const { data: up } = await sb.from('nutricion').update({ aviso_obj_at: new Date().toISOString() }).eq('alumno', n.alumno).select('alumno').maybeSingle();
+      if (!up) return json({ skip: true });
+      const { data: a } = await sb.from('alumnos').select('nombre').eq('codigo', n.alumno).maybeSingle();
+      const OBJ: Record<string, string> = { bajar: 'Bajar grasa', recomp: 'Recomposición corporal', mantener: 'Mantener', subir: 'Ganar músculo' };
+      return json(await enviar(await subsProfe(), {
+        title: `🥗 ${String(a?.nombre || n.alumno).trim()} eligió «${OBJ[n.meta.obj] || 'objetivo'}»`,
+        body: `Meta ${Math.round(n.meta.kcal || 0).toLocaleString('es-CL')} kcal · P ${n.meta.prot} · C ${n.meta.carb} · G ${n.meta.gras}. Revisa y envía su pauta.`,
+        url: './index.html#inicio', tag: 'nutri-obj-' + n.alumno }));
+    }
+    if (b.modo === 'nutri_pauta') {
+      // el profe envió la pauta: aviso al alumno (una vez por envío)
+      const { data: n } = await sb.from('nutricion').select('alumno,pauta_at,aviso_pauta_at').eq('alumno', String(b.alumno)).eq('activo', true).maybeSingle();
+      if (!n || !n.pauta_at || (n.aviso_pauta_at && n.aviso_pauta_at >= n.pauta_at)) return json({ skip: true });
+      await sb.from('nutricion').update({ aviso_pauta_at: n.pauta_at }).eq('alumno', n.alumno);
+      const prof = await nombreProfe();
+      return json(await enviar(await subsDe(n.alumno), { title: '📋 Tu pauta nutricional está lista', body: `${prof} te envió tu pauta: 3 opciones por comida. Toca para verla.`, url: './alumno.html?nutri=1', tag: 'nutri-pauta-' + n.alumno }));
+    }
     if (b.modo === 'pagos') {
       // avisos al alumno: 5 días antes, el día del vencimiento y 3 días después (se registra antes de enviar)
       const { data: pend, error } = await sb.rpc('pagos_por_avisar'); if (error) throw error;
