@@ -1216,6 +1216,7 @@ function studentCard(f, hora, code, ruts) {
 const limpiarEj = n => String(n || '').replace(/^(min(uto)?\s*\d+|\d+[ab]?)\s*·\s*/i, '').replace(/\s*\(.*?\)/g, '');
 const sinDescE = d => String(d || '').replace(/(desc(?:anso)?\.?|luego|pausa)\s*\d+(?:[:.]\d+)?\s*(?:s|seg|min|m|')(?![a-z])/gi, '').replace(/\d+(?:[:.]\d+)?\s*(?:s|seg|min)\s*de\s*(pausa|descanso)/gi, '');
 // misma regla que la app del alumno: lo primero que viene en la dosis es lo que se hace; lo que sigue es descanso
+const esSalto = n => /salto|jump|pogo|brinco|pliom[eé]tric|skipping|step-?up explosivo|burpee/i.test(n || '');
 const esTiempo = (n, d) => { d = sinDescE(d); if (/×\s*\d+(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i.test(d)) return true;
   const pri = d.replace(/^\s*mismas series\s*·?\s*/i, '').replace(/^\s*\d+\s*[×x]\s*/i, '').match(/^\s*(m[aá]x|\d+(?:\s*[–-]\s*\d+)?)\s*(s\b|seg|"|min|m\b)?/i);
   if (pri && /^m$/i.test(pri[2] || '')) return false; if (pri && /^(s|seg|"|min)/i.test(pri[2] || '')) return true; if (pri && !pri[2] && /^\s*(mismas series|\d+\s*[×x])/i.test(d)) return false;
@@ -1328,7 +1329,8 @@ function cargasHTML(f, hora, code, key, rut, r) {
       return `<div class="ej-blk">
       <div class="ej-n">${esc(e.n)}${pr ? '<span class="pr">🏆 Récord</span>' : ''}<span class="d">${esc(e.d)}${l ? ` · última: <b>${esc(fmtSets(l))}</b>` : ''}</span></div>${c.c ? `<div class="small" style="color:var(--muted);font-style:italic">💬 ${esc(c.c)}</div>` : ''}
       ${esTiempo(e.n, e.d) ? `<div class="ser-row h"><span>Serie</span><span style="grid-column:span 2">segundos</span><span></span></div>${Array.from({length: nS}, (_, j) => { const s = sets[j] || {}, ls = lsets[j]; return `
-      <div class="ser-row"><span class="sn num">${j + 1}</span><input type="text" inputmode="numeric" style="grid-column:span 2" id="tt-${kid}-${i}-${j}" data-act="ser" data-k="${esc(key)}" data-n="${esc(e.n)}" data-i="${j}" data-field="t" value="${s.t != null ? esc(s.t) : ''}" placeholder="${ls?.t != null ? esc(ls.t) : 'seg'}" aria-label="segundos serie ${j + 1} ${esc(e.n)}"><span></span></div>`; }).join('')}` : `
+      <div class="ser-row"><span class="sn num">${j + 1}</span><input type="text" inputmode="numeric" style="grid-column:span 2" id="tt-${kid}-${i}-${j}" data-act="ser" data-k="${esc(key)}" data-n="${esc(e.n)}" data-i="${j}" data-field="t" value="${s.t != null ? esc(s.t) : ''}" placeholder="${ls?.t != null ? esc(ls.t) : 'seg'}" aria-label="segundos serie ${j + 1} ${esc(e.n)}"><span></span></div>`; }).join('')}` : esSalto(e.n) ? `<div class="ser-row h"><span>Serie</span><span style="grid-column:span 2">reps</span><span></span></div>${Array.from({length: nS}, (_, j) => { const s = sets[j] || {}, ls = lsets[j]; return `
+      <div class="ser-row"><span class="sn num">${j + 1}</span><input type="text" inputmode="numeric" style="grid-column:span 2" id="rp-${kid}-${i}-${j}" data-act="ser" data-k="${esc(key)}" data-n="${esc(e.n)}" data-i="${j}" data-field="r" value="${s.r != null ? esc(s.r) : ''}" placeholder="${ls?.r != null ? esc(ls.r) : 'reps'}" aria-label="reps serie ${j + 1} ${esc(e.n)}"><span></span></div>`; }).join('')}` : `
       <div class="ser-row h"><span>Serie</span><span>kg</span><span>reps</span><span></span></div>
       ${Array.from({length: nS}, (_, j) => { const s = sets[j] || {}, ls = lsets[j], prev = j ? sets[j - 1] : null;
         const src = ls || (prev && (prev.kg != null || prev.r != null) ? prev : null); return `
