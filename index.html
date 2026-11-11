@@ -1459,6 +1459,7 @@ VIEWS.horario = () => {
 };
 
 VIEWS.alumnos = () => {
+  nuResumen();
   const q = norm(S.ui.alumnosQ), F = S.ui.alumnosF;
   let list = [...S.alumnos.values()].sort((x,y) => norm(x.nombre).localeCompare(norm(y.nombre)));
   list = list.filter(a => F === 'todos' ? true : F === 'inactivos' ? a.estado === 'inactivo' : a.estado !== 'inactivo');
@@ -1490,7 +1491,7 @@ VIEWS.alumnos = () => {
       const as = p?.inicio ? asistencias(a.codigo, p.inicio, p.fin ? addDays(p.fin, -1) : null) : {pres:0, aus:0};
       const pct = as.pres + as.aus ? Math.round(100 * as.pres / (as.pres + as.aus)) + ' %' : 'Sin registro';
       return `<tr class="click" data-act="ficha" data-id="${esc(a.codigo)}">
-        <td><div style="display:flex;gap:10px;align-items:center">${a.perfil?.avatar && fotoURL(a.perfil.avatar) ? `<img class="al-av" src="${fotoURL(a.perfil.avatar)}" alt="" loading="lazy">` : `<span class="al-av" aria-hidden="true">${esc(iniciales(a.nombre))}</span>`}<div style="min-width:0"><b>${esc(a.nombre)}</b>${a.online ? ' <span class="pill" style="background:rgba(77,163,255,.15);color:#7cc0ff;border:1px solid rgba(77,163,255,.45);font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;white-space:nowrap">🌐 Online</span>' : ''}${a.estado !== 'inactivo' ? appChips(a) : ''}<span class="sub">${esc(a.codigo)}${a.estado === 'inactivo' ? ' · inactivo' : ''}${(() => { const pg = progEstado(a); return pg ? ' · ' + esc(progTexto(pg)) + ' · sem ' + Math.min(pg.semana, pg.total) + '/' + pg.total + (pg.terminado ? ' ✓' : '') : ''; })()}</span></div></div></td>
+        <td><div style="display:flex;gap:10px;align-items:center">${a.perfil?.avatar && fotoURL(a.perfil.avatar) ? `<img class="al-av" src="${fotoURL(a.perfil.avatar)}" alt="" loading="lazy">` : `<span class="al-av" aria-hidden="true">${esc(iniciales(a.nombre))}</span>`}<div style="min-width:0"><b>${esc(a.nombre)}</b>${nuPill(a.codigo)}${a.online ? ' <span class="pill" style="background:rgba(77,163,255,.15);color:#7cc0ff;border:1px solid rgba(77,163,255,.45);font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;white-space:nowrap">🌐 Online</span>' : ''}${a.estado !== 'inactivo' ? appChips(a) : ''}<span class="sub">${esc(a.codigo)}${a.estado === 'inactivo' ? ' · inactivo' : ''}${(() => { const pg = progEstado(a); return pg ? ' · ' + esc(progTexto(pg)) + ' · sem ' + Math.min(pg.semana, pg.total) + '/' + pg.total + (pg.terminado ? ' ✓' : '') : ''; })()}</span></div></div></td>
         <td class="small">${a.online ? '<span style="color:#7cc0ff;font-weight:600">🌐 Online</span>' + ((a.diasOnline || []).length ? ' · ' + esc(a.diasOnline.map(d => DSHORT[d]).join(' ')) : '') : esc(bloquesTexto(a))}</td>
         <td class="r num">${a.online ? 'Mensual' : tot || '—'}${p?.inicio ? `<span class="sub">${fmtD(p.inicio)}–${fmtD(p.fin)}</span>` : ''}</td>
         ${a.online ? (() => { let n = 0; for (const [f, d] of S.dias) { const r = d.bloques?.online?.[a.codigo]; if (r && r.rpe != null && p?.inicio && f >= p.inicio && (!p.fin || f < p.fin)) n++; } return `<td class="r num">${n}<span class="sub">sesiones</span></td><td class="r num">—</td><td class="r num">—</td>`; })() : `<td class="r num">${as.pres + as.aus}${as.aus ? `<span class="sub">${as.aus} falta${as.aus === 1 ? '' : 's'}</span>` : ''}</td>
@@ -1729,6 +1730,73 @@ async function habAsig(el) {
   if (error) { toast('No se pudo guardar: ' + error.message, true); return; }
   toast(on ? nom + ' quitada' : nom + ' asignada ✓'); habPanel(code);
 }
+/* ---------- nutrición por alumno: activar registro, metas y cumplimiento (lo que el alumno anota en su app) ---------- */
+const NU_COMS = [['desayuno', 'Desayuno'], ['almuerzo', 'Almuerzo'], ['once', 'Once'], ['cena', 'Cena'], ['snack', 'Snacks']];
+const nuN = x => Math.round(Number(x) || 0).toLocaleString('es-CL');
+function nuSuma(rs) { return rs.reduce((t, r) => ({ kcal: t.kcal + Number(r.kcal || 0), prot: t.prot + Number(r.prot || 0), carb: t.carb + Number(r.carb || 0), gras: t.gras + Number(r.gras || 0) }), { kcal: 0, prot: 0, carb: 0, gras: 0 }); }
+function nuUltInbody(code) { const a = S.alumnos.get(code); const ls = ((a && a.inbody) || []).filter(x => x && x.f).slice().sort((x, y) => x.f.localeCompare(y.f));
+  const peso = [...ls].reverse().find(x => Number(x.peso)); const tmb = [...ls].reverse().find(x => Number(x.tmb)); return { peso: peso ? Number(peso.peso) : null, tmb: tmb ? Number(tmb.tmb) : null, f: (tmb || peso || {}).f }; }
+async function nuPanel(code) {
+  const box = document.getElementById('fa-nu'); if (!box || box.dataset.alumno !== code || !window.__sb) return;
+  const lbl = document.getElementById('fa-nu-n');
+  const { data: n, error } = await window.__sb.from('nutricion').select('alumno,activo,meta').eq('alumno', code).maybeSingle();
+  if (error) { lbl.textContent = '· no se pudo cargar'; return; }
+  if (!n || !n.activo) { lbl.textContent = '· desactivada';
+    box.innerHTML = `<div class="small muted" style="margin-bottom:8px">Al activarla, aparece la pestaña <b>Nutri</b> en su app: registra lo que come (buscador, crudo/cocido, código de barras, recetas) y tú ves aquí su cumplimiento.</div><button type="button" class="btn pri" data-act="nu-on" data-id="${esc(code)}">🥗 Activar registro de comidas</button>`; return; }
+  const m = n.meta || {}; const desde = addDays(today(), -6);
+  const { data: lg } = await window.__sb.from('comidas_log').select('fecha,comida,nombre,gramos,estado,kcal,prot,carb,gras').eq('alumno', code).gte('fecha', desde).order('created_at');
+  const rows = lg || []; const dias = [...Array(7)].map((_, i) => addDays(today(), i - 6)); const tots = dias.map(f => nuSuma(rows.filter(r => r.fecha === f)));
+  const reg = tots.filter(t => t.kcal > 0); const prom = k => reg.length ? reg.reduce((s, t) => s + t[k], 0) / reg.length : 0;
+  const enMeta = m.kcal ? reg.filter(t => Math.abs(t.kcal - m.kcal) <= m.kcal * 0.1 && (!m.prot || t.prot >= m.prot * 0.9)).length : 0;
+  lbl.textContent = '· ' + (m.kcal ? nuN(m.kcal) + ' kcal · ' : 'sin metas · ') + reg.length + '/7 días registrados';
+  const ib = nuUltInbody(code); const cel = (v, meta) => meta ? `<span class="${v > meta * 1.1 ? 'warn' : v >= meta * 0.9 ? 'ok' : ''}">${nuN(v)}</span>` : nuN(v);
+  const hoy = rows.filter(r => r.fecha === today());
+  box.innerHTML = `
+    <div class="small muted" style="margin-bottom:6px">Metas diarias que ve en su app. ${ib.tmb || ib.peso ? `Último InBody${ib.f ? ' (' + fmtD(ib.f) + ')' : ''}: ${ib.peso ? ib.peso + ' kg' : ''}${ib.tmb ? ' · metabolismo basal ' + nuN(ib.tmb) + ' kcal' : ''}.` : 'Sin InBody: escribe el peso para calcular.'}</div>
+    <div class="frow">
+      <label class="f">Peso (kg)<input type="number" inputmode="decimal" id="nu-peso" value="${esc(ib.peso || '')}"></label>
+      <label class="f">Actividad<select id="nu-act">${[[1.375, 'Ligera · 1–3 días'], [1.55, 'Moderada · 3–5 días'], [1.725, 'Alta · 6–7 días / doble']].map(([v, l]) => `<option value="${v}" ${v === (m.act || 1.55) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="f">Objetivo<select id="nu-obj">${[[-0.2, 'Bajar grasa (−20%)'], [-0.1, 'Bajar suave (−10%)'], [0, 'Mantener'], [0.1, 'Subir músculo (+10%)']].map(([v, l]) => `<option value="${v}" ${v === (m.obj ?? 0) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="f">Proteína g/kg<select id="nu-pkg">${[1.6, 1.8, 2, 2.2].map(v => `<option value="${v}" ${v === (m.pkg || 2) ? 'selected' : ''}>${String(v).replace('.', ',')}</option>`).join('')}</select></label>
+    </div>
+    <button type="button" class="btn" data-act="nu-calc" data-id="${esc(code)}" style="margin:6px 0 10px">🧮 Calcular metas${ib.tmb ? ' con su InBody' : ''}</button>
+    <div class="frow">
+      <label class="f">Calorías (kcal)<input type="number" inputmode="numeric" id="nu-kcal" value="${esc(m.kcal || '')}"></label>
+      <label class="f">Proteína (g)<input type="number" inputmode="numeric" id="nu-prot" value="${esc(m.prot || '')}"></label>
+      <label class="f">Carbohidratos (g)<input type="number" inputmode="numeric" id="nu-carb" value="${esc(m.carb || '')}"></label>
+      <label class="f">Grasas (g)<input type="number" inputmode="numeric" id="nu-gras" value="${esc(m.gras || '')}"></label>
+    </div>
+    <label class="f" style="margin-top:6px">Nota para el alumno (opcional)<input type="text" id="nu-nota" maxlength="160" value="${esc(m.nota || '')}" placeholder="Ej: prioriza proteína en cada comida"></label>
+    <div style="display:flex;gap:8px;margin:10px 0 14px;flex-wrap:wrap"><button type="button" class="btn pri" data-act="nu-meta" data-id="${esc(code)}">Guardar metas</button><button type="button" class="btn ghost" data-act="nu-off" data-id="${esc(code)}">Desactivar</button></div>
+    <div style="font-weight:700;margin-bottom:6px">Últimos 7 días <span class="small muted" style="font-weight:500">· ${reg.length}/7 registrados${m.kcal ? ' · ' + enMeta + ' en meta (±10% kcal y proteína)' : ''}</span></div>
+    <div class="tbl-wrap"><table class="small"><thead><tr><th>Día</th><th class="r">kcal</th><th class="r">Prot</th><th class="r">Carb</th><th class="r">Grasa</th></tr></thead><tbody>
+      ${dias.map((f, i) => { const t = tots[i]; return `<tr><td>${esc(DSHORT[dayKey(f)] || '')} ${fmtD(f)}</td>${t.kcal ? `<td class="r num">${cel(t.kcal, m.kcal)}</td><td class="r num">${cel(t.prot, m.prot)}</td><td class="r num">${nuN(t.carb)}</td><td class="r num">${nuN(t.gras)}</td>` : '<td class="r muted" colspan="4">sin registro</td>'}</tr>`; }).join('')}
+      ${reg.length ? `<tr><td><b>Promedio</b></td><td class="r num"><b>${nuN(prom('kcal'))}</b>${m.kcal ? ` <span class="muted">/ ${nuN(m.kcal)}</span>` : ''}</td><td class="r num"><b>${nuN(prom('prot'))}</b>${m.prot ? ` <span class="muted">/ ${nuN(m.prot)}</span>` : ''}</td><td class="r num">${nuN(prom('carb'))}</td><td class="r num">${nuN(prom('gras'))}</td></tr>` : ''}
+    </tbody></table></div>
+    ${hoy.length ? `<details style="margin-top:10px"><summary class="small" style="cursor:pointer;font-weight:600">Lo que anotó hoy (${hoy.length})</summary>${NU_COMS.map(([k, l]) => { const rs = hoy.filter(r => r.comida === k); return rs.length ? `<div class="small" style="margin-top:6px"><b>${l}</b> <span class="muted">· ${nuN(nuSuma(rs).kcal)} kcal</span>${rs.map(r => `<div class="muted">${esc(r.nombre)}${r.estado ? ' (' + esc(r.estado) + ')' : ''} · ${nuN(r.gramos)} g · ${nuN(r.kcal)} kcal · P ${nuN(r.prot)}</div>`).join('')}</div>` : ''; }).join('')}</details>` : ''}`;
+}
+function nuCalc(code) { const peso = Number(String(val('nu-peso')).replace(',', '.')); if (!peso) { toast('Escribe el peso para calcular', true); return; }
+  const ib = nuUltInbody(code); const act = Number(val('nu-act')) || 1.55, obj = Number(val('nu-obj')) || 0, pkg = Number(val('nu-pkg')) || 2;
+  const base = ib.tmb || peso * 22; const kcal = Math.round(base * act * (1 + obj) / 10) * 10; const prot = Math.round(peso * pkg), gras = Math.round(peso * 0.9); const carb = Math.max(0, Math.round((kcal - prot * 4 - gras * 9) / 4));
+  [['nu-kcal', kcal], ['nu-prot', prot], ['nu-carb', carb], ['nu-gras', gras]].forEach(([i, v]) => { const el = document.getElementById(i); if (el) el.value = v; });
+  toast(ib.tmb ? 'Calculado con su metabolismo basal. Ajusta y guarda.' : 'Cálculo aproximado (sin InBody). Ajusta y guarda.'); }
+async function nuGuardarMeta(code, el) { const num = i => Math.round(Number(String(val(i)).replace(',', '.')) || 0);
+  let meta = { kcal: num('nu-kcal'), prot: num('nu-prot'), carb: num('nu-carb'), gras: num('nu-gras'), nota: val('nu-nota').slice(0, 160), act: Number(val('nu-act')) || 1.55, obj: Number(val('nu-obj')) || 0, pkg: Number(val('nu-pkg')) || 2, desde: today() };
+  if (!meta.kcal && (meta.prot || meta.carb || meta.gras)) meta.kcal = meta.prot * 4 + meta.carb * 4 + meta.gras * 9;
+  if (meta.kcal && (meta.kcal < 800 || meta.kcal > 6000)) { toast('Revisa las calorías', true); return; }
+  el.disabled = true; const { error } = await window.__sb.from('nutricion').update({ meta, updated_at: new Date().toISOString() }).eq('alumno', code); el.disabled = false;
+  if (error) { toast('No se pudo guardar: ' + error.message, true); return; } toast('Metas guardadas ✓ Le aparecen al abrir su app'); S.nuRes = null; nuPanel(code); }
+async function nuActivar(code, on, el) { const nom = firstName((S.alumnos.get(code) || {}).nombre || '');
+  if (!on && !confirm(`¿Desactivar nutrición para ${nom}? Se oculta la pestaña en su app; su registro y metas quedan guardados.`)) return;
+  el.disabled = true; const { error } = await window.__sb.from('nutricion').upsert({ alumno: code, activo: on, updated_at: new Date().toISOString() }, { onConflict: 'alumno' }); el.disabled = false;
+  if (error) { toast('No se pudo guardar: ' + error.message, true); return; } toast(on ? 'Nutrición activada ✓ Que cierre y abra su app' : 'Nutrición desactivada'); S.nuRes = null; nuPanel(code); }
+// resumen para la lista de alumnos: días registrados en los últimos 7
+async function nuResumen() { if (S.nuRes || S.nuResCargando || !window.__sb) return; S.nuResCargando = true;
+  try { const { data: ns } = await window.__sb.from('nutricion').select('alumno,meta').eq('activo', true); const m = new Map();
+    if ((ns || []).length) { const { data: lg } = await window.__sb.from('comidas_log').select('alumno,fecha').gte('fecha', addDays(today(), -6)).in('alumno', ns.map(n => n.alumno));
+      ns.forEach(n => m.set(n.alumno, new Set((lg || []).filter(r => r.alumno === n.alumno).map(r => r.fecha)).size)); }
+    S.nuRes = m; } catch (_) { S.nuRes = new Map(); } S.nuResCargando = false; if (S.view === 'alumnos') render(); }
+const nuPill = code => { const r = S.nuRes && S.nuRes.get(code); if (r == null) return ''; return ` <span class="pill" title="Nutrición: días registrados en los últimos 7" style="background:${r >= 5 ? 'rgba(111,211,154,.15)' : r >= 3 ? 'rgba(243,180,91,.15)' : 'rgba(215,31,48,.15)'};color:${r >= 5 ? 'var(--ok)' : r >= 3 ? 'var(--warn)' : 'var(--crit)'}">🥗 ${r}/7</span>`; };
 function fichaAlumno(code, tabIni) {
   const isNew = !code;
   const a = isNew ? {codigo: nextCode(), nombre:'', estado:'activo', telefono:'', notas:'', clases:8, bloques:[], planes:[]} : clone(S.alumnos.get(code));
@@ -1800,6 +1868,7 @@ function fichaAlumno(code, tabIni) {
     </div>
     </details>
     ${isNew ? '' : `<details class="sec" id="fa-hab-sec"><summary>⭐ Skills <span class="small muted" id="fa-hab-n" style="font-weight:500">· cargando…</span></summary><div class="small muted" style="margin:8px 0 6px">Toca para asignar o quitar. La pestaña Skills solo aparece en la app de quien tenga alguna asignada.</div><div class="chips" id="fa-hab" data-alumno="${esc(a.codigo)}"></div></details>`}
+    ${isNew ? '' : `<details class="sec" id="fa-nu-sec"><summary>🥗 Nutrición <span class="small muted" id="fa-nu-n" style="font-weight:500">· cargando…</span></summary><div id="fa-nu" data-alumno="${esc(a.codigo)}"></div></details>`}
     <details class="sec" ${isNew ? 'open' : ''}><summary>🗓 Horario fijo <span class="small muted" style="font-weight:500">· ${esc(bloquesTexto(a))}</span></summary>
       ${grid}
     </details>
@@ -1826,7 +1895,7 @@ function fichaAlumno(code, tabIni) {
     </details>
     <div id="del-zone"></div>
   `;
-  if (!isNew) setTimeout(() => habPanel(a.codigo), 0);
+  if (!isNew) setTimeout(() => { habPanel(a.codigo); nuPanel(a.codigo); }, 0);
   if (!isNew && window.__sb) setTimeout(async () => { try {
     const { data } = await window.__sb.from('actividades_hechas').select('fecha,minutos,rpe,nota,eventos(titulo,tipo)').eq('alumno', a.codigo).order('fecha', { ascending: false }).limit(20);
     const box = document.getElementById('fa-acts'); if (!box || !data || !data.length) return;
@@ -2839,6 +2908,9 @@ document.addEventListener('click', e => {
   if (act === 'reinvitar') { e.preventDefault(); e.stopPropagation(); const al = S.alumnos.get(id);
     if (al && confirm(`¿Mandarle un código nuevo a ${firstName(al.nombre)}? Le llega un código nuevo que vale 24 horas; su sesión anterior se cierra (sus datos y su rutina no se pierden).`)) invitarAlumno(id, el, true); return; }
   if (act === 'hab-asig') { e.preventDefault(); e.stopPropagation(); habAsig(el); return; }
+  if (act === 'nu-on' || act === 'nu-off') { e.preventDefault(); e.stopPropagation(); nuActivar(id, act === 'nu-on', el); return; }
+  if (act === 'nu-calc') { e.preventDefault(); e.stopPropagation(); nuCalc(id); return; }
+  if (act === 'nu-meta') { e.preventDefault(); e.stopPropagation(); nuGuardarMeta(id, el); return; }
   if (act === 'invitar') { e.preventDefault(); e.stopPropagation(); invitarAlumno(id, el); return; }
   if (act === 'ag-abrir') { e.preventDefault(); if (window.tlAbrirAgenda) window.tlAbrirAgenda('prox'); else document.getElementById('tl-agb')?.click(); return; }
   if (act === 'cp-on') { cpActivar(el); return; }
