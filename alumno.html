@@ -819,10 +819,11 @@ V.hoy = () => {
   const saldo = p ? Math.max(0, (p.monto || 0) - abonado(p)) : 0;
   const rd0 = rutinaDeHoy(); let prox = proximas(1)[0];
   // online: siempre puede entrenar hoy su próxima sesión (él organiza su semana)
-  if (ONL()) prox = terminada(recOf(t, 'online')) ? { f: addDays(t, 1), h: 'online' } : { f: t, h: 'online' };
+  const conHora = ONL() && prox && prox.h !== 'online' && prox.f === t; // hoy tiene una clase agendada con hora: esa manda
+  if (ONL() && !conHora) prox = terminada(recOf(t, 'online')) ? { f: addDays(t, 1), h: 'online' } : { f: t, h: 'online' };
   // la tarjeta muestra la rutina de la clase de la que habla (hoy o la próxima) y el botón abre esa misma clase
   const pe0 = ONL() ? progEstado() : null;
-  const idProx = ONL() ? (recOf(prox.f, 'online')?.rutina || pe0?.next?.[0] || rd0.id) : prox ? (recOf(prox.f, prox.h)?.rutina || prediccion().get(prox.f + '|' + prox.h) || rd0.id) : rd0.id;
+  const idProx = ONL() && !conHora ? (recOf(prox.f, 'online')?.rutina || pe0?.next?.[0] || rd0.id) : prox ? (recOf(prox.f, prox.h)?.rutina || prediccion().get(prox.f + '|' + prox.h) || rd0.id) : rd0.id;
   const rd = Object.assign({}, rd0, idProx && S.rutinas.get(idProx) ? { id: idProx, r: S.rutinas.get(idProx) } : {});
   const linea = rd.pe && rd.r ? progLinea(rd.r, rd.pe.semana) : '';
   const mes = t.slice(0, 7); const delMes = S.clases.filter(r => r.fecha.startsWith(mes) && terminada(r)).length;
@@ -834,7 +835,7 @@ V.hoy = () => {
   ${mensajesHTML()}
   ${(() => { const nac = S.perfil?.nac || S.a.nacimiento; return nac && nac.slice(5) === t.slice(5) ? `<section class="card" style="background:linear-gradient(135deg,#d71f30,#7a0f1a);border-color:#d71f30;text-align:center"><div style="font-size:40px">🎂</div><div class="disp" style="font-size:28px;color:#fff">¡Feliz cumpleaños, ${esc(nombreC)}!</div><div style="color:#ffe3e6">Todo el equipo Titanium te desea un gran día. Hoy celebra… y entrena con todo 💪</div></section>` : ''; })()}
   <section class="card">
-    <div class="row"><span class="eyebrow red">${(() => { const tg = prox ? tagClase(prox.f, prox.h, recOf(prox.f, prox.h)) : null; return tg && tg.c === 'ev' ? `<span class="tg ev" style="margin:0">${esc(tg.t)}</span>` : (ONL() ? (prox.f === t ? 'Tu sesión de hoy' : 'Hoy ya entrenaste ✅') : prox && prox.f === t ? 'Tu clase de hoy' : 'Tu próxima clase'); })()}</span><span class="small muted">${ONL() ? (prox.f === t ? '🌐 Online · cuando te acomode' : '🌐 Próxima sesión') : prox ? esc((prox.f === t ? 'Hoy' : DL[dayKey(prox.f)] + ' ' + fmtD(prox.f)) + ' · ' + prox.h) : 'Sin clases agendadas'}</span></div>
+    <div class="row"><span class="eyebrow red">${(() => { const tg = prox ? tagClase(prox.f, prox.h, recOf(prox.f, prox.h)) : null; return tg && tg.c === 'ev' ? `<span class="tg ev" style="margin:0">${esc(tg.t)}</span>` : (ONL() && !conHora ? (prox.f === t ? 'Tu sesión de hoy' : 'Hoy ya entrenaste ✅') : prox && prox.f === t ? 'Tu clase de hoy' : 'Tu próxima clase'); })()}</span><span class="small muted">${ONL() && !conHora ? (prox.f === t ? '🌐 Online · cuando te acomode' : '🌐 Próxima sesión') : prox ? esc((prox.f === t ? 'Hoy' : DL[dayKey(prox.f)] + ' ' + fmtD(prox.f)) + ' · ' + prox.h) : 'Sin clases agendadas'}</span></div>
     ${rd.r ? `<button class="ag-rut" ${prox ? `data-abrses="${esc(prox.f + '|' + prox.h + '|' + (rd.id || ''))}"` : 'data-go="rutina"'}><div style="flex:1;min-width:0"><div class="blk-t" style="font-size:22px">${esc(rd.r.tipo || 'Rutina')}</div><div class="small muted">${linea ? 'Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total + ' · ' : ''}${prox && prox.f === t ? 'Toca para entrenar' : 'Toca para ver la rutina'}</div></div><span class="chev" aria-hidden="true">›</span></button>` : `<div class="small muted">Franco te asigna la rutina en la clase.</div>`}
     ${prox && !ONL() ? asisCorto(prox.f, prox.h) : ''}
   </section>
