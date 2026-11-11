@@ -1188,7 +1188,7 @@ function studentCard(f, hora, code, ruts) {
       <label class="f">RPE<input type="number" min="1" max="10" id="rpe-${esc(key)}" data-act="campo" data-field="rpe" data-k="${esc(key)}" value="${esc(r.rpe||'')}"></label>
       <label class="f">Notas<textarea rows="1" id="nota-${esc(key)}" data-act="campo" data-field="notas" data-k="${esc(key)}" placeholder="Molestias, ajustes…">${esc(r.notas||'')}</textarea></label>
     </div>`;
-      return `<div class="sc-det"><div class="st-row small sc-acc"><button class="btn sm ghost" data-act="ficha" data-id="${esc(code)}">Ficha</button><button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button><button class="btn sm ghost" data-act="reag" data-k="${esc(key)}">↻ Reagendar</button><button class="btn sm ghost crit-t" data-act="quitar-hoy" data-k="${esc(key)}">✕ Quitar de esta clase</button>${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}</div><div class="sc-tabs" role="group" aria-label="Detalle">${tb('series', 'Series')}${tb('rutina', 'Rutina' + (rid && !r.aprobada ? ' •' : ''))}${tb('cierre', 'Cierre' + (cierreN ? ' ✓' : ''))}</div><div class="sc-c">${body}</div></div>`; })() : ''}
+      return `<div class="sc-det"><div class="st-row small sc-acc"><button class="btn sm ghost" data-act="ficha" data-tab="ficha" data-id="${esc(code)}">Ficha</button><button class="btn sm ghost" data-act="progreso" data-id="${esc(code)}">Progreso</button><button class="btn sm ghost" data-act="reag" data-k="${esc(key)}">↻ Reagendar</button><button class="btn sm ghost crit-t" data-act="quitar-hoy" data-k="${esc(key)}">✕ Quitar de esta clase</button>${ve.k !== 'vigente' ? (['vencido','hoy','pronto'].includes(ve.k) ? pillPago(ve, code, p?.id) : pill(ve)) : ''}${pe.k !== 'pagado' ? (['pendiente','parcial'].includes(pe.k) ? pillPago(pe, code, p?.id) : pill(pe)) : ''}</div><div class="sc-tabs" role="group" aria-label="Detalle">${tb('series', 'Series')}${tb('rutina', 'Rutina' + (rid && !r.aprobada ? ' •' : ''))}${tb('cierre', 'Cierre' + (cierreN ? ' ✓' : ''))}</div><div class="sc-c">${body}</div></div>`; })() : ''}
   </article>`;
 }
 // lo que el alumno va anotando desde su app durante la clase (se actualiza solo)
@@ -1537,7 +1537,7 @@ VIEWS.pagos = () => {
     <thead><tr><th>Alumno</th><th class="r">Monto</th><th class="r">Abonado</th><th class="r">Saldo</th><th>Inicio</th><th>Renueva</th><th>Estado</th><th class="r">Acciones</th></tr></thead>
     <tbody>
     ${vis.length ? vis.map(({a,p}) => { const actual = planActual(a)?.id === p.id; return `<tr class="${S.ui.pagosFoco === a.codigo && actual ? 'foco' : ''}">
-      <td><b style="cursor:pointer" data-act="ficha" data-id="${esc(a.codigo)}">${esc(a.nombre)}</b><span class="sub">${actual ? 'Plan actual' : 'Plan anterior'} · ${p.clases ? p.clases + ' clases' : 'sin clases'}</span></td>
+      <td><b style="cursor:pointer" data-act="ficha" data-tab="ficha" data-id="${esc(a.codigo)}">${esc(a.nombre)}</b><span class="sub">${actual ? 'Plan actual' : 'Plan anterior'} · ${p.clases ? p.clases + ' clases' : 'sin clases'}</span></td>
       <td class="r num">${clp(p.monto)}</td><td class="r num">${clp(abonado(p))}</td>
       <td class="r num" style="${saldo(p) ? 'color:var(--crit);font-weight:700' : ''}">${clp(saldo(p))}</td>
       <td class="num">${fmtDY(p.inicio)}</td><td class="num">${fmtDY(p.fin)}</td>
@@ -1713,7 +1713,7 @@ async function habAsig(el) {
   if (error) { toast('No se pudo guardar: ' + error.message, true); return; }
   toast(on ? nom + ' quitada' : nom + ' asignada ✓'); habPanel(code);
 }
-function fichaAlumno(code) {
+function fichaAlumno(code, tabIni) {
   const isNew = !code;
   const a = isNew ? {codigo: nextCode(), nombre:'', estado:'activo', telefono:'', notas:'', clases:8, bloques:[], planes:[]} : clone(S.alumnos.get(code));
   if (!a) return;
@@ -1826,7 +1826,8 @@ function fichaAlumno(code) {
     const box = document.getElementById('fa-acts'); if (!box || !data || !data.length) return;
     box.innerHTML = data.map(x => `<div class="li"><span class="grow"><b>${esc(x.eventos?.titulo || 'Actividad')}</b> <span class="muted num">· ${fmtDY(x.fecha)}${x.minutos ? ' · ' + x.minutos + ' min' : ''}${x.rpe != null ? ' · RPE ' + esc(x.rpe) : ''}</span>${x.nota ? `<br><span class="muted">${esc(x.nota)}</span>` : ''}</span><span class="pill ok">Hecha</span></div>`).join('');
     document.getElementById('fa-acts-n').textContent = '· ' + data.length + ' registrada' + (data.length === 1 ? '' : 's'); document.getElementById('fa-acts-sec').hidden = false; } catch (_) {} }, 0);
-  const tab0 = PF_TABS.some(([k]) => k === S.ui.pfTab) ? S.ui.pfTab : 'agenda';
+  // al abrir un perfil parte en Agenda (o en la pestaña que pide el botón); solo al volver de abonar/reagendar mantiene la pestaña en que estabas
+  const tab0 = S.ui.pfKeep && PF_TABS.some(([k]) => k === S.ui.pfTab) ? S.ui.pfTab : PF_TABS.some(([k]) => k === tabIni) ? tabIni : 'agenda';
   if (!isNew && S.ui.pfKeep) { S.ui.pfKeep = false; if (S.ui.pfRec) delete S.ui.pfRec[a.codigo]; }
   else if (!isNew) { S.ui.pfMes = today().slice(0, 7); S.ui.pfSel = null; S.ui.pfAddT = 'Clase'; S.ui.pfMq = ''; if (S.ui.pfRec) delete S.ui.pfRec[a.codigo]; if (S.ui.pfEv) Object.keys(S.ui.pfEv).forEach(k => { if (k.startsWith(a.codigo + '|')) delete S.ui.pfEv[k]; }); }
   openModal(isNew ? 'Nuevo alumno' : a.nombre, isNew ? fichaNueva() : `<div id="pf" data-id="${esc(a.codigo)}">
@@ -2191,7 +2192,7 @@ function medidasHTML(a) {
 function progresoModal(code) {
   const a = S.alumnos.get(code); if (!a) return;
   openModal(`Progreso · ${a.nombre}`, progresoHTML(a),
-    {wide: true, extra: `<button type="button" class="btn" data-act="ficha" data-id="${esc(code)}">Ver ficha</button><button type="button" class="btn" data-act="msg" data-id="${esc(code)}">Mensaje</button>`});
+    {wide: true, extra: `<button type="button" class="btn" data-act="ficha" data-tab="ficha" data-id="${esc(code)}">Ver ficha</button><button type="button" class="btn" data-act="msg" data-id="${esc(code)}">Mensaje</button>`});
 }
 /* =====================================================================
    PERFIL DEL ALUMNO · vista del profe
@@ -2876,7 +2877,7 @@ document.addEventListener('click', e => {
     case 'pf-obj': { const v = parseFloat(String(val('pf-obj')).replace(',', '.')); const a = clone(S.alumnos.get(id)); if (!a) break;
       if (val('pf-obj') && !(v >= 30 && v <= 250)) { toast('Escribe un peso entre 30 y 250 kg.', true); break; }
       a.ingreso = Object.assign({}, a.ingreso || {}, {pesoObj: val('pf-obj') ? v : null}); saveAlumno(a); toast(val('pf-obj') ? `Objetivo: ${n1(v)} kg 🎯` : 'Objetivo quitado.'); refrescarCuerpo(id); break; }
-    case 'ficha': fichaAlumno(id); break;
+    case 'ficha': fichaAlumno(id, el.dataset.tab); break;
     case 'abrir-bloque': S.ui.claseFecha = el.dataset.fecha; S.ui.claseHora = el.dataset.hora; location.hash = '#clase'; if (S.view === 'clase') render(); break;
     case 'clase-hoy': e.preventDefault(); S.ui.claseFecha = null; S.ui.claseHora = null; render(); break;
     case 'clase-hora': S.ui.claseHora = el.dataset.hora; render(); break;
