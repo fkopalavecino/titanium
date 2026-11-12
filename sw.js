@@ -29,7 +29,7 @@ self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data && e.data.text() }; }
   const op = {
-    body: d.body || '', icon: 'icon-192.png', badge: 'icon-192.png', tag: d.tag, renotify: !!d.tag,
+    body: d.body || '', icon: 'icon-192.png', badge: 'badge-96.png', tag: d.tag, renotify: !!d.tag,
     data: { url: new URL(d.url || './alumno.html', self.registration.scope).href, clase: d.clase || null }
   };
   // recordatorio de clase: botones directos (Android; en iPhone se confirma al abrir la app)
