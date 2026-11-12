@@ -518,12 +518,18 @@ const putFoco = () => { if (S.foco == null) return; try { localStorage.setItem(F
 // dónde iba el alumno en su entrenamiento: al volver a abrir la app, lo devolvemos ahí
 const PKEY = () => 'tl-pos-' + codigo;
 const guardarPos = y => { try { if (S.v === 'rutina' && !S.evSel) localStorage.setItem(PKEY(), JSON.stringify({ ses: S.ses || null, rutSel: S.rutSel || null, foco: S.foco != null, d: today(), t: Date.now(), y: y ?? window.scrollY })); else localStorage.removeItem(PKEY()); } catch (_) {} };
-const restaurarPos = () => { try { const p = JSON.parse(localStorage.getItem(PKEY()) || 'null'); if (!p || p.d !== today() || Date.now() - p.t > 4 * 3600e3) return null;
-  S.v = 'rutina'; S.ses = p.ses; S.rutSel = p.rutSel; const d = getDraft(); const g = getFoco();
+const leerPos = () => { try { const p = JSON.parse(localStorage.getItem(PKEY()) || 'null'); if (!p || p.d !== today() || Date.now() - p.t > 4 * 3600e3) return null;
+  const v0 = S.v, s0 = S.ses, r0 = S.rutSel; S.ses = p.ses; S.rutSel = p.rutSel; const d = getDraft(); const g = getFoco(); const nom = rutinaDeHoy()?.r?.nombre || '';
+  S.v = v0; S.ses = s0; S.rutSel = r0;
   const empezado = Object.values(d.sets || {}).some(x => Object.values(x || {}).some(v => Object.values(v || {}).some(z => String(z ?? '').trim() !== ''))) || Object.keys(d.ok || {}).length || (p.foco && g);
-  if (!empezado) { S.v = 'hoy'; S.ses = null; S.rutSel = null; return null; }
-  if (p.foco) { S.foco = g ? g.k : 0; S.cck = new Set(g ? g.cck : []); S.vta = g ? g.vta : {}; }
-  return p; } catch (_) { S.v = 'hoy'; return null; } };
+  return empezado ? { ...p, g, nom } : null; } catch (_) { return null; } };
+const volverPos = p => { S.v = 'rutina'; S.evSel = null; S.ses = p.ses; S.rutSel = p.rutSel; if (p.foco) { S.foco = p.g ? p.g.k : 0; S.cck = new Set(p.g ? p.g.cck : []); S.vta = p.g ? p.g.vta : {}; } else S.foco = null;
+  render(); if (p.y && !p.foco) setTimeout(() => window.scrollTo(0, p.y), 60); toast('Seguimos donde ibas 💪'); };
+const avisoPos = p => { document.getElementById('sheet')?.remove(); const sh = document.createElement('div'); sh.id = 'sheet';
+  const paso = p.foco && p.g && p.g.k > 0 ? ' · modo clase, paso ' + (p.g.k + 1) : p.foco ? ' · modo clase' : '';
+  sh.innerHTML = `<div class="in" role="dialog" aria-modal="true" aria-label="Entrenamiento sin terminar"><div style="font:700 24px 'Barlow Condensed',sans-serif">💪 Tienes un entrenamiento sin terminar</div><div class="muted">${esc(p.nom || 'Tu rutina de hoy')}${esc(paso)}</div><button class="btn pri" data-pos="si">▶ Volver donde iba</button><button class="btn" data-pos="no">Ahora no</button></div>`;
+  document.body.appendChild(sh);
+  sh.addEventListener('click', ev => { const b = ev.target.closest('[data-pos]'); if (!b && ev.target !== sh) return; ev.stopPropagation(); sh.remove(); if (b && b.dataset.pos === 'si') volverPos(p); else try { localStorage.removeItem(PKEY()); } catch (_) {} }); };
 const clearFoco = () => { try { localStorage.removeItem(FKEY()); } catch (_) {} };
 // serie marcada con ✓ (se recuerda en el borrador para que un repintado no la desmarque)
 const okKey = i => (i.dataset.ap ? 'A|' : '') + i.dataset.n + '|' + i.dataset.i;
@@ -2310,7 +2316,7 @@ document.addEventListener('click', async ev => {
 
 await cargarNutri();
 await cargarHab(); // las skills se cargan aquí: SKILLS/SKD recién existen en este punto del script
-{ const pos = restaurarPos(); render(); if (pos) { if (pos.y && !pos.foco) setTimeout(() => window.scrollTo(0, pos.y), 60); toast('Seguimos donde ibas 💪'); } }
+{ const pos = leerPos(); if (pos) S.tourAuto = true; render(); if (pos) { try { const { g, nom, ...raw } = pos; localStorage.setItem(PKEY(), JSON.stringify(raw)); } catch (_) {} avisoPos(pos); } }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { putFoco(); guardarPos(); } });
 window.addEventListener('pagehide', () => { putFoco(); guardarPos(); });
 /* abrir el evento de un aviso: Evaluación → Progreso (evaluaciones); el resto → Agenda en ese día */
