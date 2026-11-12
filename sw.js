@@ -6,8 +6,25 @@ self.addEventListener('fetch', e => {
   const r = e.request; if (r.method !== 'GET') return;
   const u = new URL(r.url); if (u.origin !== self.location.origin) return;
   if (r.mode === 'navigate' || /\.(html|js|json)$/.test(u.pathname) || u.pathname.endsWith('/'))
-    e.respondWith(fetch(r, { cache: 'no-store' }).catch(() => fetch(r)));
+    e.respondWith(fresca(r));
 });
+// siempre intenta la versión nueva; si no hay señal (o tarda mucho), abre la última copia guardada en vez del error de Safari
+const CACHE = 'tl-app';
+const llave = r => { const u = new URL(r.url); u.search = ''; return u.href; };
+async function fresca(r) {
+  const c = await caches.open(CACHE);
+  try {
+    const res = await Promise.race([fetch(r.url, { cache: 'no-store', credentials: 'same-origin' }),
+      new Promise((_, no) => setTimeout(() => no(new Error('lento')), 8000))]);
+    if (res && res.ok) c.put(llave(r), res.clone()).catch(() => {});
+    return res;
+  } catch (_) {
+    const g = await c.match(llave(r));
+    if (g) return g;
+    if (r.mode === 'navigate') return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#0e0c0f;color:#fff;font:600 18px system-ui;text-align:center;padding:24px"><div><p>Sin conexión a internet 📶</p><p style="color:#a69ea3;font-size:15px">Revisa tu wifi o datos y vuelve a intentar.</p><button onclick="location.reload()" style="margin-top:8px;height:52px;padding:0 28px;border:0;border-radius:14px;background:#d71f30;color:#fff;font:800 18px system-ui">Reintentar</button></div></body>`, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+    throw _;
+  }
+}
 self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data && e.data.text() }; }
