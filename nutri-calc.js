@@ -15,9 +15,10 @@
   const ACT = [['sed', 1.2, 'Sedentario', 'No entrena'], ['1-3', 1.375, '1 a 3 días', 'Entrena 1 a 3 días'], ['3-5', 1.55, '3 a 5 días', 'Entrena 3 a 5 días'], ['6-7', 1.725, '6 a 7 días', 'Entrena 6 a 7 días']];
   const factor = (dias, fisico) => { const f = (ACT.find(a => a[0] === dias) || ACT[2])[1]; return fisico ? Math.max(f, 1.725) : f; };
   // datos del último InBody con peso: peso, % grasa, masa libre de grasa, músculo, basal
-  function datos(inbody) {
+  // f (opcional): fecha del InBody a usar; si no está, el último
+  function datos(inbody, f) {
     const ls = (inbody || []).filter(x => x && Number(x.peso)).slice().sort((a, b) => String(a.f).localeCompare(String(b.f)));
-    const x = ls[ls.length - 1]; if (!x) return null; const n = v => (v == null || v === '' || isNaN(+v)) ? null : +v;
+    const x = (f && ls.find(y => y.f === f)) || ls[ls.length - 1]; if (!x) return null; const n = v => (v == null || v === '' || isNaN(+v)) ? null : +v;
     const peso = n(x.peso), pgc = n(x.pgc), tmb = n(x.tmb), mme = n(x.mme);
     let mlg = n(x.mlg); if (mlg == null && pgc != null) mlg = Math.round(peso * (1 - pgc / 100) * 10) / 10;
     return { f: x.f, peso, pgc, mlg, mme, tmb: tmb >= 800 && tmb <= 4500 ? tmb : null };
@@ -215,9 +216,11 @@
   const metasDescanso = m => m && m.kcal ? { kcal: Math.round((m.kcal - m.carb * (1 - DESC) * 4) / 10) * 10, prot: m.prot, carb: Math.round(m.carb * DESC), gras: m.gras } : m;
   function opDescanso(op) { return { items: op.items.map(x => { if (rol(x) !== 'c') return x; const st = PASO(x.n); return Object.assign({}, x, { g: Math.max(st, Math.round(x.g * DESC / st) * st) }); }) }; }
   /* ---------- evolución entre los dos últimos InBody y sugerencia ---------- */
-  function evolucion(inbody, obj) {
-    const ls = (inbody || []).filter(x => x && Number(x.peso)).slice().sort((a, b) => String(a.f).localeCompare(String(b.f))); if (ls.length < 2) return null;
-    const a = ls[ls.length - 2], b = ls[ls.length - 1]; const n = v => (v == null || v === '' || isNaN(+v)) ? null : +v;
+  // compara el InBody elegido (f, o el último) con el anterior a él
+  function evolucion(inbody, obj, f) {
+    const ls = (inbody || []).filter(x => x && Number(x.peso)).slice().sort((a, b) => String(a.f).localeCompare(String(b.f)));
+    let ib = f ? ls.findIndex(y => y.f === f) : -1; if (ib < 0) ib = ls.length - 1; if (ib < 1) return null;
+    const a = ls[ib - 1], b = ls[ib]; const n = v => (v == null || v === '' || isNaN(+v)) ? null : +v;
     const dias = Math.max(1, Math.round((new Date(b.f) - new Date(a.f)) / 864e5)); const mes = 30 / dias;
     const gA = n(a.mgc) ?? (n(a.pgc) != null ? a.peso * a.pgc / 100 : null), gB = n(b.mgc) ?? (n(b.pgc) != null ? b.peso * b.pgc / 100 : null);
     const d = { dias, peso: b.peso - a.peso, grasa: gA != null && gB != null ? gB - gA : null, musc: n(a.mme) != null && n(b.mme) != null ? b.mme - a.mme : null };

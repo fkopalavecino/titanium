@@ -584,7 +584,7 @@ td.crit{color:var(--crit);font-weight:700}
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supa-shim.js"></script><script src="inbody-ocr.js?v=20261111"></script><script src="alimentos.js?v=20261111"></script><script src="nutri-calc.js?v=20261111d"></script><script src="sonidos.js?v=2"></script>
+<script src="supa-shim.js"></script><script src="inbody-ocr.js?v=20261111"></script><script src="alimentos.js?v=20261111"></script><script src="nutri-calc.js?v=20261112a"></script><script src="sonidos.js?v=2"></script>
 <script>
 (() => {
 'use strict';
@@ -1772,7 +1772,9 @@ const NUC = () => window.TL_NUTRI;
 const NU_ED = {}; // por alumno: { o: opciones de cálculo, metas, pauta (borrador) }
 function nuSuma(rs) { return rs.reduce((t, r) => ({ kcal: t.kcal + Number(r.kcal || 0), prot: t.prot + Number(r.prot || 0), carb: t.carb + Number(r.carb || 0), gras: t.gras + Number(r.gras || 0) }), { kcal: 0, prot: 0, carb: 0, gras: 0 }); }
 function nuEdad(a) { const n = a.nacimiento || a.perfil?.nac || a.perfil?.ficha?.nac; if (!n) return null; const d = parseISO(n), h = new Date(); let e = h.getFullYear() - d.getFullYear(); if (h < new Date(h.getFullYear(), d.getMonth(), d.getDate())) e--; return e > 0 && e < 110 ? e : null; }
-function nuPersona(code) { const a = S.alumnos.get(code) || {}; const d = NUC().datos(a.inbody) || {};
+// InBody con que se calcula la pauta: el elegido en «Cálculo» (por defecto, el último)
+function nuIB(code) { return NUC().datos((S.alumnos.get(code) || {}).inbody, NU_ED[code]?.o?.ib); }
+function nuPersona(code) { const d = nuIB(code) || {}; const a = S.alumnos.get(code) || {};
   return { nombre: String(a.nombre || '').replace(/\b\p{L}/gu, c => c.toUpperCase()), edad: nuEdad(a), estatura: a.perfil?.ficha?.estatura, peso: d.peso, pgc: d.pgc, mme: d.mme, coach: 'Franco Palavecino' }; }
 async function nuPanel(code) {
   const box = document.getElementById('fa-nu'); if (!box || box.dataset.alumno !== code || !window.__sb) return;
@@ -1783,8 +1785,9 @@ async function nuPanel(code) {
     box.innerHTML = `<div class="small muted" style="margin-bottom:8px">Al activarla aparece la pestaña <b>Nutri</b> en su app: elige su objetivo con su InBody, recibe su pauta y registra lo que come. Tú revisas, ajustas, envías y exportas el PDF.</div><button type="button" class="btn pri" data-act="nu-on" data-id="${esc(code)}">🥗 Activar nutrición</button>`; return; }
   const m = n.meta || {}; const a = S.alumnos.get(code) || {}; const d = NUC().datos(a.inbody);
   const ed = NU_ED[code] = NU_ED[code] || {};
-  ed.o = ed.o || { obj: m.obj || 'recomp', aj: m.aj ?? null, dias: m.dias || '3-5', fisico: !!m.fisico, pkg: m.pkg || null, gkg: m.gkg || 0.9, nCom: (n.pauta && n.pauta.nCom) || 4 };
+  ed.o = ed.o || { ib: d ? d.f : null, obj: m.obj || 'recomp', aj: m.aj ?? null, dias: m.dias || '3-5', fisico: !!m.fisico, pkg: m.pkg || null, gkg: m.gkg || 0.9, nCom: (n.pauta && n.pauta.nCom) || 4 };
   ed.metas = ed.metas || (m.kcal ? { kcal: m.kcal, prot: m.prot, carb: m.carb, gras: m.gras } : null);
+  if (ed.metasIb === undefined) ed.metasIb = m.ib || null; // InBody con que se calcularon las metas guardadas
   ed.nota = ed.nota ?? (m.nota || ''); ed.excl = ed.excl || ((n.prefs || {}).excluir || []);
   if (!ed.pauta) ed.pauta = m.revisar && ed.metas ? NUC().generar(ed.metas, ed.o.nCom, ed.excl) : n.pauta ? JSON.parse(JSON.stringify(n.pauta)) : null;
   ed.enviada = n.pauta_at; ed.revisar = !!m.revisar; ed.fuente = m.fuente;
@@ -1869,7 +1872,8 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target
 // abre la ficha del alumno directo en la sección Nutrición
 function nuIr(code) { fichaAlumno(code, 'nutri'); }
 function nuPintarPanel(code) {
-  const box = document.getElementById('fa-nu'); if (!box) return; const ed = NU_ED[code]; const N = NUC(); const a = S.alumnos.get(code) || {}; const d = N.datos(a.inbody); const o = ed.o;
+  const box = document.getElementById('fa-nu'); if (!box) return; const ed = NU_ED[code]; const N = NUC(); const a = S.alumnos.get(code) || {}; const o = ed.o; const d = N.datos(a.inbody, o.ib);
+  const ibs = (a.inbody || []).filter(x => x && Number(x.peso)).slice().sort((x, y) => String(y.f).localeCompare(String(x.f)));
   const calc = d ? N.calcMetas(d, o) : null; const b = N.basal(d); const ob = N.OBJ[o.obj];
   const f1 = v => v == null ? '—' : String(Math.round(v * 10) / 10).replace('.', ',');
   const metas = ed.metas; const P = ed.pauta; const opTot = op => N.suma(op.items);
@@ -1880,13 +1884,15 @@ function nuPintarPanel(code) {
   const resumen = card(`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b>Metas diarias</b><span class="small muted">${ob.ic} ${esc(ob.l)} · ${esc((N.ACT.find(x => x[0] === o.dias) || [])[2] || '')}${o.fisico ? ' · trabajo físico' : ''}</span></div>
     <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px">${box4}</div>
     ${dsc ? `<div class="small muted">😴 Día de descanso: ${nuN(dsc.kcal)} kcal · C ${nuN(dsc.carb)} g (el alumno lo elige en su app)</div>` : ''}
+    ${d && metas && ed.metasIb && ed.metasIb !== d.f ? `<div class="small" style="background:var(--warn-soft);border-radius:10px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>⚠️ Estas metas son del InBody <b>${fmtD(ed.metasIb)}</b>. ¿Las recalculo con el del <b>${fmtD(d.f)}</b>?</span><button type="button" class="btn sm pri" data-act="nu-ib" data-id="${esc(code)}" data-v="${esc(d.f)}">Usar InBody ${fmtD(d.f)}</button></div>` : ''}
     ${ed.cambio ? `<div class="small" style="color:var(--warn);font-weight:600">Las metas cambiaron: toca <b>↻ Nueva pauta</b> para rehacer las comidas.</div>` : ''}`);
   // 2 · cálculo (plegado): InBody, evolución, objetivo, actividad y ajustes
-  const ev = N.evolucion(a.inbody, o.obj); const fs = v => v == null ? '—' : (v > 0 ? '+' : '') + String(Math.round(v * 10) / 10).replace('.', ',') + ' kg';
+  const ev = N.evolucion(a.inbody, o.obj, d && d.f); const fs = v => v == null ? '—' : (v > 0 ? '+' : '') + String(Math.round(v * 10) / 10).replace('.', ',') + ' kg';
   const calculo = `<details ${S.ui.nuCalc ? 'open' : ''} data-nucalc="1" style="border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 14px"><summary style="cursor:pointer;font-weight:700;display:flex;justify-content:space-between;gap:8px"><span>⚙️ Cálculo</span><span class="small muted" style="font-weight:500">${d ? 'InBody ' + fmtD(d.f) + ' · ' + f1(d.peso) + ' kg' : 'sin InBody'}</span></summary>
     <div style="display:grid;gap:10px;margin-top:10px">
+      ${ibs.length > 1 ? `<div><div class="small muted" style="margin-bottom:4px">InBody para la pauta</div><div class="chips" style="flex-wrap:wrap">${ibs.map((x, i) => `<button type="button" class="chip" data-act="nu-ib" data-id="${esc(code)}" data-v="${esc(x.f)}" aria-pressed="${!!d && d.f === x.f}">📅 ${fmtD(x.f)} · ${f1(+x.peso)} kg${i === 0 ? ' · último' : ''}</button>`).join('')}</div></div>` : ''}
       <div class="small">${d ? `Peso <b>${f1(d.peso)} kg</b> · grasa ${f1(d.pgc)} % · masa libre de grasa ${f1(d.mlg)} kg · basal <b>${nuN(b?.v)} kcal</b> <span class="muted">(${b ? (b.src === 'InBody' ? 'del InBody' : 'Katch-McArdle') : 'falta % grasa'})</span>` : 'Sube el InBody (foto, PDF o a mano) en la pestaña <b>Cuerpo</b>.'}</div>
-      ${ev ? `<div class="small" style="background:var(--sunk);border-radius:10px;padding:8px 10px">📈 Desde ${fmtD(ev.desde)}: peso ${fs(ev.peso)} · grasa ${fs(ev.grasa)} · músculo ${fs(ev.musc)}<br><b>${esc(ev.txt)}</b>${ev.dk && metas ? ` <button type="button" class="btn sm" data-act="nu-evo" data-id="${esc(code)}" data-v="${ev.dk}">Aplicar ${ev.dk > 0 ? '+' : ''}${ev.dk} kcal</button>` : ''}</div>` : ''}
+      ${ev ? `<div class="small" style="background:var(--sunk);border-radius:10px;padding:8px 10px">📈 Desde ${fmtD(ev.desde)}: peso ${fs(ev.peso)} · grasa ${fs(ev.grasa)} · músculo ${fs(ev.musc)}<br><b>${esc(ev.txt)}</b>${ev.dk < 0 && ev.musc != null && ev.musc < -0.3 ? `<br><span style="color:var(--warn)">Ojo: también bajó músculo. Si el día anterior comió bajo en carbos o no se midió igual, puede ser agua: confírmalo antes de restar.</span>` : ''}${ev.dk && metas ? ` <button type="button" class="btn sm" data-act="nu-evo" data-id="${esc(code)}" data-v="${ev.dk}">Aplicar ${ev.dk > 0 ? '+' : ''}${ev.dk} kcal</button>` : ''}</div>` : ''}
       <div><div class="small muted" style="margin-bottom:4px">Objetivo</div><div class="chips" style="flex-wrap:wrap">${Object.entries(N.OBJ).map(([k, x]) => `<button type="button" class="chip" data-act="nu-obj" data-id="${esc(code)}" data-v="${k}" aria-pressed="${o.obj === k}">${x.ic} ${esc(x.l)}</button>`).join('')}</div></div>
       <div><div class="small muted" style="margin-bottom:4px">Actividad</div><div class="chips" style="flex-wrap:wrap">${N.ACT.map(([k, f, l]) => `<button type="button" class="chip" data-act="nu-dias" data-id="${esc(code)}" data-v="${k}" aria-pressed="${o.dias === k}">${esc(l)}</button>`).join('')}<button type="button" class="chip" data-act="nu-fisico" data-id="${esc(code)}" aria-pressed="${o.fisico}">🛠️ Trabajo físico</button></div></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">
@@ -1932,14 +1938,14 @@ function nuPintarPanel(code) {
     ${acciones}</div>`;
 }
 // las metas siguen al cálculo (objetivo, actividad, ajustes); la pauta se rehace solo cuando el profe toca «Nueva pauta»
-function nuRecalc(code) { const ed = NU_ED[code], N = NUC(); const d = N.datos((S.alumnos.get(code) || {}).inbody); const c = d && N.calcMetas(d, ed.o);
+function nuRecalc(code) { const ed = NU_ED[code], N = NUC(); const d = nuIB(code); const c = d && N.calcMetas(d, ed.o); if (c) ed.metasIb = d.f;
   if (c) { ed.metas = { kcal: c.kcal, prot: c.prot, carb: c.carb, gras: c.gras }; ed.cambio = !!ed.pauta; } nuPintarPanel(code); }
 function nuLeerMetas(code) { const ed = NU_ED[code]; const v = {}; document.querySelectorAll(`#fa-nu .nu-m`).forEach(i => { v[i.dataset.k] = Math.round(Number(String(i.value).replace(',', '.')) || 0); });
   if (!v.kcal && (v.prot || v.carb || v.gras)) v.kcal = v.prot * 4 + v.carb * 4 + v.gras * 9; ed.metas = v.kcal ? v : null; const nt = document.querySelector('#fa-nu .nu-nota'); if (nt) ed.nota = nt.value.trim().slice(0, 160); return ed.metas; }
 async function nuGuardar(code, el, conPauta) { const ed = NU_ED[code]; const m = nuLeerMetas(code);
   if (!m) { toast('Faltan las metas', true); return; } if (m.kcal < 800 || m.kcal > 6000) { toast('Revisa las calorías', true); return; }
   const meta = Object.assign({}, m, { obj: ed.o.obj, aj: ed.o.aj ?? NUC().OBJ[ed.o.obj].def, dias: ed.o.dias, fisico: ed.o.fisico, pkg: ed.o.pkg, gkg: ed.o.gkg, nota: ed.nota, fuente: 'coach', revisar: false, desde: today() });
-  const d = NUC().datos((S.alumnos.get(code) || {}).inbody); if (d) meta.ib = d.f;
+  const d = nuIB(code); if (d) meta.ib = d.f;
   const upd = { meta, updated_at: new Date().toISOString() }; if (conPauta && ed.pauta) { ed.pauta.nCom = ed.pauta.comidas.length; ed.pauta.fecha = today(); delete ed.pauta.base; upd.pauta = ed.pauta; upd.pauta_at = new Date().toISOString(); }
   el.disabled = true; const { error } = await window.__sb.from('nutricion').update(upd).eq('alumno', code); el.disabled = false;
   if (error) { toast('No se pudo guardar: ' + error.message, true); return; }
@@ -1955,7 +1961,8 @@ function nuAccion(act, code, el) { const ed = NU_ED[code]; if (!ed) { toast('Cie
   if (act === 'nu-obj') { ed.o.obj = el.dataset.v; ed.o.aj = null; ed.o.pkg = null; nuRecalc(code); return; }
   if (act === 'nu-dias') { ed.o.dias = el.dataset.v; nuRecalc(code); return; }
   if (act === 'nu-fisico') { ed.o.fisico = !ed.o.fisico; nuRecalc(code); return; }
-  if (act === 'nu-usar') { const d = N.datos((S.alumnos.get(code) || {}).inbody); const c = d && N.calcMetas(d, ed.o); if (!c) return; nuLeerMetas(code);
+  if (act === 'nu-ib') { ed.o.ib = el.dataset.v; nuRecalc(code); toast('Metas recalculadas con el InBody ' + fmtD(el.dataset.v) + ': revisa y envía'); return; }
+  if (act === 'nu-usar') { const d = nuIB(code); const c = d && N.calcMetas(d, ed.o); if (!c) return; nuLeerMetas(code);
     ed.metas = { kcal: c.kcal, prot: c.prot, carb: c.carb, gras: c.gras }; ed.pauta = N.generar(ed.metas, ed.o.nCom, ed.excl); nuPintarPanel(code); toast('Pauta generada: revísala y envíala'); return; }
   if (act === 'nu-gen') { const m = nuLeerMetas(code); if (!m) { toast('Faltan las metas: sube el InBody o escríbelas', true); return; } if (ed.pauta && !confirm('¿Crear una pauta nueva? Se pierden los cambios hechos a mano en la actual.')) return; ed.pauta = N.generar(m, ed.o.nCom, ed.excl); ed.cambio = false; nuPintarPanel(code); toast('Pauta nueva lista: revísala y envíala'); return; }
   if (act === 'nu-ex') { const k = el.dataset.v; ed.excl = ed.excl.includes(k) ? ed.excl.filter(x => x !== k) : [...ed.excl, k];
