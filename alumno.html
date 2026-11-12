@@ -165,7 +165,7 @@ details.ses summary::-webkit-details-marker{display:none}
 .av-up input{position:absolute;inset:0;opacity:0;cursor:pointer}
 .av-up .cam{position:absolute;right:-2px;bottom:-2px;background:var(--fg);color:var(--ink);border-radius:50%;width:30px;height:30px;display:grid;place-items:center;font-size:15px}
 .eb-row{display:flex;justify-content:space-between;align-items:center;gap:8px}.res-b{border-color:var(--red,#d71f30);color:var(--fg);font-weight:700;min-height:36px}
-.rs-blk{display:grid;gap:6px}.rs-h{display:flex;align-items:center;gap:8px;margin-top:4px}.rs-it{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--fg);font:inherit}
+.rs-blk{display:grid;gap:6px}.rs-top{position:sticky;top:-18px;z-index:1;background:var(--surface);margin:-18px -18px 0;padding:18px 18px 8px}.rs-h{display:flex;align-items:center;gap:8px;margin-top:4px}.rs-it{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--fg);font:inherit}
 .rs-it.on{border-color:#d71f30;background:rgba(215,31,48,.1)}.rs-it.ok .rs-ck{background:var(--ok);color:#0b0b0d;border-color:var(--ok)}.rs-ck{flex:none;width:34px;height:34px;border-radius:9px;border:1px solid var(--line);display:grid;place-items:center;font-weight:700;font-size:13px}
 .rs-tx{flex:1;min-width:0;display:grid;gap:2px}.rs-tx b{font-weight:700}.rs-aqui{flex:none;font-size:11px;font-weight:700;text-transform:uppercase;color:#d71f30;letter-spacing:.06em}
 #sheet{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
@@ -1150,13 +1150,13 @@ function abrirResumen() { const rd = rutinaDeHoy(); const r = rd.r; if (!r) retu
     const nomB = (m ? m[2] : b.titulo) || 'Bloque ' + letra; const isB = /bloque b/i.test(b.titulo || '');
     let filas;
     if (isB) filas = ejs.map(e => { const p = paso++; const h = hechos[e.nombre]; const n = nSer(e.dosis); const s = h ? h.s || 0 : 0;
-      const det = s ? (h.t != null ? 'mejor ' + h.t + ' s' : h.kg != null ? 'mejor ' + String(h.kg).replace('.', ',') + ' kg' + (h.r != null ? ' × ' + h.r : '') : '') : '';
+      const det = s ? (h.t != null ? 'mejor ' + h.t + ' s' : h.kg ? 'mejor ' + String(h.kg).replace('.', ',') + ' kg' + (h.r != null ? ' × ' + h.r : '') : h.r != null ? 'mejor ' + h.r + ' reps' : '') : '';
       return `<button class="rs-it${p === k ? ' on' : ''}${s >= n ? ' ok' : ''}" data-irpaso="${p}"><span class="rs-ck">${s >= n ? '✓' : s ? s + '/' + n : ''}</span><span class="rs-tx"><b>${esc(e.nombre)}</b><span class="small muted">${esc(e.dosis || '')}${det ? ' · ' + esc(det) : ''}</span></span>${p === k ? '<span class="rs-aqui">Aquí</span>' : ''}</button>`; }).join('');
     else { const p = paso++; filas = `<button class="rs-it rs-circ${p === k ? ' on' : ''}" data-irpaso="${p}"><span class="rs-tx">${ejs.map((e, ei) => `<span class="small${ck.has(bi + '-' + ei) ? ' ok' : ''}">${ck.has(bi + '-' + ei) ? '✓ ' : '· '}<b>${esc(e.nombre)}</b> <span class="muted">${esc(e.dosis || '')}</span></span>`).join('')}</span>${p === k ? '<span class="rs-aqui">Aquí</span>' : ''}</button>`; }
     return `<div class="rs-blk"><div class="rs-h"><span class="blk-l ${isB ? 'b' : ''}">${esc(letra)}</span><b>${esc(nomB)}</b></div>${filas}</div>`; }).join('');
   const sh = document.createElement('div'); sh.id = 'sheet';
-  sh.innerHTML = `<div class="in" role="dialog" aria-modal="true" aria-label="Rutina completa"><div class="row"><span class="eyebrow red">${esc(r.tipo || 'Tu rutina')}</span><button class="btn" data-close="1" style="width:auto;min-height:36px" aria-label="Cerrar">✕</button></div>
-    ${html}<div class="small muted">Toca un ejercicio para ir directo a él.</div><button class="btn pri" data-close="1">‹ Volver a mis series</button></div>`;
+  sh.innerHTML = `<div class="in" role="dialog" aria-modal="true" aria-label="Rutina completa"><div class="row rs-top"><span class="eyebrow red">${esc(r.tipo || 'Tu rutina')}</span><button class="btn" data-close="1" style="width:auto;min-height:36px" aria-label="Cerrar">✕</button></div>
+    ${html}</div>`;
   sh.addEventListener('click', ev => { const ir = ev.target.closest('[data-irpaso]');
     if (ir) { sh.remove(); const n = Number(ir.dataset.irpaso); if (n !== S.foco) { if (ASpend) guardarYa(); finDescanso(); S.foco = n; render(); window.scrollTo(0, 0); } return; }
     if (ev.target === sh || ev.target.closest('[data-close]')) sh.remove(); }); document.body.appendChild(sh); }
