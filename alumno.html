@@ -535,11 +535,18 @@ const clearFoco = () => { try { localStorage.removeItem(FKEY()); } catch (_) {} 
 const okKey = i => (i.dataset.ap ? 'A|' : '') + i.dataset.n + '|' + i.dataset.i;
 const putDraft = d => { try { localStorage.setItem(DKEY(), JSON.stringify(d)); } catch (e) {} };
 const clearDraft = () => { try { localStorage.removeItem(DKEY()); Object.keys(localStorage).filter(k => k.startsWith('tl-draft-' + codigo + '-') && k !== DKEY() && k.slice(('tl-draft-' + codigo + '-').length, ('tl-draft-' + codigo + '-').length + 10) < addDays(today(), -30)).forEach(k => localStorage.removeItem(k)); } catch (e) {} };
+// serie marcada con kg y reps: la siguiente (vacía) queda con esos mismos números de sugerencia → basta apretar ✓
+function sugerirSiguiente(row) { const kI = row.querySelector('[data-f="kg"]'), rI = row.querySelector('[data-f="r"]');
+  if (row.classList.contains('ap') || !row.classList.contains('done') || !kI || !rI || !kI.value.trim() || !rI.value.trim()) return;
+  let nx = row.nextElementSibling; while (nx && (!nx.classList.contains('set') || nx.classList.contains('ap'))) nx = nx.nextElementSibling;
+  const nk = nx?.querySelector('[data-f="kg"]'), nr = nx?.querySelector('[data-f="r"]');
+  if (nk && nr && !nx.classList.contains('done') && !nk.value.trim() && !nr.value.trim()) { nk.placeholder = kI.value.trim(); nr.placeholder = rI.value.trim(); } }
 function applyDraft() { if (S.v !== 'rutina') return; const d = getDraft();
   document.querySelectorAll('.set input').forEach(i => { const v = d[i.dataset.ap ? 'ap' : 'sets']?.[i.dataset.n]?.[i.dataset.i]?.[i.dataset.f]; const row = i.closest('.set');
     if (v != null && v !== '' && v !== i.value) { i.value = v; if (!d.ok?.[okKey(i)]) row.classList.remove('done'); }
     if (d.ok?.[okKey(i)] && row.querySelector('input') === i) row.classList.add('done'); });
   document.querySelectorAll('.set').forEach(box => { if (![...box.querySelectorAll('input')].some(i => i.value.trim() !== '')) box.classList.remove('done'); });
+  document.querySelectorAll('.set.done').forEach(sugerirSiguiente);
   if (d.carga != null && $('#carga')) $('#carga').value = d.carga;
   document.querySelectorAll('.com-i').forEach(i => { const v = d.com?.[i.dataset.comn]; if (v != null) { i.value = v; if (v.trim()) { i.closest('.com-w').hidden = false; const b = document.querySelector(`[data-com="${CSS.escape(i.dataset.comn)}"]`); if (b) b.hidden = true; } } });
   if (d.rpe != null) { S.rpe = d.rpe; document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.rpe) === String(d.rpe))); } }
@@ -1854,11 +1861,7 @@ document.addEventListener('click', async ev => {
       const d0 = getDraft(); if (d0.ok && ins[0]) { delete d0.ok[okKey(ins[0])]; putDraft(d0); } finDescanso(); autoGuardar(400); toast('Serie desmarcada'); return; }
     ins.forEach(i => { if (i.value.trim() === '' && !/kg|reps|seg/.test(i.placeholder)) { i.value = i.placeholder; i.dispatchEvent(new Event('input', { bubbles: true })); } });
     if (ins.some(i => i.value.trim() !== '')) { row.classList.add('done'); row.dataset.ok = '1'; { const d0 = getDraft(); (d0.ok = d0.ok || {})[okKey(ins[0])] = 1; putDraft(d0); } iniciarDescanso(Number(chk.dataset.rest) || 90, row.querySelector('input')?.dataset.n || '');
-      // copiar kg y reps a la siguiente serie (solo series efectivas, con ambos datos, y si la siguiente está vacía)
-      { const kI = row.querySelector('[data-f="kg"]'), rI = row.querySelector('[data-f="r"]');
-        if (!row.classList.contains('ap') && kI && rI && kI.value.trim() && rI.value.trim()) { let nx = row.nextElementSibling; while (nx && (!nx.classList.contains('set') || nx.classList.contains('ap'))) nx = nx.nextElementSibling;
-          const nk = nx?.querySelector('[data-f="kg"]'), nr = nx?.querySelector('[data-f="r"]');
-          if (nk && nr && !nx.classList.contains('done') && !nk.value.trim() && !nr.value.trim()) { nk.value = kI.value.trim(); nr.value = rI.value.trim(); nk.dispatchEvent(new Event('input', { bubbles: true })); nr.dispatchEvent(new Event('input', { bubbles: true })); } } }
+      sugerirSiguiente(row);
       autoGuardar(400); } else toast(row.querySelector('[data-f="t"]') ? 'Anota los segundos.' : 'Anota los kilos y las repeticiones.'); return; }
   const dp = ev.target.closest('[data-dep]'); if (dp) { S.pfDeps = S.pfDeps || [...(S.perfil.deportes || [])]; const d = dp.dataset.dep; S.pfDeps = S.pfDeps.includes(d) ? S.pfDeps.filter(x => x !== d) : [...S.pfDeps, d]; dp.setAttribute('aria-pressed', S.pfDeps.includes(d)); return; }
   if (ev.target.id === 'pf-ok') { ev.target.disabled = true; const ig = $('#pf-ig').value.trim().replace(/^@+/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '');
