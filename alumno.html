@@ -164,6 +164,10 @@ details.ses summary::-webkit-details-marker{display:none}
 .av-up{position:relative;cursor:pointer;display:inline-block}
 .av-up input{position:absolute;inset:0;opacity:0;cursor:pointer}
 .av-up .cam{position:absolute;right:-2px;bottom:-2px;background:var(--fg);color:var(--ink);border-radius:50%;width:30px;height:30px;display:grid;place-items:center;font-size:15px}
+.eb-row{display:flex;justify-content:space-between;align-items:center;gap:8px}.res-b{border-color:var(--red,#d71f30);color:var(--fg);font-weight:700;min-height:36px}
+.rs-blk{display:grid;gap:6px}.rs-h{display:flex;align-items:center;gap:8px;margin-top:4px}.rs-it{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--fg);font:inherit}
+.rs-it.on{border-color:#d71f30;background:rgba(215,31,48,.1)}.rs-it.ok .rs-ck{background:var(--ok);color:#0b0b0d;border-color:var(--ok)}.rs-ck{flex:none;width:34px;height:34px;border-radius:9px;border:1px solid var(--line);display:grid;place-items:center;font-weight:700;font-size:13px}
+.rs-tx{flex:1;min-width:0;display:grid;gap:2px}.rs-tx b{font-weight:700}.rs-aqui{flex:none;font-size:11px;font-weight:700;text-transform:uppercase;color:#d71f30;letter-spacing:.06em}
 #sheet{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
 #sheet .in{background:var(--surface);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:85vh;overflow:auto;padding:18px 18px calc(18px + env(safe-area-inset-bottom));display:grid;gap:12px}
 .brand{height:30px;width:auto;display:block}
@@ -1137,6 +1141,25 @@ function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nS
       ${tp === 'kg' ? `<button type="button" class="ap-add" data-apx="${esc(e.nombre)}">+ Serie de aproximación</button>` : ''}</div>`; })() + `
     <button class="com-add" data-com="${esc(e.nombre)}" ${com ? 'hidden' : ''}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 5h16v10H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>${pcom ? 'Comentario · la vez anterior: ' + esc(pcom) : 'Agregar comentario <span>(ej: kg por mano)</span>'}</button>
     <div class="com-w" data-comw="${esc(e.nombre)}" ${com ? '' : 'hidden'}><span class="com-ic" aria-hidden="true">💬</span><input class="com-i" data-comn="${esc(e.nombre)}" maxlength="80" enterkeyhint="done" placeholder="${esc(pcom ? 'La vez anterior: ' + pcom : 'Ej: 20 kg por mano · agarre neutro')}" value="${esc(com)}"></div>` : ''}</div>`; }
+// vista previa de toda la sesión sin salir del ejercicio: se abre encima y al cerrar sigues donde estabas
+function abrirResumen() { const rd = rutinaDeHoy(); const r = rd.r; if (!r) return; document.getElementById('sheet')?.remove();
+  const bloques = r.bloques || []; const hechos = {}; try { colectarEj().forEach(x => { hechos[x.n] = x; }); } catch (_) {}
+  let paso = 0; const k = S.foco || 0; const ck = S.cck || new Set();
+  const html = bloques.map((b, bi) => { const ejs = b.ejercicios || []; if (!ejs.length) return '';
+    const m = String(b.titulo || '').match(/^bloque\s+([a-z])\s*[·:-]?\s*(.*)$/i); const letra = m ? m[1].toUpperCase() : String.fromCharCode(65 + bi);
+    const nomB = (m ? m[2] : b.titulo) || 'Bloque ' + letra; const isB = /bloque b/i.test(b.titulo || '');
+    let filas;
+    if (isB) filas = ejs.map(e => { const p = paso++; const h = hechos[e.nombre]; const n = nSer(e.dosis); const s = h ? h.s || 0 : 0;
+      const det = s ? (h.t != null ? 'mejor ' + h.t + ' s' : h.kg != null ? 'mejor ' + String(h.kg).replace('.', ',') + ' kg' + (h.r != null ? ' × ' + h.r : '') : '') : '';
+      return `<button class="rs-it${p === k ? ' on' : ''}${s >= n ? ' ok' : ''}" data-irpaso="${p}"><span class="rs-ck">${s >= n ? '✓' : s ? s + '/' + n : ''}</span><span class="rs-tx"><b>${esc(e.nombre)}</b><span class="small muted">${esc(e.dosis || '')}${det ? ' · ' + esc(det) : ''}</span></span>${p === k ? '<span class="rs-aqui">Aquí</span>' : ''}</button>`; }).join('');
+    else { const p = paso++; filas = `<button class="rs-it rs-circ${p === k ? ' on' : ''}" data-irpaso="${p}"><span class="rs-tx">${ejs.map((e, ei) => `<span class="small${ck.has(bi + '-' + ei) ? ' ok' : ''}">${ck.has(bi + '-' + ei) ? '✓ ' : '· '}<b>${esc(e.nombre)}</b> <span class="muted">${esc(e.dosis || '')}</span></span>`).join('')}</span>${p === k ? '<span class="rs-aqui">Aquí</span>' : ''}</button>`; }
+    return `<div class="rs-blk"><div class="rs-h"><span class="blk-l ${isB ? 'b' : ''}">${esc(letra)}</span><b>${esc(nomB)}</b></div>${filas}</div>`; }).join('');
+  const sh = document.createElement('div'); sh.id = 'sheet';
+  sh.innerHTML = `<div class="in" role="dialog" aria-modal="true" aria-label="Rutina completa"><div class="row"><span class="eyebrow red">${esc(r.tipo || 'Tu rutina')}</span><button class="btn" data-close="1" style="width:auto;min-height:36px" aria-label="Cerrar">✕</button></div>
+    ${html}<div class="small muted">Toca un ejercicio para ir directo a él.</div><button class="btn pri" data-close="1">‹ Volver a mis series</button></div>`;
+  sh.addEventListener('click', ev => { const ir = ev.target.closest('[data-irpaso]');
+    if (ir) { sh.remove(); const n = Number(ir.dataset.irpaso); if (n !== S.foco) { if (ASpend) guardarYa(); finDescanso(); S.foco = n; render(); window.scrollTo(0, 0); } return; }
+    if (ev.target === sh || ev.target.closest('[data-close]')) sh.remove(); }); document.body.appendChild(sh); }
 function abrirTec(id) { const t = (S.tec || []).find(x => x.id === id); if (!t) return; document.getElementById('sheet')?.remove();
   const sh = document.createElement('div'); sh.id = 'sheet';
   sh.innerHTML = `<div class="in" role="dialog" aria-modal="true" aria-label="${esc(t.nombre)}"><div class="row"><span class="eyebrow red">Técnica</span><button class="btn" data-close="1" style="width:auto;min-height:36px" aria-label="Cerrar">✕</button></div>
@@ -1277,13 +1300,14 @@ V.rutina = () => {
     const nav = `<div class="grid2"><button class="btn" data-fnav="-1" ${k === 0 ? 'disabled' : ''}>‹ Anterior</button><button class="btn pri" data-fnav="1">${k === pasos.length - 1 ? 'Terminar ›' : 'Siguiente ›'}</button></div>`;
     if (fin) { const res = rd.rec?.carga || getDraft().carga;
       return `${head}<h1 style="font-size:30px;line-height:1.05">¡Terminaste! 💪</h1>${res ? `<div class="small muted">Resultado · <b style="color:var(--fg)">${esc(res)}</b></div>` : ''}${finalDe(true)}<button class="btn" data-fnav="-1">‹ Anterior</button>`; }
-    if (st.t === 'ej') return `${head}<div class="eyebrow">Bloque ${esc(st.inf.letra)} · ${esc(st.inf.nomB)}</div>
+    const ojo = `<button class="chip res-b" data-resumen="1" aria-label="Ver la rutina completa">☰ Ver rutina</button>`;
+    if (st.t === 'ej') return `${head}<div class="eb-row"><div class="eyebrow">Bloque ${esc(st.inf.letra)} · ${esc(st.inf.nomB)}</div>${ojo}</div>
     <section class="card foco">${st.ei === 0 && st.b.nota ? `<div class="small muted">${esc(st.b.nota)}</div>` : ''}${ejHTML(st.e, true, cur, true)}</section>${nav}`;
     // circuito: todos los ejercicios a la vista, se marcan al pasar; vueltas en el A, temporizador y resultado en el C
     const b = st.b, bi = st.bi, ejs = b.ejercicios || [];
     const nV = Number((String(b.nota || '') + ' ' + String(b.titulo || '')).match(/(\d+)\s*(?:vueltas?|rondas?)/i)?.[1] || 0) || Math.max(0, ...ejs.map(e => Number((String(e.dosis || '').match(/^\s*(\d+)\s*[×x]/) || [])[1]) || 0));
     const v = (S.vta && S.vta[bi]) || 1; const ck = S.cck || new Set();
-    return `${head}<div class="eyebrow">Bloque ${esc(st.inf.letra)} · circuito</div>
+    return `${head}<div class="eb-row"><div class="eyebrow">Bloque ${esc(st.inf.letra)} · circuito</div>${ojo}</div>
     <h1 style="font-size:28px;line-height:1.05">${esc(st.inf.nomB)}</h1>
     <section class="card foco">${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}
       ${!st.inf.isC && nV > 1 ? `<div class="row" style="align-items:center"><b>Vuelta ${Math.min(v, nV)} de ${nV}</b>${v < nV ? `<button class="chip" data-vuelta="${bi}">Siguiente vuelta ›</button>` : '<span class="small ok" style="font-weight:700">Última vuelta</span>'}</div>` : ''}
@@ -1811,6 +1835,7 @@ document.addEventListener('click', async ev => {
   const cck = ev.target.closest('[data-cck]'); if (cck) { S.cck = S.cck || new Set(); const k = cck.dataset.cck; const on = !S.cck.has(k); on ? S.cck.add(k) : S.cck.delete(k);
     cck.setAttribute('aria-pressed', on); cck.closest('.circ-it')?.classList.toggle('ok', on); if (on && navigator.vibrate) try { navigator.vibrate(15); } catch (_) {} avisarCirc(Number(k.split('-')[0])); return; }
   const vta = ev.target.closest('[data-vuelta]'); if (vta) { const bi = vta.dataset.vuelta; S.vta = S.vta || {}; S.vta[bi] = (S.vta[bi] || 1) + 1; [...(S.cck || [])].filter(k => k.startsWith(bi + '-')).forEach(k => S.cck.delete(k)); render(); window.scrollTo(0, 0); avisarCirc(Number(bi)); return; }
+  if (ev.target.closest('[data-resumen]')) { abrirResumen(); return; }
   if (ev.target.closest('[data-focox]')) { S.foco = null; render(); return; }
   const fnv = ev.target.closest('[data-fnav]'); if (fnv) { finDescanso(); S.foco = Math.max(0, (S.foco || 0) + Number(fnv.dataset.fnav)); render(); window.scrollTo(0, 0); return; }
   const tmb = ev.target.closest('[data-timer]'); if (tmb) { const r = rutinaDeHoy().r; if (r) abrirTimer(r.bloques[Number(tmb.dataset.timer)], { sinRes: !!tmb.dataset.sinres, vueltas: Number(tmb.dataset.vtas) || 0 }); return; }
