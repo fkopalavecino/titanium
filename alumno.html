@@ -171,6 +171,19 @@ details.ses summary::-webkit-details-marker{display:none}
 #rest b{font:800 20px 'Barlow Condensed',Barlow,sans-serif;margin-left:4px}
 #rest button{min-width:40px;height:36px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);font:600 13px Barlow,sans-serif;cursor:pointer}
 #rest.go{border-color:#17804a;background:#123322;padding-right:6px}
+#rest.tsm{inset:0;left:0;bottom:0;transform:none;border:0;border-radius:0;padding:20px;background:rgba(8,6,9,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);justify-content:center;box-shadow:none;white-space:normal;z-index:60}
+#rest.tsm .tsm-c{width:min(320px,88vw);background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--red);border-radius:22px;padding:18px 18px 16px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6);animation:tourIn .2s ease both}
+#rest.tsm .tsm-n{font:700 17px Barlow,sans-serif;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#rest.tsm .tsm-s{font-size:13px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.08em}
+#rest.tsm .tsm-r{position:relative;width:180px;height:180px;margin:14px auto 12px}
+#rest.tsm .tsm-r svg{width:100%;height:100%;transform:rotate(-90deg)}
+#rest.tsm .tsm-r circle{fill:none;stroke-width:10}
+#rest.tsm .tsm-r .bg{stroke:var(--line)}#rest.tsm .tsm-r .fg{stroke:var(--red);stroke-linecap:round;transition:stroke-dashoffset .25s linear}
+#rest.tsm .tsm-t{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:800 58px 'Barlow Condensed',Barlow,sans-serif;color:var(--fg);margin:0}
+#rest.tsm.pre .tsm-t{color:var(--warn)}#rest.tsm.pau .tsm-t{opacity:.45}
+#rest.tsm .tsm-b{display:flex;gap:10px}
+#rest.tsm .tsm-b button{flex:1;height:50px;border-radius:14px;font:700 16px Barlow,sans-serif;color:var(--fg);background:var(--sunk);border:1px solid var(--line)}
+#rest.tsm .tsm-b button.st{background:var(--red);border-color:var(--red);color:#fff}
 .tbtn{width:100%;margin-top:4px}
 #tmr{position:fixed;inset:0;z-index:60;background:#0b0a0c;display:flex;align-items:center;justify-content:center;padding:max(24px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom))}
 #tmr .tin{width:100%;max-width:440px;display:grid;gap:14px;text-align:center}
@@ -920,20 +933,24 @@ function iniciarDescanso(seg, ej) { finDescanso(true); RESTEJ = ej || ''; const 
     el.innerHTML = `<span>⏱ Descanso <b>${mmss(Math.ceil(q))}</b></span><button data-rm="-15" aria-label="Quitar 15 segundos">−15</button><button data-rm="15" aria-label="Sumar 15 segundos">+15</button><button data-rx="1" aria-label="Saltar descanso">✕</button>`; };
   el.addEventListener('click', ev => { const b = ev.target.closest('button'); if (!b) return; ev.stopPropagation(); if (b.dataset.rx) return finDescanso(); fin += Number(b.dataset.rm) * 1000; pintar(); avisarDescanso((fin - Date.now()) / 1000, RESTEJ); });
   document.body.appendChild(el); pintar(); REST = setInterval(pintar, 250); }
-function cuentaSerie(n, i, seg) { finDescanso(true); const el = document.createElement('div'); el.id = 'rest'; let fin = Date.now() + seg * 1000, pre = 3; beep(660, 60);
+function cuentaSerie(n, i, seg) { finDescanso(true); const el = document.createElement('div'); el.id = 'rest'; el.className = 'tsm pre'; let fin = Date.now() + seg * 1000, pre = 3, pausa = 0; beep(660, 60);
+  const C = 2 * Math.PI * 80;
+  el.innerHTML = `<div class="tsm-c" role="dialog" aria-label="Temporizador"><div class="tsm-n">${esc(String(n))}</div><div class="tsm-s">Serie ${i + 1} · ${seg} s</div><div class="tsm-r"><svg viewBox="0 0 180 180"><circle class="bg" cx="90" cy="90" r="80"/><circle class="fg" cx="90" cy="90" r="80" stroke-dasharray="${C}" stroke-dashoffset="0"/></svg><b class="tsm-t">3</b></div><div class="tsm-b"><button data-rp="1" aria-label="Pausar">⏸ Pausa</button><button class="st" data-rx="1" aria-label="Terminar">■ Terminar</button></div></div>`;
+  const T = el.querySelector('.tsm-t'), R = el.querySelector('.fg'), BP = el.querySelector('[data-rp]');
   const fila = () => [...document.querySelectorAll('.set input[data-f="t"]')].find(x => x.dataset.n === n && Number(x.dataset.i) === i);
-  const pintar = () => { if (pre > 0) return;
+  const pintar = () => { if (pre > 0 || pausa) return;
     const q = (fin - Date.now()) / 1000;
     if (q <= 0) { clearInterval(REST); REST = null; el.remove(); snd('final'); avisarTmr({ off: 1 }, true);
       const inp = fila(); if (inp) { inp.value = String(seg); inp.dispatchEvent(new Event('input', { bubbles: true })); inp.closest('.set')?.querySelector('[data-chk]')?.click(); } return; }
     if (q <= 3.05 && Math.ceil(q) !== Number(el.dataset.l)) { el.dataset.l = Math.ceil(q); snd('cuenta', el.dataset.l); }
-    el.innerHTML = `<span>⏱ ${esc(String(n).slice(0, 22))} · serie ${i + 1} <b>${mmss(Math.ceil(q))}</b></span><button data-rx="1" aria-label="Detener">■</button>`;
+    T.textContent = seg >= 60 ? mmss(Math.ceil(q)) : String(Math.ceil(q)); R.style.strokeDashoffset = String(C * (1 - q / seg));
     avisarTmr({ n, fase: 'Serie ' + (i + 1), big: mmss(Math.ceil(q)) }); };
   el.addEventListener('click', ev => { const b = ev.target.closest('button'); if (!b) return; ev.stopPropagation();
-    const hecho = Math.max(0, Math.round(seg - (fin - Date.now()) / 1000)); clearInterval(REST); REST = null; el.remove(); avisarTmr({ off: 1 }, true);
+    if (b.dataset.rp) { if (pre > 0) return; if (pausa) { fin = Date.now() + pausa; pausa = 0; el.classList.remove('pau'); BP.textContent = '⏸ Pausa'; pintar(); } else { pausa = Math.max(0, fin - Date.now()); el.classList.add('pau'); BP.textContent = '▶ Seguir'; } return; }
+    const hecho = Math.max(0, Math.round(seg - (pausa || (fin - Date.now())) / 1000)); clearInterval(REST); REST = null; el.remove(); avisarTmr({ off: 1 }, true);
     const inp = fila(); if (inp && hecho >= 3) { inp.value = String(hecho); inp.dispatchEvent(new Event('input', { bubbles: true })); } });
   document.body.appendChild(el);
-  const cd = () => { if (pre > 0) { el.innerHTML = `<span>Prepárate… <b>${pre}</b></span>`; snd('prep', pre); pre--; setTimeout(cd, 1000); } else { fin = Date.now() + seg * 1000; snd('inicio'); pintar(); REST = setInterval(pintar, 250); } }; cd(); }
+  const cd = () => { if (!el.isConnected) return; if (pre > 0) { T.textContent = String(pre); snd('prep', pre); pre--; setTimeout(cd, 1000); } else { el.classList.remove('pre'); fin = Date.now() + seg * 1000; snd('inicio'); pintar(); REST = setInterval(pintar, 250); } }; cd(); }
 function finDescanso(silencio) { const habia = !!REST; clearInterval(REST); REST = null; document.getElementById('rest')?.remove(); if (habia && !silencio) avisarDescanso(0, RESTEJ); }
 
 /* ---------- temporizador del bloque C (EMOM, AMRAP, Tabata, intervalos, por tiempo…) ---------- */
