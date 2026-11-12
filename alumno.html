@@ -515,6 +515,15 @@ const getDraft = () => { try { const k = DKEY(); let v = localStorage.getItem(k)
 const FKEY = () => DKEY() + '-foco';
 const getFoco = () => { try { return JSON.parse(localStorage.getItem(FKEY()) || 'null'); } catch (_) { return null; } };
 const putFoco = () => { if (S.foco == null) return; try { localStorage.setItem(FKEY(), JSON.stringify({ k: S.foco, cck: [...(S.cck || [])], vta: S.vta || {} })); } catch (_) {} };
+// dónde iba el alumno en su entrenamiento: al volver a abrir la app, lo devolvemos ahí
+const PKEY = () => 'tl-pos-' + codigo;
+const guardarPos = y => { try { if (S.v === 'rutina' && !S.evSel) localStorage.setItem(PKEY(), JSON.stringify({ ses: S.ses || null, rutSel: S.rutSel || null, foco: S.foco != null, d: today(), t: Date.now(), y: y ?? window.scrollY })); else localStorage.removeItem(PKEY()); } catch (_) {} };
+const restaurarPos = () => { try { const p = JSON.parse(localStorage.getItem(PKEY()) || 'null'); if (!p || p.d !== today() || Date.now() - p.t > 4 * 3600e3) return null;
+  S.v = 'rutina'; S.ses = p.ses; S.rutSel = p.rutSel; const d = getDraft(); const g = getFoco();
+  const empezado = Object.values(d.sets || {}).some(x => Object.values(x || {}).some(v => Object.values(v || {}).some(z => String(z ?? '').trim() !== ''))) || Object.keys(d.ok || {}).length || (p.foco && g);
+  if (!empezado) { S.v = 'hoy'; S.ses = null; S.rutSel = null; return null; }
+  if (p.foco) { S.foco = g ? g.k : 0; S.cck = new Set(g ? g.cck : []); S.vta = g ? g.vta : {}; }
+  return p; } catch (_) { S.v = 'hoy'; return null; } };
 const clearFoco = () => { try { localStorage.removeItem(FKEY()); } catch (_) {} };
 // serie marcada con ✓ (se recuerda en el borrador para que un repintado no la desmarque)
 const okKey = i => (i.dataset.ap ? 'A|' : '') + i.dataset.n + '|' + i.dataset.i;
@@ -1704,6 +1713,7 @@ document.addEventListener('click', async ev => {
 
 function render(mantener) {
   diaRender = today(); const y = window.scrollY; putFoco();
+  guardarPos();
   if (!mantener) window.scrollTo(0, 0);
   const lock = appBloqueada(); const onb = lock ? '' : onboardingHTML();
   $('#app').innerHTML = lock ? bloqueoHTML() : onb || V[S.v]();
@@ -2300,7 +2310,9 @@ document.addEventListener('click', async ev => {
 
 await cargarNutri();
 await cargarHab(); // las skills se cargan aquí: SKILLS/SKD recién existen en este punto del script
-render();
+{ const pos = restaurarPos(); render(); if (pos) { if (pos.y && !pos.foco) setTimeout(() => window.scrollTo(0, pos.y), 60); toast('Seguimos donde ibas 💪'); } }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { putFoco(); guardarPos(); } });
+window.addEventListener('pagehide', () => { putFoco(); guardarPos(); });
 /* abrir el evento de un aviso: Evaluación → Progreso (evaluaciones); el resto → Agenda en ese día */
 async function irAEvento(id) {
   let e = S.eventos.find(x => String(x.id) === String(id));
