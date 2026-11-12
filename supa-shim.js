@@ -297,6 +297,7 @@
   const TEJ = { 'Reunión': 'Ej: Reunión de objetivos', 'Evaluación': 'Ej: Evaluación InBody', 'Nutrición': 'Ej: Tu pauta de alimentación', 'Documento': 'Ej: Programa de 8 semanas', 'Actividad': 'Ej: Hiking grupal', 'Evento': 'Ej: Competencia Titanium', 'Otro': 'Ej: Recordatorio' };
   const escA = x => String(x == null ? '' : x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const AGCSS = `
+#tl-agb{transition:transform .25s,opacity .25s,width .2s,padding .2s}#tl-agb.mini{width:48px;padding:0;justify-content:center}#tl-agb.mini .tx{display:none}#tl-agb.fuera{transform:translateY(90px);opacity:0;pointer-events:none}
 #tl-agb{position:fixed;left:max(16px,env(safe-area-inset-left));bottom:calc(16px + env(safe-area-inset-bottom));z-index:900;height:48px;padding:0 18px;border-radius:24px;border:1px solid #2f2a2e;background:#0e0c0f;color:#fff;font:700 15px Barlow,system-ui,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.3);cursor:pointer;display:flex;align-items:center;gap:8px;-webkit-tap-highlight-color:transparent}
 #tl-agp{position:fixed;inset:0;z-index:950;background:rgba(10,6,8,.6);display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));font:15px Barlow,system-ui,sans-serif;color:#f2eef0}
 #tl-agp *{box-sizing:border-box}
@@ -385,8 +386,12 @@
   function agendaBtn() {
     if (document.getElementById('tl-agb')) return;
     if (!document.getElementById('tl-agcss')) { const st = document.createElement('style'); st.id = 'tl-agcss'; st.textContent = AGCSS; document.head.appendChild(st); }
-    const b = document.createElement('button'); b.id = 'tl-agb'; b.innerHTML = '<span aria-hidden="true">📅</span> Agenda alumnos';
+    const b = document.createElement('button'); b.id = 'tl-agb'; b.innerHTML = '<span aria-hidden="true">📅</span><span class="tx">Agenda alumnos</span>'; b.setAttribute('aria-label', 'Agenda alumnos'); b.title = 'Agenda alumnos';
     b.onclick = abrirAgenda; document.body.appendChild(b);
+    // al bajar leyendo se esconde para no tapar ejercicios; al subir vuelve como ícono chico
+    let ya = window.scrollY, tk = false;
+    window.addEventListener('scroll', () => { if (tk) return; tk = true; requestAnimationFrame(() => { const y = window.scrollY;
+      b.classList.toggle('mini', y > 120); if (Math.abs(y - ya) > 6) { b.classList.toggle('fuera', y > ya && y > 120); ya = y; } tk = false; }); }, { passive: true });
   }
   const isoD = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const masDias = n => { const d = new Date(); d.setDate(d.getDate() + n); return isoD(d); };
