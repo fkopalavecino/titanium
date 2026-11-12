@@ -1106,7 +1106,7 @@ const normEj = n => String(n || '').toLowerCase().replace(/^(min(uto)?\s*\d+|\d+
 const tecDe = n => { const x = normEj(n); return (S.tec || []).find(t => { try { return t.re.test(x); } catch (_) { return false; } }) || null; };
 const ytBuscar = q => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q + ' técnica ejercicio');
 // modo clase: botón de video siempre a mano; tu video si está grabado, si no ejemplos en YouTube
-const vidBtn = (e, tc) => tc && tc.video ? `<a class="vid-b own" href="${esc(tc.video)}" target="_blank" rel="noopener" aria-label="Ver video: ${esc(e.nombre)}">▶ Video</a>` : `<a class="vid-b" href="${esc(ytBuscar(tc ? tc.nombre : normEj(e.nombre)))}" target="_blank" rel="noopener" aria-label="Ver ejemplos en YouTube: ${esc(e.nombre)}">▶ YouTube</a>`;
+const vidBtn = (e, tc) => tc && tc.video ? `<a class="vid-b own" href="${esc(tc.video)}" target="_blank" rel="noopener" aria-label="Ver video: ${esc(e.nombre)}">▶ Video</a>` : `<a class="vid-b" href="${esc(ytBuscar(tc ? tc.nombre : normEj(e.nombre)))}" target="_blank" rel="noopener" aria-label="Ver video: ${esc(e.nombre)}">▶ Video</a>`;
 const fmtKg = v => String(Math.round(v * 10) / 10).replace('.', ',');
 // carga sugerida: si en la sesión anterior llegó al tope de reps en todas sus series pesadas, sube; si no, mantiene
 function sugerencia(e) { if (tipoEj(e) === 'tiempo') { const pv = prevSets(e.nombre).filter(x => x && x.t > 0); if (!pv.length) return null; const t = Math.max(...pv.map(x => x.t)); const obj = segObj(e);
@@ -1124,7 +1124,7 @@ function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nS
   return `<div class="ej${foco ? ' ej-f' : ''}"><div class="ej-h"><b class="ej-n">${esc(e.nombre)}</b><span class="ej-acc">${foco ? vidBtn(e, tc) : ''}${tc && !foco ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</span></div>
     <div class="small muted">${esc(e.dosis)}${isB && !/desc|\d\s*(min|s)\b/i.test(String(e.dosis || '').replace(/^\d+\s*[×x]\s*[\d–-]+/, '')) ? ` · ⏱ ${mmss(descansoDe(e))}` : ''}</div>
     ${sg ? `<div class="sug${sg.sube ? ' up' : ''}">${sg.sube ? '↗' : '→'} ${esc(sg.txt)}</div>` : ''}
-    ${tc && foco ? `<details class="tec-d"><summary>¿Cómo se hace?</summary><ol>${(tc.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol>${tc.video ? `<a class="btn" href="${esc(tc.video)}" target="_blank" rel="noopener">▶ Ver video</a>` : `<a class="small red-t" href="${esc(ytBuscar(tc.nombre))}" target="_blank" rel="noopener">🔎 Ver ejemplos en YouTube</a>`}</details>` : ''}
+    ${tc && foco ? `<details class="tec-d"><summary>¿Cómo se hace?</summary><ol>${(tc.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol></details>` : ''}
     ${isB ? (() => { const tp = tipoEj(e); const ap = tp === 'kg' ? Math.max(nAprox(e), (c?.ap || []).length, (S.apX || {})[DKEY() + e.nombre] || 0, ...Object.keys(getDraft().ap?.[e.nombre] || {}).map(k => Number(k) + 1)) : 0; const aps = c?.ap || [];
       const base = sg?.kg ?? (pv.length ? Math.max(0, ...pv.map(x => x.kg || 0)) : 0); const inc = /mancuerna|kb|kettlebell|pesa rusa/i.test(e.nombre) ? 1 : 2.5;
       const PCT = [[0.5, 8], [0.75, 3], [0.85, 2], [0.9, 1]];
@@ -1164,7 +1164,7 @@ function abrirTec(id) { const t = (S.tec || []).find(x => x.id === id); if (!t) 
   const sh = document.createElement('div'); sh.id = 'sheet';
   sh.innerHTML = `<div class="in" role="dialog" aria-modal="true" aria-label="${esc(t.nombre)}"><div class="row"><span class="eyebrow red">Técnica</span><button class="btn" data-close="1" style="width:auto;min-height:36px" aria-label="Cerrar">✕</button></div>
     <h2 style="font-size:26px;margin:0">${esc(t.nombre)}</h2><ol class="tec-ol">${(t.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol>
-    ${t.video ? `<a class="btn pri" href="${esc(t.video)}" target="_blank" rel="noopener">▶ Ver video</a>` : `<a class="btn" href="${esc(ytBuscar(t.nombre))}" target="_blank" rel="noopener">🔎 Ver ejemplos en YouTube</a>`}<button class="btn" data-close="1">Listo</button></div>`;
+    ${t.video ? `<a class="btn pri" href="${esc(t.video)}" target="_blank" rel="noopener">▶ Ver video</a>` : `<a class="btn" href="${esc(ytBuscar(t.nombre))}" target="_blank" rel="noopener">▶ Ver video</a>`}<button class="btn" data-close="1">Listo</button></div>`;
   sh.addEventListener('click', ev => { if (ev.target === sh || ev.target.closest('[data-close]')) sh.remove(); }); document.body.appendChild(sh); }
 // junta lo anotado: lo guardado + el borrador + lo que está en pantalla
 function colectarEj() { const rd = rutinaDeHoy(); const by = {}, apBy = {};
@@ -1312,7 +1312,7 @@ V.rutina = () => {
     <section class="card foco">${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}
       ${!st.inf.isC && nV > 1 ? `<div class="row" style="align-items:center"><b>Vuelta ${Math.min(v, nV)} de ${nV}</b>${v < nV ? `<button class="chip" data-vuelta="${bi}">Siguiente vuelta ›</button>` : '<span class="small ok" style="font-weight:700">Última vuelta</span>'}</div>` : ''}
       <div class="circ">${ejs.map((e, ei) => { const tc = tecDe(e.nombre); const on = ck.has(bi + '-' + ei);
-        return `<div class="circ-it${on ? ' ok' : ''}"><button class="circ-ck" data-cck="${bi}-${ei}" aria-pressed="${on}" aria-label="Marcar ${esc(e.nombre)}">✓</button><div class="circ-tx"><b>${esc(e.nombre)}</b><span class="small muted">${esc(e.dosis)}</span></div>${vidBtn(e, tc)}${tc ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</div>`; }).join('')}</div>
+        return `<div class="circ-it${on ? ' ok' : ''}"><button class="circ-ck" data-cck="${bi}-${ei}" aria-pressed="${on}" aria-label="Marcar ${esc(e.nombre)}">✓</button><div class="circ-tx"><b>${esc(e.nombre)}</b><span class="small muted">${esc(e.dosis)}</span></div>${tc ? '' : vidBtn(e, tc)}${tc ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</div>`; }).join('')}</div>
       ${!st.inf.isC ? `<button class="btn" data-timer="${bi}" data-sinres="1" data-vtas="${nV > 1 ? nV : 0}">⏱ Cronómetro · ${esc(timerTxt(Object.assign(detectarTimer(b), (() => { const c = detectarTimer(b); return c.modo === 'crono' && !c.vueltas && nV > 1 ? { nombre: c.nombre === 'Cronómetro' ? 'Circuito' : c.nombre, vueltas: nV } : {}; })())))}</button>` : ''}
       ${st.inf.isC ? `<button class="btn pri" data-timer="${bi}">⏱ Iniciar · ${esc(timerTxt(detectarTimer(b)))}</button>
       ${cIdx === bi ? `<label class="field">Resultado · ${esc(cNom)}<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>` : ''}` : ''}
