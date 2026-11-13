@@ -732,7 +732,7 @@ async function borrarFotoAlumno(btn) { const ang = btn.dataset.fdel, f = btn.dat
   if (path) sb.storage.from('fotos').remove([path]).then(() => {}, () => {});
   if (S.a) S.a.fotos = S.fotos; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); }
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-fdel]'); if (b) { ev.preventDefault(); ev.stopPropagation(); borrarFotoAlumno(b); } }, true);
-document.addEventListener('change', ev => { if (ev.target.dataset?.fmulti) { subirFotos3Alumno(ev.target); return; } if (ev.target.dataset?.ibsel) { S['ib' + ev.target.dataset.ibsel] = ev.target.value; render(true); return; } if (ev.target.dataset?.fsel) { S['f' + ev.target.dataset.fsel] = ev.target.value; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; } if (ev.target.dataset?.fang2) subirFotoAlumno(ev.target); else if (ev.target.id === 'fu-f') { S.fotoUpF = ev.target.value; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); } });
+document.addEventListener('change', ev => { if (ev.target.dataset?.fmulti) { subirFotos3Alumno(ev.target); return; } if (ev.target.dataset?.ibsel) { S['ib' + ev.target.dataset.ibsel] = ev.target.value; render(true); return; } if (ev.target.dataset?.fsel) { S['f' + ev.target.dataset.fsel] = ev.target.value; render(true); return; } if (ev.target.dataset?.fang2) subirFotoAlumno(ev.target); else if (ev.target.id === 'fu-f') { S.fotoUpF = ev.target.value; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); } });
 function avatarHTML(cls) { const u = S.perfil?.avatar && S.urls[S.perfil.avatar]; const ini = (S.perfil?.apodo || S.a.nombre || '?').trim().charAt(0).toUpperCase();
   return u ? `<img class="av ${cls}" src="${esc(u)}" alt="Tu foto de perfil">` : `<span class="av ${cls}" aria-hidden="true">${esc(ini)}</span>`; }
 function cuadrado(file, lado) { return new Promise((res, rej) => { const u = URL.createObjectURL(file), img = new Image();
@@ -1776,7 +1776,7 @@ async function recupAccion(k, cancelar) { const [f, h] = k.split('_');
     ok: cancelar ? 'Sí, cancelar' : 'Aceptar', no: cancelar ? 'Volver' : 'Rechazar' }))) return;
   toast(cancelar ? 'Cancelando…' : 'Agendando tu recuperación…');
   const { data, error } = await sb.rpc(cancelar ? 'cancelar_recuperacion' : 'recuperar_clase', { p_fecha: f, p_hora: h });
-  if (error) { toast(String(error.message || 'No se pudo').replace(/^.*?: /, '')); try { const { data: rc } = await sb.rpc('mis_recuperaciones'); if (rc) S.recup = rc; } catch (_) {} render(); return; }
+  if (error) { toast(String(error.message || 'No se pudo').replace(/^.*?: /, '')); try { const { data: rc } = await sb.rpc('mis_recuperaciones'); if (rc) S.recup = rc; } catch (_) {} render(true); return; }
   S.recup = data; document.querySelectorAll('.toast').forEach(t => t.remove()); toast(cancelar ? 'Recuperación cancelada.' : '✅ Recuperación agendada · te esperamos ' + txt + ' 💪'); render(true); await load(); render(true); }
 function noVoyBtn(i, f, h) { const n = waNum(); const nom = String(S.a.nombre || '').split(' ')[0];
   const msg = `Hola Franco, soy ${nom}. No puedo ir a mi clase del ${longD(f).toLowerCase()} a las ${h}.`;
@@ -1865,7 +1865,7 @@ V.hab = () => {
   <section class="card"><h2>Historial</h2>${hist.length ? hist.map((l, k) => `<div class="row small"><b>Etapa ${l.etapa + 1} · ${fmtD(l.fecha)}</b><span class="muted">${l.val != null ? habNf.format(l.val) + ' ' + uLog(l) : ''}${l.nota ? ' · ' + esc(l.nota) : ''}</span></div>`).join('') + `<button data-habdel="1" style="justify-self:start;border:0;background:none;color:var(--muted);font:600 14px Barlow,sans-serif;min-height:40px;padding:0;cursor:pointer">Borrar el último registro</button>` : '<div class="small muted">Aún no registras prácticas.</div>'}</section>`;
 };
 document.addEventListener('click', async ev => {
-  const sel = ev.target.closest('[data-habsel]'); if (sel) { S.habSel = sel.dataset.habsel; S.habVer = null; render(); return; }
+  const sel = ev.target.closest('[data-habsel]'); if (sel) { S.habSel = sel.dataset.habsel; S.habVer = null; render(true); return; }
   const ver = ev.target.closest('[data-habver]'); if (ver && !ver.disabled) { S.habVer = Number(ver.dataset.habver); render(true); return; }
   const et = ev.target.closest('[data-habetapa]'); if (et) { et.disabled = true; const n = Number(et.dataset.habetapa); const ant = S.hab.find(x => x.skill === S.habSel)?.etapa ?? 0;
     const { error } = await sb.rpc('hab_etapa', { p_skill: S.habSel, p_etapa: n }); if (error) { toast('No se pudo guardar: ' + error.message); et.disabled = false; return; }
@@ -1882,10 +1882,16 @@ document.addEventListener('click', async ev => {
     await cargarHab(); render(true); toast('Registro borrado'); return; }
 });
 
+/* al tocar algo que se redibuja en la misma pantalla, el botón tocado queda en el mismo lugar (no salta ni se descentra) */
+let ANC = null;
+const ancDe = el => { const e = el && el.closest && el.closest('[id],select,button,a,[role=button],[data-zoom]'); if (!e) return null; const sel = e.id ? '#' + CSS.escape(e.id) : (() => { const d = [...e.attributes].find(a => a.name.startsWith('data-')); return d ? `[${d.name}="${CSS.escape(d.value)}"]` : null; })();
+  return sel ? { sel, top: e.getBoundingClientRect().top, t: Date.now() } : null; };
+['click', 'change'].forEach(tp => document.addEventListener(tp, ev => { if (ev.target.closest && ev.target.closest('#app')) ANC = ancDe(ev.target); }, true));
+function anclar() { const a = ANC; ANC = null; if (!a || Date.now() - a.t > 1500) return; const e = document.querySelector('#app ' + a.sel); if (!e) return; const d = e.getBoundingClientRect().top - a.top; if (Math.abs(d) > 1) window.scrollBy(0, d); }
 function render(mantener) {
   diaRender = today(); const y = window.scrollY; putFoco();
   guardarPos();
-  if (!mantener) window.scrollTo(0, 0);
+  if (!mantener) { ANC = null; window.scrollTo(0, 0); }
   const lock = appBloqueada(); const onb = lock ? '' : onboardingHTML();
   $('#app').innerHTML = lock ? bloqueoHTML() : onb || V[S.v]();
   $('#tabs').hidden = !!(onb || lock);
@@ -1893,7 +1899,7 @@ function render(mantener) {
   document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.v === S.v || (S.v === 'clases' && b.dataset.v === 'agenda') ? 'page' : 'false'));
   applyDraft();
   if (!lock && !onb && S.v === 'hoy' && !tourHecho() && !TR && !S.tourAuto) { S.tourAuto = true; setTimeout(() => { if (S.v === 'hoy' && !TR) iniciarTour(); }, 700); }
-  if (mantener) { window.scrollTo(0, y); return; }
+  if (mantener) { window.scrollTo(0, y); anclar(); return; }
   window.scrollTo(0, 0); requestAnimationFrame(() => window.scrollTo(0, 0));
 }
 
@@ -1991,8 +1997,8 @@ document.addEventListener('click', async ev => {
   const rdia = ev.target.closest('[data-rdia]'); if (rdia) { S.rDia = rdia.dataset.rdia; const card = document.getElementById('recup-card');
     if (card) { const tmp = document.createElement('div'); tmp.innerHTML = recupHTML(); const nuevo = tmp.firstElementChild; if (nuevo) card.replaceWith(nuevo); } else render(); return; }
   const rcx = ev.target.closest('[data-rcx]'); if (rcx) { recupAccion(rcx.dataset.rcx, true); return; }
-  const msx = ev.target.closest('[data-msx]'); if (msx) { try { const x = JSON.parse(localStorage.getItem('tl-msx') || '[]'); x.push(Number(msx.dataset.msx)); localStorage.setItem('tl-msx', JSON.stringify(x.slice(-30))); } catch (_) {} render(); return; }
-  if (ev.target.closest('[data-pushx]')) { try { localStorage.setItem('tl-pushx', '1'); } catch (_) {} render(); return; }
+  const msx = ev.target.closest('[data-msx]'); if (msx) { try { const x = JSON.parse(localStorage.getItem('tl-msx') || '[]'); x.push(Number(msx.dataset.msx)); localStorage.setItem('tl-msx', JSON.stringify(x.slice(-30))); } catch (_) {} render(true); return; }
+  if (ev.target.closest('[data-pushx]')) { try { localStorage.setItem('tl-pushx', '1'); } catch (_) {} render(true); return; }
   if (ev.target.closest('[data-ficha]')) secAbiertos.add('ficha');
   const fxn = ev.target.closest('[data-fxno]'); if (fxn) { const g = fxn.dataset.fxno; fxn.setAttribute('aria-pressed', 'true'); document.querySelector(`[data-fxsi="${g}"]`)?.setAttribute('aria-pressed', 'false');
     document.querySelectorAll(`[data-fx="${g}"]`).forEach(b => b.setAttribute('aria-pressed', 'false')); document.querySelectorAll(`[data-fxtx="${g}"]`).forEach(i => { i.value = ''; });
@@ -2026,12 +2032,12 @@ document.addEventListener('click', async ev => {
   if (ev.target.id === 'pf-ok') { ev.target.disabled = true; const ig = $('#pf-ig').value.trim().replace(/^@+/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '');
     if (await guardarPerfil({ apodo: $('#pf-apodo').value.trim() || null, meta: $('#pf-meta').value.trim() || null, nac: $('#pf-nac').value || null, ig: ig || null, deportes: S.pfDeps || S.perfil.deportes || [] })) { S.pfDeps = null; toast('Perfil guardado ✓'); } else ev.target.disabled = false; return; }
   if (ev.target.id === 'ib-ok') { guardarInbody(ev.target); return; }
-  const ptb = ev.target.closest('[data-ptab]'); if (ptb) { S.ptab = ptb.dataset.ptab; S.pdet = null; S.fotoUp = S.ptab === 'fotos' && S.fotoUp; render(); return; }
-  const pj = ev.target.closest('[data-pej]'); if (pj) { S.pej = pj.dataset.pej; render(); return; }
+  const ptb = ev.target.closest('[data-ptab]'); if (ptb) { S.ptab = ptb.dataset.ptab; S.pdet = null; S.fotoUp = S.ptab === 'fotos' && S.fotoUp; render(true); return; }
+  const pj = ev.target.closest('[data-pej]'); if (pj) { S.pej = pj.dataset.pej; render(true); return; }
   const pdt = ev.target.closest('[data-pdet]'); if (pdt) { S.pdet = pdt.dataset.pdet || null; S.pmet = null; render(); return; }
   const pmt = ev.target.closest('[data-pmet]'); if (pmt) { S.pmet = pmt.dataset.pmet; render(true); return; }
-  if (ev.target.closest('[data-iball]')) { S.ibAll = !S.ibAll; render(); return; }
-  if (ev.target.closest('[data-mall]')) { S.mAll = !S.mAll; render(); return; }
+  if (ev.target.closest('[data-iball]')) { S.ibAll = !S.ibAll; render(true); return; }
+  if (ev.target.closest('[data-mall]')) { S.mAll = !S.mAll; render(true); return; }
   const ibd = ev.target.closest('[data-ibdel]'); if (ibd) {
     if (!ibd.dataset.ok) { ibd.dataset.ok = '1'; const t0 = ibd.textContent; ibd.textContent = ibd.classList.contains('chip') ? '¿Borrar?' : '¿Seguro? Toca de nuevo para borrar'; setTimeout(() => { if (ibd.isConnected) { delete ibd.dataset.ok; ibd.textContent = t0; } }, 4000); return; }
     ibd.disabled = true; const img = ibd.dataset.ibdel || null;
@@ -2045,7 +2051,7 @@ document.addEventListener('click', async ev => {
   if (ev.target.id === 'fup-open') { S.fotoUp = !S.fotoUp; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'ib-cancel') { if (S.ibNew?.prev) URL.revokeObjectURL(S.ibNew.prev); S.ibNew = null; render(); return; }
   if (ev.target.closest('[data-entrenar]')) { const pe = progEstado(); if (!pe) return; const id = pe.next[0]; S.evSel = null; S.foco = null; S.ses = { f: today(), h: 'libre', id }; S.rutSel = id; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
-  if (ev.target.closest('[data-actedit]')) { S.actEdit = true; S.actRpe = null; render(); return; }
+  if (ev.target.closest('[data-actedit]')) { S.actEdit = true; S.actRpe = null; render(true); return; }
   const arp = ev.target.closest('[data-actrpe]'); if (arp) { S.actRpe = Number(arp.dataset.actrpe); document.querySelectorAll('[data-actrpe]').forEach(b => b.setAttribute('aria-pressed', b === arp)); return; }
   const ahe = ev.target.closest('[data-acthecha]'); if (ahe) { const mn = parseInt(($('#act-min')?.value || '').replace(/\D/g, ''), 10); const nota = ($('#act-nota')?.value || '').trim();
     const e0 = S.eventos.find(x => String(x.id) === ahe.dataset.acthecha); const rpe = S.actRpe ?? (e0 && hechaDe(e0)?.rpe) ?? null;
@@ -2058,10 +2064,10 @@ document.addEventListener('click', async ev => {
   const eg = ev.target.closest('[data-evgo]'); if (eg) { S.evSel = null; S.v = eg.dataset.evgo; S.evalFirst = S.v === 'progreso'; if (S.evalFirst) S.ptab = 'cuerpo'; render(); return; }
   const gd = ev.target.closest('[data-goday]'); if (gd) { S.dia = gd.dataset.goday; S.wk = lunesDe(S.dia); S.v = 'agenda'; render(); return; }
   const zf = ev.target.closest('[data-zoom]'); if (zf) { const lb = document.createElement('div'); lb.id = 'lightbox'; lb.innerHTML = `<img src="${zf.getAttribute('src')}" alt="Foto ampliada">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); return; }
-  const fa = ev.target.closest('[data-fang]'); if (fa) { S.fang = fa.dataset.fang; render(); return; }
-  const wd = ev.target.closest('[data-dia]'); if (wd) { S.dia = wd.dataset.dia; render(); return; }
-  const wn = ev.target.closest('[data-wk]'); if (wn) { if (Number(wn.dataset.wk) < 0 && S.wk <= AGENDA_DESDE) return; S.wk = addDays(S.wk, Number(wn.dataset.wk)); const t = today(); S.dia = (t >= S.wk && t <= addDays(S.wk, 6)) ? t : S.wk; render(); return; }
-  if (ev.target.closest('[data-hoy]')) { S.dia = today(); S.wk = lunesDe(S.dia); render(); return; }
+  const fa = ev.target.closest('[data-fang]'); if (fa) { S.fang = fa.dataset.fang; render(true); return; }
+  const wd = ev.target.closest('[data-dia]'); if (wd) { S.dia = wd.dataset.dia; render(true); return; }
+  const wn = ev.target.closest('[data-wk]'); if (wn) { if (Number(wn.dataset.wk) < 0 && S.wk <= AGENDA_DESDE) return; S.wk = addDays(S.wk, Number(wn.dataset.wk)); const t = today(); S.dia = (t >= S.wk && t <= addDays(S.wk, 6)) ? t : S.wk; render(true); return; }
+  if (ev.target.closest('[data-hoy]')) { S.dia = today(); S.wk = lunesDe(S.dia); render(true); return; }
   const rp = ev.target.closest('[data-rpe]'); if (rp) { S.rpe = Number(rp.dataset.rpe); { const d = getDraft(); d.rpe = S.rpe; putDraft(d); } document.querySelectorAll('[data-rpe]').forEach(b => b.setAttribute('aria-pressed', b === rp)); autoGuardar(300); return; }
   const vy = ev.target.closest('[data-voy]'); if (vy) { const k = vy.dataset.voy;
     if (!(await confirmarAsis(k, 'voy'))) return;
@@ -2347,7 +2353,7 @@ document.addEventListener('click', async ev => { const t = ev.target;
 document.addEventListener('click', async ev => {
   const t = ev.target;
   const tb = t.closest('[data-nutab2]'); if (tb) { S.nuTab = tb.dataset.nutab2; S.nuCompra = false; render(true); return; }
-  if (t.closest('[data-nucambiar]')) { S.nuObj = true; S.nuObjSel = null; render(); return; }
+  if (t.closest('[data-nucambiar]')) { S.nuObj = true; S.nuObjSel = null; render(true); return; }
   if (t.closest('[data-nuobjx]')) { S.nuObj = false; render(true); return; }
   const ok = t.closest('[data-nuobjk]'); if (ok) { S.nuObjSel.obj = ok.dataset.nuobjk; render(true); return; }
   const od = t.closest('[data-nuobjd]'); if (od) { S.nuObjSel.dias = od.dataset.nuobjd; render(true); return; }
