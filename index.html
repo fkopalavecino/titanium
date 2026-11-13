@@ -3534,20 +3534,17 @@ let agAbierta = true;
 document.addEventListener('toggle', e => { if (e.target.id === 'ag-card') agAbierta = e.target.open; }, true);
 async function cargarProxEventos() { if (!window.__sb) return; const t = today();
   const { data } = await window.__sb.from('eventos').select('id,alumno,fecha,hora,tipo,titulo').gte('fecha', t).lte('fecha', addDays(t, 7)).order('fecha').order('hora', { nullsFirst: true });
-  // los entrenamientos personales del plan (Actividad de un alumno) no llenan esta lista, salvo los tuyos (tu ficha de alumno)
-  S.proxEv = data || []; schedule(); }
-// tu propia ficha de alumno: la que tiene tu mismo teléfono (WhatsApp del panel)
-function misCodigos() { const w = String(cfg().whatsapp || '').replace(/\D/g, '').slice(-9); const out = new Set(); if (!w) return out;
-  S.alumnos.forEach((a, k) => { if (String(a.telefono || '').replace(/\D/g, '').slice(-9) === w) out.add(k); }); return out; }
+  // los entrenamientos personales del plan (Actividad de un alumno) no llenan esta lista
+  S.proxEv = (data || []).filter(e => !(e.tipo === 'Actividad' && e.alumno)); schedule(); }
 function proximosAgendaHTML() {
-  const mios = misCodigos(); const L = S.proxEv && S.proxEv.filter(e => !(e.tipo === 'Actividad' && e.alumno && !mios.has(e.alumno))); const t = today(), m = addDays(t, 1);
+  const L = S.proxEv; const t = today(), m = addDays(t, 1);
   const cuando = f => f === t ? 'Hoy' : f === m ? 'Mañana' : DNAME[DKEYS[parseISO(f).getDay()]].slice(0, 3) + ' ' + fmtD(f);
   const nHoy = (L || []).filter(e => e.fecha === t).length;
   return `<details class="sec" id="ag-card" ${agAbierta ? 'open' : ''} style="background:var(--sunk);border:1px solid var(--line)">
     <summary><span>📅 Próximos en la agenda</span>${L ? `<span class="pill ${nHoy ? 'warn' : 'muted'}">${nHoy ? nHoy + ' hoy' : (L.length || 'Nada') + (L.length ? ' en 7 días' : ' esta semana')}</span>` : ''}</summary>
     <div style="display:grid;gap:2px">
-      ${!L ? '<div class="small muted">Cargando…</div>' : !L.length ? '<div class="small muted">No hay evaluaciones, reuniones ni entrenamientos tuyos agendados para los próximos 7 días.</div>'
-        : L.slice(0, 6).map(e => `<div class="li" style="padding:7px 0"><span style="font-size:18px">${EV_ICO[e.tipo] || '📌'}</span><span class="grow"><b>${esc(e.titulo || e.tipo)}</b><span class="small muted"> · ${e.alumno ? (misCodigos().has(e.alumno) ? 'Tú' : esc(firstName(nombre(e.alumno)))) : 'Todos'}</span></span><span class="small ${e.fecha === t ? 'warn' : 'muted'}" style="white-space:nowrap;font-weight:600">${esc(cuando(e.fecha))}${e.hora ? ' ' + esc(String(e.hora).slice(0, 5)) : ''}</span></div>`).join('')
+      ${!L ? '<div class="small muted">Cargando…</div>' : !L.length ? '<div class="small muted">No hay evaluaciones, reuniones ni actividades agendadas para los próximos 7 días.</div>'
+        : L.slice(0, 6).map(e => `<div class="li" style="padding:7px 0"><span style="font-size:18px">${EV_ICO[e.tipo] || '📌'}</span><span class="grow"><b>${esc(e.titulo || e.tipo)}</b><span class="small muted"> · ${e.alumno ? esc(firstName(nombre(e.alumno))) : 'Todos'}</span></span><span class="small ${e.fecha === t ? 'warn' : 'muted'}" style="white-space:nowrap;font-weight:600">${esc(cuando(e.fecha))}${e.hora ? ' ' + esc(String(e.hora).slice(0, 5)) : ''}</span></div>`).join('')
           + (L.length > 6 ? `<div class="small muted">y ${L.length - 6} más…</div>` : '')}
       <div class="tools" style="margin-top:6px"><button class="btn sm" data-act="ag-abrir">Ver todos los próximos</button></div>
     </div></details>`; }
