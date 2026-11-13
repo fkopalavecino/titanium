@@ -435,9 +435,9 @@ const esHora = h => /^\d\d:\d\d$/.test(h) || h === 'online'; // las sesiones onl
 const horaTxt = h => h === 'online' ? 'Online' : h;
 const ONL_NOMBRE = 'Titanium Online Coaching'; // nombre del servicio online (se muestra al alumno)
 function bloquesDe(f) {
-  // online: sus clases ya agendadas en el centro (con hora) se respetan; si ese día no tiene, va la sesión online sugerida
+  // online: solo lo agendado (clases en el centro con hora y sesiones online ya registradas); no se sugieren días
   if (ONL()) { const ag = [...new Set(S.clases.filter(r => r.fecha === f && r.extra && !r.quitado && /^\d\d:\d\d$/.test(r.hora)).map(r => r.hora))].sort();
-    const onl = S.clases.some(r => r.fecha === f && r.hora === 'online' && !r.quitado) || (!ag.length && (S.a.dias_online || []).includes(dayKey(f)));
+    const onl = S.clases.some(r => r.fecha === f && r.hora === 'online' && !r.quitado);
     return onl ? [...ag, 'online'] : ag; }
   const base = (S.a.bloques || []).filter(k => k.startsWith(dayKey(f) + '-')).map(k => k.split('-')[1]);
   const extra = S.clases.filter(r => r.fecha === f && r.extra).map(r => r.hora);
@@ -824,7 +824,7 @@ function onboardingHTML() {
       ${ONL() ? `<section class="card" style="gap:8px">
         <h2 style="margin:0">🌐 ${ONL_NOMBRE}</h2>
         <div style="display:grid;gap:6px" class="small">
-          <div>• Entrenas por tu cuenta con la rutina de la app. Los días sugeridos están en tu <b>Agenda</b>.</div>
+          <div>• Entrenas por tu cuenta con la rutina de la app, desde <b>Entreno</b>. En tu <b>Agenda</b> ves solo lo agendado.</div>
           <div>• Si se te corre la semana, haz tu próxima sesión el día que te acomode: la app siempre te muestra la que sigue.</div>
           <div>• Anota tus series y termina con el <b>RPE</b>: así ${prof} ve tu avance y ajusta tu programa.</div>
         </div></section>` : `<section class="card" style="gap:8px">
@@ -939,9 +939,8 @@ V.hoy = () => {
   const p = planActual(); const usadas = p ? presentes(p.inicio, p.fin ? addDays(p.fin, -1) : null) : 0; const tot = p?.clases || S.a.clases || 0;
   const saldo = p ? Math.max(0, (p.monto || 0) - abonado(p)) : 0;
   const rd0 = rutinaDeHoy(); let prox = proximas(1)[0];
-  // online: siempre puede entrenar hoy su próxima sesión (él organiza su semana)
-  const conHora = ONL() && prox && prox.h !== 'online' && prox.f === t; // hoy tiene una clase agendada con hora: esa manda
-  if (ONL() && !conHora) prox = terminada(recOf(t, 'online')) ? { f: addDays(t, 1), h: 'online' } : { f: t, h: 'online' };
+  // online: la tarjeta muestra solo lo agendado (igual que presencial); sin agenda puede entrenar desde «Entreno»
+  const conHora = true;
   // la tarjeta muestra la rutina de la clase de la que habla (hoy o la próxima) y el botón abre esa misma clase
   const pe0 = ONL() ? progEstado() : null;
   const idProx = ONL() && !conHora ? (recOf(prox.f, 'online')?.rutina || pe0?.next?.[0] || rd0.id) : prox ? (recOf(prox.f, prox.h)?.rutina || prediccion().get(prox.f + '|' + prox.h) || rd0.id) : rd0.id;
@@ -956,8 +955,8 @@ V.hoy = () => {
   ${mensajesHTML()}
   ${(() => { const nac = S.perfil?.nac || S.a.nacimiento; return nac && nac.slice(5) === t.slice(5) ? `<section class="card" style="background:linear-gradient(135deg,#d71f30,#7a0f1a);border-color:#d71f30;text-align:center"><div style="font-size:40px">🎂</div><div class="disp" style="font-size:28px;color:#fff">¡Feliz cumpleaños, ${esc(nombreC)}!</div><div style="color:#ffe3e6">Todo el equipo Titanium te desea un gran día. Hoy celebra… y entrena con todo 💪</div></section>` : ''; })()}
   <section class="card">
-    <div class="row"><span class="eyebrow red">${(() => { const tg = prox ? tagClase(prox.f, prox.h, recOf(prox.f, prox.h)) : null; return tg && tg.c === 'ev' ? `<span class="tg ev" style="margin:0">${esc(tg.t)}</span>` : (ONL() && !conHora ? (prox.f === t ? 'Tu sesión de hoy' : 'Hoy ya entrenaste ✅') : prox && prox.f === t ? 'Tu clase de hoy' : 'Tu próxima clase'); })()}</span><span class="small muted">${ONL() && !conHora ? (prox.f === t ? '🌐 Online · cuando te acomode' : '🌐 Próxima sesión') : prox ? esc((prox.f === t ? 'Hoy' : DL[dayKey(prox.f)] + ' ' + fmtD(prox.f)) + ' · ' + prox.h) : 'Sin clases agendadas'}</span></div>
-    ${rd.r ? `<button class="ag-rut" ${prox ? `data-abrses="${esc(prox.f + '|' + prox.h + '|' + (rd.id || ''))}"` : 'data-go="rutina"'}><div style="flex:1;min-width:0"><div class="blk-t" style="font-size:22px">${esc(rd.r.tipo || 'Rutina')}</div><div class="small muted">${linea ? 'Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total + ' · ' : ''}${prox && prox.f === t ? 'Toca para entrenar' : 'Toca para ver la rutina'}</div></div><span class="chev" aria-hidden="true">›</span></button>` : `<div class="small muted">Franco te asigna la rutina en la clase.</div>`}
+    <div class="row"><span class="eyebrow red">${(() => { const tg = prox ? tagClase(prox.f, prox.h, recOf(prox.f, prox.h)) : null; return tg && tg.c === 'ev' ? `<span class="tg ev" style="margin:0">${esc(tg.t)}</span>` : (ONL() && !conHora ? (prox.f === t ? 'Tu sesión de hoy' : 'Hoy ya entrenaste ✅') : prox && prox.f === t ? 'Tu clase de hoy' : 'Tu próxima clase'); })()}</span><span class="small muted">${ONL() && !conHora ? (prox.f === t ? '🌐 Online · cuando te acomode' : '🌐 Próxima sesión') : prox ? esc((prox.f === t ? 'Hoy' : DL[dayKey(prox.f)] + ' ' + fmtD(prox.f)) + ' · ' + horaTxt(prox.h)) : 'Sin clases agendadas'}</span></div>
+    ${ONL() && !prox ? `<div class="small muted">No tienes nada agendado. Cuando quieras entrenar, tu próxima sesión está en «Entreno».</div>` : rd.r ? `<button class="ag-rut" ${prox ? `data-abrses="${esc(prox.f + '|' + prox.h + '|' + (rd.id || ''))}"` : 'data-go="rutina"'}><div style="flex:1;min-width:0"><div class="blk-t" style="font-size:22px">${esc(rd.r.tipo || 'Rutina')}</div><div class="small muted">${linea ? 'Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total + ' · ' : ''}${prox && prox.f === t ? 'Toca para entrenar' : 'Toca para ver la rutina'}</div></div><span class="chev" aria-hidden="true">›</span></button>` : `<div class="small muted">Franco te asigna la rutina en la clase.</div>`}
     ${prox && !ONL() ? asisCorto(prox.f, prox.h) : ''}
   </section>
   ${flexHTML()}
@@ -1795,7 +1794,7 @@ V.agenda = () => {
       : rec?.reag_a ? '<span class="small muted" style="font-weight:700">Movida a otro día</span>' : past ? '<span class="small muted">Sin registro</span>' : rec?.reag_de?.recup ? '<span class="tg ev" style="margin:0">🔁 Recuperación</span>' : rec?.reag_de ? '<span class="tg ev" style="margin:0">↻ Clase movida</span>' : '<span class="small red" style="font-weight:700">Agendada</span>';
     const nEjA = (rec?.ej || []).filter(x => (x.sets || []).some(conDato) || conDato(x)).length; const ej = nEjA ? `<div class="small muted">Anotaste ${nEjA} ejercicio${nEjA === 1 ? '' : 's'}${rec.carga ? ' · ' + esc(rec.carga) : ''}${rec.rpe != null ? ' · RPE ' + esc(rec.rpe) : ''}</div>` : '';
     const nv = !past ? proximas(4).findIndex(p => p.f === S.dia && p.h === x.h) : -1;
-    return `<section class="card"><div class="row"><div class="disp" style="font-size:26px">${esc(x.h === 'online' ? (past ? 'Online' : 'Sugerida') : x.h)}</div>${est}</div>
+    return `<section class="card"><div class="row"><div class="disp" style="font-size:26px">${esc(x.h === 'online' ? 'Online' : x.h)}</div>${est}</div>
       ${r ? `<button class="ag-rut" data-abrses="${esc(S.dia + '|' + x.h + '|' + id)}"><div style="flex:1;min-width:0"><b>${esc(r.tipo || 'Rutina')}</b><div class="small muted">${esc(r.familia || '')}${!rec?.rutina && !past ? ' · según tu programa' : ''}</div></div><span class="chev" aria-hidden="true">›</span></button>` : `<div class="small muted">${past ? (x.h === 'online' ? 'Sesión online' : 'Clase en Titanium') : 'Franco te asigna la rutina en la clase.'}</div>`}
       ${ej}
       ${S.dia === t && r && !past ? `<button class="btn pri" data-abrses="${esc(S.dia + '|' + x.h + '|' + id)}">Entrenar ahora</button>` : ''}
@@ -1806,7 +1805,7 @@ V.agenda = () => {
   ${weekStrip(S.wk, S.dia, 'data-dia')}
 
   <div class="eyebrow">${esc(longD(S.dia))}</div>
-  ${items.length || evs.length ? [...items.map(x => ({ k: x.h, html: card(x) })), ...evs.map(e => ({ k: e.hora || '00:00', html: evHTML(e) }))].sort((a, b) => a.k.localeCompare(b.k)).map(x => x.html).join('') : `<div class="card"><div class="muted">${S.dia < t ? 'No tuviste clase este día.' : (ONL() ? 'Día sin sesión sugerida. Si te acomoda más, puedes entrenar hoy tu próxima sesión desde «Entreno».' : 'No tienes nada agendado este día. ¡Descansa o muévete libre!')}</div></div>`}`;
+  ${items.length || evs.length ? [...items.map(x => ({ k: x.h, html: card(x) })), ...evs.map(e => ({ k: e.hora || '00:00', html: evHTML(e) }))].sort((a, b) => a.k.localeCompare(b.k)).map(x => x.html).join('') : `<div class="card"><div class="muted">${S.dia < t ? 'No tuviste clase este día.' : (ONL() ? 'No tienes nada agendado este día. Si quieres entrenar, tu próxima sesión está en «Entreno».' : 'No tienes nada agendado este día. ¡Descansa o muévete libre!')}</div></div>`}`;
 };
 V.clases = () => {
   const t = today(); const pas = S.clases.filter(r => r.fecha < t && r.fecha >= addDays(t, -14) && (r.asis || r.quitado)).slice(-6).reverse();
@@ -2189,7 +2188,7 @@ function nuObjetivoHTML() { const N = NUT(), d = nuDatosIB(), m = S.nu.meta || {
       <button class="btn pri" data-nuobjok="1">Guardar mi objetivo</button><div class="small muted">Tu profe revisa el cálculo y te envía tu pauta con 3 opciones por comida.</div>` : '<div class="small muted">Toca tu objetivo para ver tu meta.</div>'}</section>`; }
 /* día de entreno / descanso: en descanso ¾ de los carbohidratos */
 const NU_DT_K = 'tl-nu-dt';
-function nuEntrenaEl(f) { const dk = DK[parseISO(f).getDay()]; return (S.a?.bloques || []).some(b => String(b).startsWith(dk + '-')) || (S.a?.online && (S.a.dias_online || []).includes(dk)) || (S.clases || []).some(c => c.fecha === f && !c.quitado); }
+function nuEntrenaEl(f) { const dk = DK[parseISO(f).getDay()]; return (S.a?.bloques || []).some(b => String(b).startsWith(dk + '-')) || (S.clases || []).some(c => c.fecha === f && !c.quitado); }
 function nuTipoDia(f) { let m = {}; try { m = JSON.parse(localStorage.getItem(NU_DT_K) || '{}'); } catch (_) {} return m[f] || (nuEntrenaEl(f) ? 'entreno' : 'descanso'); }
 function nuSetTipoDia(f, t) { let m = {}; try { m = JSON.parse(localStorage.getItem(NU_DT_K) || '{}'); } catch (_) {} m[f] = t; Object.keys(m).sort().slice(0, -20).forEach(k => delete m[k]); try { localStorage.setItem(NU_DT_K, JSON.stringify(m)); } catch (_) {} }
 function nuMetaDia(f) { const m = S.nu?.meta || {}; if (!m.kcal || nuTipoDia(f) !== 'descanso' || !NUT()) return m; return Object.assign({}, m, NUT().metasDescanso(m)); }
