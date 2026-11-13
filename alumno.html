@@ -1390,12 +1390,6 @@ V.progreso = () => {
   const H = historial(); const mejor = l => l.some(x => x.t != null) ? l.reduce((b, x) => (x.t || 0) > (b.t || 0) ? x : b, l[0]) : l.reduce((b, x) => (x.kg || 0) > (b.kg || 0) || ((x.kg || 0) === (b.kg || 0) && (x.r || 0) > (b.r || 0)) ? x : b, l[0]);
   const best = Object.entries(H).map(([n, l]) => [n, mejor(l), l]).filter(([, b]) => b && (b.kg || b.t));
   best.sort((a, b) => b[2].length - a[2].length);
-  const top = best.find(x => x[0] === S.pej) || best[0];
-  let chart = '';
-  if (top) { const uT = top[2].some(x => x.t != null) ? 's' : 'kg'; const byF = {}; top[2].forEach(x => { const v = uT === 's' ? x.t : x.kg; if (v != null) byF[x.f] = Math.max(byF[x.f] || 0, v); });
-    const pts = Object.entries(byF).sort(); if (pts.length >= 2) { const mn = Math.min(...pts.map(p => p[1])), mx = Math.max(...pts.map(p => p[1])); const W = 320, Hh = 110;
-      const xy = pts.map(([f, v], i) => [10 + i * (W - 20) / (pts.length - 1), Hh - 10 - (mx === mn ? 0.5 : (v - mn) / (mx - mn)) * (Hh - 30)]);
-      chart = `<svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="${esc(top[0])}: de ${mn} a ${mx} ${uT}"><polyline points="${xy.map(p => p.join(',')).join(' ')}" fill="none" stroke="#d71f30" stroke-width="3" stroke-linejoin="round"/>${xy.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#d71f30"/>`).join('')}<text x="${W - 4}" y="14" text-anchor="end" fill="#f2eef0" font-size="13" font-weight="700">${String(mx).replace('.', ',')} ${uT}</text></svg>`; } }
   const ANG = [['frente', 'Frente'], ['perfil', 'Perfil'], ['espalda', 'Espalda']]; const ang = S.fang || 'frente';
   const ses = S.fotos.slice().sort((a, b) => a.f < b.f ? -1 : a.f > b.f ? 1 : 0);
   const fA = ses.find(x => x.f === S.fA) || ses[0], fB = ses.find(x => x.f === S.fB) || ses[ses.length - 1];
@@ -1465,17 +1459,83 @@ V.progreso = () => {
   const tab = S.ptab || (S.fotoUp ? 'fotos' : S.evalFirst ? 'cuerpo' : 'entreno');
   const TABS = [['entreno', '💪 Entreno'], ['cuerpo', '📊 Cuerpo'], ['fotos', '📸 Fotos']];
   const nom = n => n.replace(/^\d+[ab]? · /, '');
-  const verTodas = S.mAll ? best : best.slice(0, 5);
-  const entreno = `
-  ${top ? `<section class="card"><div class="row"><h2 style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nom(top[0]))}</h2><span class="small muted" style="white-space:nowrap">mejor ${esc(fmtSet(top[1]))}</span></div>
-    ${chart || '<div class="small muted">Anota más sesiones de este ejercicio para ver tu gráfico.</div>'}
-    ${best.length > 1 ? `<div class="chips">${best.slice(0, 8).map(([n]) => `<button class="chip" data-pej="${esc(n)}" aria-pressed="${n === top[0]}">${esc(nom(n).split(' (')[0])}</button>`).join('')}</div>` : ''}</section>` : ''}
-  <section class="card"><h2>Tus mejores marcas</h2>${best.length ? verTodas.map(([n, bb]) => `<div class="row small"><span style="min-width:0">${esc(nom(n))}</span><b style="white-space:nowrap">${esc(fmtSet(bb))}</b></div>`).join('') + (best.length > 5 ? `<button class="chip" data-mall="1" style="justify-self:start">${S.mAll ? 'Ver menos' : 'Ver todas (' + best.length + ')'}</button>` : '') : '<div class="small muted">Cuando anotes tus series en «Entreno», aquí verás tus récords.</div>'}</section>`;
+  const PR = progresoEj(best);
+  const entreno = S.pdet && PR.ej.find(x => x.n === S.pdet) ? detalleEj(PR.ej.find(x => x.n === S.pdet), nom) : entrenoHTML(PR, nom);
+  // racha de semanas seguidas con al menos una clase o actividad (la semana actual no corta la racha)
+  const lun = f => { const d = parseISO(f); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return toISO(d); };
+  const sem = new Set([...S.clases.filter(terminada).map(r => r.fecha), ...[...(S.hechas?.values() || [])].map(r => String(r.fecha).slice(0, 10))].map(lun));
+  let w = lun(t); if (!sem.has(w)) w = addDays(w, -7); let racha = 0; while (sem.has(w)) { racha++; w = addDays(w, -7); }
+  const mAnt = toISO(new Date(parseISO(t).getFullYear(), parseISO(t).getMonth() - 1, 1)).slice(0, 7);
+  const dHoy = Number(t.slice(8));
+  const antMes = S.clases.filter(r => r.fecha.startsWith(mAnt) && Number(r.fecha.slice(8)) <= dHoy && terminada(r)).length;
+  const dif = delMes - antMes; const MESC = MES.map(m => m.slice(0, 3));
+  const recMes = PR.recs.filter(r => r.f.startsWith(mes)).length;
+  const tile = (v, l, sub, cls) => `<div class="card" style="padding:12px 10px;gap:2px;min-width:0"><div class="disp ${cls || ''}" style="font-size:28px;line-height:1">${v}</div><div class="small muted" style="font-size:12px">${l}</div>${sub ? `<div style="font-size:12px">${sub}</div>` : ''}</div>`;
+  const tiles = [tile(delMes, ONL() ? 'Sesiones ' + MESC[parseISO(t).getMonth()] + '.' : 'Clases ' + MESC[parseISO(t).getMonth()] + '.', antMes || delMes ? `<span class="${dif > 0 ? 'ok' : 'muted'}" style="font-weight:600">${dif > 0 ? '+' + dif : dif < 0 ? dif : '='} vs ${MESC[Number(mAnt.slice(5)) - 1]}.</span>` : ''),
+    ...(actsMes(mes) ? [tile(actsMes(mes), 'Actividades', '')] : []),
+    ...(ONL() ? [] : [tile(marcadas ? Math.round(delMes / marcadas * 100) + '%' : '—', 'Asistencia', marcadas ? `<span class="muted">${delMes} de ${marcadas}</span>` : '')]),
+    tile(recMes, 'Récords nuevos', '<span class="muted">este mes</span>', 'red')];
+  const resumen = `${racha ? `<section class="card" style="flex-direction:row;align-items:center;gap:14px"><div style="width:48px;height:48px;border-radius:14px;background:var(--red);display:grid;place-items:center;flex:none"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2c1 4 5 6 5 11a5 5 0 0 1-10 0c0-3 2-4 2-7 1.5 1 3 2.5 3 2.5"/></svg></div><div style="min-width:0"><div class="disp" style="font-size:24px;line-height:1">${racha} semana${racha === 1 ? '' : 's'} seguida${racha === 1 ? '' : 's'}</div><div class="small muted" style="margin-top:3px">${sem.has(lun(t)) ? '¡Vas bien! Sigue así.' : '¡Entrena esta semana para no cortarla!'}</div></div></section>` : ''}
+  <div style="display:grid;grid-template-columns:repeat(${tiles.length},1fr);gap:8px">${tiles.join('')}</div>`;
   return `<h1>${tab === 'cuerpo' && S.evalFirst ? 'Mis evaluaciones' : 'Mi progreso'}</h1>
-  <section class="card" style="flex-direction:row;padding:12px 6px">${[[ONL() ? 'Sesiones del mes' : 'Clases del mes', delMes, ''], ...(actsMes(mes) ? [['Actividades', actsMes(mes), '']] : []), ...(ONL() ? [] : [['Asistencia', marcadas ? Math.round(delMes / marcadas * 100) + '%' : '—', '']]), ['Récords', best.length, 'red']].map(([l, v, c], i) => `<div style="flex:1;text-align:center;${i ? 'border-left:1px solid var(--line)' : ''}"><div class="disp ${c}" style="font-size:26px;line-height:1">${v}</div><div class="small muted" style="font-size:12px">${l}</div></div>`).join('')}</section>
+  ${S.pdet && tab === 'entreno' ? '' : resumen}
   <div class="seg" role="tablist">${TABS.map(([k, l]) => `<button role="tab" data-ptab="${k}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>
   ${tab === 'entreno' ? entreno : tab === 'cuerpo' ? inbCard + medCard : fotosCard}`;
 };
+/* Progreso · Entreno: récords reales, fuerza estimada, tarjetas por ejercicio y detalle */
+const e1rm = x => x.t != null ? x.t : (x.kg || 0) * (x.r > 1 && x.r <= 15 ? 1 + x.r / 30 : 1);
+const fmtN1 = v => String(Math.round(v * 10) / 10).replace('.', ',');
+function progresoEj(best) {
+  const recs = []; const ej = best.map(([n, mej, l]) => {
+    const seg = l.some(x => x.t != null); const byF = {};
+    l.forEach(x => { if (seg ? x.t == null : !x.kg) return; if (!byF[x.f] || e1rm(x) > e1rm(byF[x.f])) byF[x.f] = x; });
+    const dias = Object.keys(byF).sort().map(f => ({ f, s: byF[f], v: e1rm(byF[f]) }));
+    let prev = null; dias.forEach(d => { d.rec = !!(prev && d.v > prev.v + 0.01); if (d.rec) recs.push({ n, f: d.f, s: d.s, antes: prev.s }); if (!prev || d.v > prev.v) prev = d; });
+    const ini = dias[0], top = dias.reduce((b, d) => d.v > b.v ? d : b, dias[0] || { v: 0 });
+    return { n, seg, mej, dias, ini, top, ult: dias.length ? dias[dias.length - 1].f : '' };
+  }).filter(x => x.dias.length);
+  recs.sort((a, b) => a.f < b.f ? 1 : a.f > b.f ? -1 : 0);
+  return { ej, recs };
+}
+const mejoraEj = e => { if (!e.ini || e.dias.length < 2) return '';
+  if (e.seg) { const d = e.top.s.t - e.ini.s.t; return d > 0 ? `+${d} s` : ''; }
+  const dk = (e.top.s.kg || 0) - (e.ini.s.kg || 0), pc = e.ini.v ? Math.round((e.top.v - e.ini.v) / e.ini.v * 100) : 0;
+  return [dk > 0 ? '+' + fmtN1(dk) + ' kg' : '', pc > 0 ? '+' + pc + '%' : ''].filter(Boolean).join(' · '); };
+const sparkEj = e => { if (e.dias.length < 3) return `<div style="width:76px;height:34px;border:1px dashed var(--line);border-radius:8px;display:grid;place-items:center;font-size:12px;color:var(--muted);flex:none">${e.dias.length} de 3</div>`;
+  const v = e.dias.slice(-8).map(d => d.v), mn = Math.min(...v), mx = Math.max(...v), W = 76, H = 34;
+  const xy = v.map((y, i) => [3 + i * (W - 6) / (v.length - 1), H - 4 - (mx === mn ? .5 : (y - mn) / (mx - mn)) * (H - 8)]);
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true" style="flex:none"><polyline points="${xy.map(p => p.join(',')).join(' ')}" fill="none" stroke="#d71f30" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${xy[xy.length - 1][0]}" cy="${xy[xy.length - 1][1]}" r="3" fill="#d71f30"/></svg>`; };
+const COPA = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff5a68" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>';
+function entrenoHTML(PR, nom) {
+  if (!PR.ej.length) return '<section class="card"><h2>Tus ejercicios</h2><div class="small muted">Cuando anotes tus series en «Entreno», aquí verás tu progreso y tus récords.</div></section>';
+  const mes = today().slice(0, 7); const delMes = PR.recs.filter(r => r.f.startsWith(mes));
+  const recL = (delMes.length ? delMes : PR.recs).slice(0, 3);
+  const recCard = recL.length ? `<section class="card"><div class="row"><h2>Récords recientes</h2><span class="small muted">${delMes.length ? MES[Number(mes.slice(5)) - 1] : 'últimos'}</span></div>
+    ${recL.map(r => `<button type="button" data-pdet="${esc(r.n)}" style="display:flex;align-items:center;gap:12px;padding:8px 0;border:0;border-top:1px solid var(--line);background:none;color:inherit;text-align:left;font:inherit;cursor:pointer;width:100%"><span style="width:36px;height:36px;border-radius:10px;background:rgba(215,31,48,.16);display:grid;place-items:center;flex:none">${COPA}</span><span style="flex:1;min-width:0"><span style="display:block;font-weight:600;font-size:15px">${esc(nom(r.n))}</span><span class="small muted" style="font-size:13px">${esc(DL[dayKey(r.f)] + ' ' + fmtD(r.f))} · antes ${esc(fmtSet(r.antes))}</span></span><b class="disp" style="font-size:19px;white-space:nowrap">${esc(fmtSet(r.s))}</b></button>`).join('')}</section>` : '';
+  const lista = S.mAll ? PR.ej : PR.ej.slice(0, 5);
+  const card = e => { const m = mejoraEj(e); const fe = !e.seg && e.top.s.r > 1 && e.top.s.r <= 15 ? `Fuerza estimada ≈ ${fmtN1(e.top.v)} kg` : '';
+    const sub = e.dias.length < 3 ? `Te ${3 - e.dias.length === 1 ? 'falta 1 sesión' : 'faltan ' + (3 - e.dias.length) + ' sesiones'} para ver tu tendencia` : fe;
+    return `<button type="button" class="card" data-pdet="${esc(e.n)}" style="flex-direction:row;align-items:center;gap:12px;padding:14px;color:inherit;text-align:left;font:inherit;cursor:pointer;width:100%"><span style="flex:1;min-width:0"><span style="display:block;font-weight:600;font-size:15px">${esc(nom(e.n))}</span><span style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><span class="disp" style="font-size:25px">${esc(fmtSet(e.top.s))}</span>${m ? `<span class="ok" style="font-size:13px;font-weight:700">${m}</span>` : ''}</span>${sub ? `<span class="small muted" style="display:block;font-size:12px">${sub}</span>` : ''}</span>${sparkEj(e)}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a69ea3" stroke-width="2" aria-hidden="true" style="flex:none"><path d="M9 6l6 6-6 6"/></svg></button>`; };
+  return `${recCard}<div class="row" style="margin-top:4px"><h2>Tus ejercicios</h2><span class="small muted">vs tu primer registro</span></div>
+  ${lista.map(card).join('')}${PR.ej.length > 5 ? `<button class="btn" data-mall="1">${S.mAll ? 'Ver menos' : 'Ver los ' + PR.ej.length + ' ejercicios'}</button>` : ''}`;
+}
+function detalleEj(e, nom) {
+  const fz = !e.seg && S.pmet === 'fz'; const val = d => e.seg ? d.s.t : fz ? d.v : d.s.kg; const u = e.seg ? 's' : 'kg';
+  const pts = e.dias.map(d => [d.f, val(d)]); let chart = '<div class="small muted" style="text-align:center">📈 Anota este ejercicio en 2 sesiones o más para ver tu gráfico.</div>';
+  if (pts.length >= 2) { const vs = pts.map(p => p[1]); let mn = Math.min(...vs), mx = Math.max(...vs); if (mx === mn) { mn -= 1; mx += 1; }
+    const W = 326, H = 190, L = 34, T = 16, B = 26; const X = i => L + 6 + i * (W - L - 16) / (pts.length - 1), Y = v => T + (1 - (v - mn) / (mx - mn)) * (H - T - B);
+    const ticks = [mx, (mx + mn) / 2, mn]; const xs = pts.length > 2 ? [0, Math.floor((pts.length - 1) / 2), pts.length - 1] : [0, 1];
+    chart = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(nom(e.n))}: ${pts.map(p => fmtN1(p[1]) + ' ' + u).join(', ')}">${ticks.map(v => `<line x1="${L}" x2="${W}" y1="${Y(v)}" y2="${Y(v)}" stroke="#2f2a2e"/><text x="0" y="${Y(v) + 4}" fill="#a69ea3" font-size="11">${fmtN1(v)}</text>`).join('')}
+      <polyline points="${pts.map((p, i) => X(i) + ',' + Y(p[1])).join(' ')}" fill="none" stroke="#d71f30" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>${pts.map((p, i) => `<circle cx="${X(i)}" cy="${Y(p[1])}" r="${e.dias[i].rec ? 5 : 3.5}" fill="#d71f30"/>`).join('')}
+      ${xs.map((i, k) => `<text x="${X(i)}" y="${H - 6}" fill="#a69ea3" font-size="11" text-anchor="${k === 0 ? 'start' : k === xs.length - 1 ? 'end' : 'middle'}">${esc(fmtD(pts[i][0]))}</text>`).join('')}</svg>`; }
+  const m = mejoraEj(e); const pc = (m.match(/\+\d+%/) || [m.split(' · ')[0] || '—'])[0];
+  const st = (l, v, c) => `<div class="card" style="padding:12px 10px;gap:2px;min-width:0"><div class="small muted" style="font-size:12px">${l}</div><div class="disp ${c || ''}" style="font-size:22px;line-height:1.1">${v}</div></div>`;
+  return `<button type="button" class="btn" data-pdet="" style="justify-self:start;width:auto;padding:0 14px">‹ Volver</button>
+  <div><h2 style="font-size:30px;line-height:1.05">${esc(nom(e.n))}</h2><div class="small muted" style="margin-top:4px">${e.dias.length} sesión${e.dias.length === 1 ? '' : 'es'} · desde el ${esc(fmtD(e.ini.f))}</div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${st('Inicio', esc(fmtSet(e.ini.s)))}${st('Mejor', esc(fmtSet(e.top.s)), 'red')}${st('Mejora', pc, pc === '—' ? '' : 'ok')}</div>
+  <section class="card">${e.seg ? '' : `<div class="chips"><button class="chip" data-pmet="kg" aria-pressed="${!fz}">Peso</button><button class="chip" data-pmet="fz" aria-pressed="${fz}">Fuerza estimada</button></div>`}${chart}${fz ? '<div class="small muted" style="font-size:12px">Fuerza estimada: lo que podrías levantar a 1 repetición, calculado con tus kilos y repeticiones.</div>' : ''}</section>
+  <section class="card"><h2>Historial</h2>${e.dias.slice().reverse().map(d => `<div class="row small" style="padding:6px 0;border-top:1px solid var(--line)"><span>${esc(DL[dayKey(d.f)] + ' ' + fmtD(d.f))}</span><b style="white-space:nowrap" class="${d.rec ? 'red' : ''}">${esc(fmtSet(d.s))}${d.rec ? ' · Récord' : ''}</b></div>`).join('')}</section>`;
+}
 V.plan = () => {
   const p = planActual(); if (!p) return `<h1>Mi perfil</h1>${perfilCard()}${fichaCard()}${avisosCard()}<div class="card"><div class="muted">Todavía no tienes un plan registrado. Habla con Franco.</div></div><button class="btn" data-tour="1">▶ Ver el tour de la app</button><button class="btn" style="background:transparent;border:0;color:#a69ea3;text-decoration:underline;min-height:40px" onclick="if(confirm('¿Cerrar sesión? Tendrás que pedir un código nuevo para volver a entrar.'))tlLogout()">Cerrar sesión</button>`;
   const usadas = presentes(p.inicio, p.fin ? addDays(p.fin, -1) : null); const tot = p.clases || S.a.clases || 0; const ab = abonado(p); const saldo = Math.max(0, (p.monto || 0) - ab);
@@ -1952,8 +2012,10 @@ document.addEventListener('click', async ev => {
   if (ev.target.id === 'pf-ok') { ev.target.disabled = true; const ig = $('#pf-ig').value.trim().replace(/^@+/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '');
     if (await guardarPerfil({ apodo: $('#pf-apodo').value.trim() || null, meta: $('#pf-meta').value.trim() || null, nac: $('#pf-nac').value || null, ig: ig || null, deportes: S.pfDeps || S.perfil.deportes || [] })) { S.pfDeps = null; toast('Perfil guardado ✓'); } else ev.target.disabled = false; return; }
   if (ev.target.id === 'ib-ok') { guardarInbody(ev.target); return; }
-  const ptb = ev.target.closest('[data-ptab]'); if (ptb) { S.ptab = ptb.dataset.ptab; S.fotoUp = S.ptab === 'fotos' && S.fotoUp; render(); return; }
+  const ptb = ev.target.closest('[data-ptab]'); if (ptb) { S.ptab = ptb.dataset.ptab; S.pdet = null; S.fotoUp = S.ptab === 'fotos' && S.fotoUp; render(); return; }
   const pj = ev.target.closest('[data-pej]'); if (pj) { S.pej = pj.dataset.pej; render(); return; }
+  const pdt = ev.target.closest('[data-pdet]'); if (pdt) { S.pdet = pdt.dataset.pdet || null; S.pmet = null; render(); return; }
+  const pmt = ev.target.closest('[data-pmet]'); if (pmt) { S.pmet = pmt.dataset.pmet; render(true); return; }
   if (ev.target.closest('[data-iball]')) { S.ibAll = !S.ibAll; render(); return; }
   if (ev.target.closest('[data-mall]')) { S.mAll = !S.mAll; render(); return; }
   const ibd = ev.target.closest('[data-ibdel]'); if (ibd) {
