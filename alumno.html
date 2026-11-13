@@ -654,42 +654,58 @@ async function compartirFotos(btn) {
   btn.disabled = false; btn.textContent = t0;
 }
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-fshare]'); if (b) { ev.preventDefault(); compartirFotos(b); } });
-// imagen para historias: el pensamiento del día con el mismo formato de la tarjeta + logo Titanium
+// imagen para historias: copia literal del inicio de la app (logo, foto, fecha, "Hola, nombre" y el pensamiento del día)
 async function compartirFrase(btn) {
   const [tit, txt] = fraseDelDia(); const t0 = btn.innerHTML; btn.disabled = true; btn.textContent = '⏳';
   const carga = src => new Promise((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = rej; im.src = src; });
   try {
-    try { await Promise.all(['600 60px Barlow', '400 40px Barlow', 'italic 400 40px Barlow', '700 60px "Barlow Condensed"'].map(f => document.fonts?.load(f))); } catch (_) {}
-    const W = 1080, H = 1920, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
-    g.fillStyle = '#0e0c0f'; g.fillRect(0, 0, W, H); g.strokeStyle = 'rgba(215,31,48,.18)'; g.lineWidth = 60; g.beginPath(); g.arc(W + 40, -40, 300, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(-60, H + 60, 260, 0, Math.PI * 2); g.stroke();
-    const wrap = (s, max) => { const out = []; let l = ''; s.split(' ').forEach(w => { const t = l ? l + ' ' + w : w; if (g.measureText(t).width > max && l) { out.push(l); l = w; } else l = t; }); if (l) out.push(l); return out; };
-    // medir la tarjeta
-    const pad = 70, cx = 60, cw = W - cx * 2, iw = cw - pad * 2;
-    g.font = '600 64px Barlow,sans-serif'; const lq = wrap('«' + txt + '»', iw); const lhQ = 86;
-    g.font = 'italic 400 36px Barlow,sans-serif'; const lb = wrap('Inspirado en los principios de Napoleon Hill · Piense y hágase rico y Más astuto que el diablo', iw); const lhB = 50;
-    const ch = pad + 44 + 50 + lq.length * lhQ + 30 + lb.length * lhB + pad - 10;
-    // logo arriba
-    let lgH = 0, lg = null; try { lg = await carga('logo-titanium.png'); lgH = 720 * lg.height / lg.width; } catch (_) {}
-    const total = lgH + 110 + ch; let y = Math.max(140, (H - total) / 2 - 40);
-    if (lg) { g.drawImage(lg, (W - 720) / 2, y, 720, lgH); y += lgH + 110; }
-    // tarjeta igual a la app
-    const gr = g.createLinearGradient(cx, y, cx + cw, y + ch); gr.addColorStop(0, '#2a0d12'); gr.addColorStop(0.6, '#1b181c'); gr.addColorStop(1, '#1b181c');
-    g.beginPath(); g.roundRect ? g.roundRect(cx, y, cw, ch, 40) : g.rect(cx, y, cw, ch); g.fillStyle = gr; g.fill(); g.lineWidth = 3; g.strokeStyle = '#4a1d24'; g.stroke();
-    let ty = y + pad + 30;
-    g.textBaseline = 'alphabetic'; g.textAlign = 'left'; g.fillStyle = '#e0505f'; g.font = '500 34px Barlow,sans-serif'; if ('letterSpacing' in g) g.letterSpacing = '4px';
-    g.fillText('PENSAMIENTO DEL DÍA', cx + pad, ty); if ('letterSpacing' in g) g.letterSpacing = '0px';
-    g.textAlign = 'right'; g.fillStyle = '#a79fa4'; g.font = '400 38px Barlow,sans-serif'; g.fillText(tit, cx + cw - pad, ty); g.textAlign = 'left';
-    ty += 50 + 64; g.fillStyle = '#f4f1f2'; g.font = '600 64px Barlow,sans-serif'; lq.forEach((l, i) => g.fillText(l, cx + pad, ty + i * lhQ));
-    ty += (lq.length - 1) * lhQ + 30 + lhB; g.fillStyle = '#a79fa4';
-    // atribución con títulos en cursiva (igual a la tarjeta)
+    try { await Promise.all(['400 14px Barlow', 'italic 400 14px Barlow', '600 19px Barlow', '700 12px Barlow', '700 32px "Barlow Condensed"', '700 20px "Barlow Condensed"'].map(f => document.fonts?.load(f))); } catch (_) {}
+    const s = 2.7, W = 400, H = 1920 / s, cv = document.createElement('canvas'); cv.width = 1080; cv.height = 1920; const g = cv.getContext('2d'); g.scale(s, s);
+    const C = { bg: '#121013', line: '#2f2a2e', fg: '#f2eef0', muted: '#a69ea3', redT: '#ff5a68', red: '#d71f30' };
+    const ls = v => { if ('letterSpacing' in g) g.letterSpacing = v; };
+    const rr = (x, y, w, h, r) => { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); };
+    g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+    const X = 18, CW = W - 36;
+    // medidas
+    const nombre = S.perfil?.apodo || String(S.a.nombre || '').split(' ')[0]; const nombreC = nombre.charAt(0).toUpperCase() + nombre.slice(1);
+    const onl = ONL(), meta = S.perfil?.meta || '';
+    const wrapW = (str, max, font) => { g.font = font; const out = []; let l = ''; str.split(' ').forEach(w => { const t = l ? l + ' ' + w : w; if (g.measureText(t).width > max && l) { out.push(l); l = w; } else l = t; }); if (l) out.push(l); return out; };
+    const fQ = '600 19px Barlow,sans-serif', lq = wrapW('«' + txt + '»', CW - 34, fQ), lhQ = 19 * 1.35;
     const tk = [...'Inspirado en los principios de Napoleon Hill ·'.split(' ').map(w => [w, 0]), ...'Piense y hágase rico'.split(' ').map(w => [w, 1]), ['y', 0], ...'Más astuto que el diablo'.split(' ').map(w => [w, 1])];
-    const fI = it => (it ? 'italic ' : '') + '400 36px Barlow,sans-serif'; let x = cx + pad, ly = ty;
-    tk.forEach(([w, it], j) => { g.font = fI(it); const sp = j ? g.measureText(' ').width : 0, ww = g.measureText(w).width; if (x + sp + ww > cx + cw - pad && x > cx + pad) { x = cx + pad; ly += lhB; } else x += sp; g.fillText(w, x, ly); x += ww; });
-    g.textAlign = 'center'; g.fillStyle = '#a79fa4'; g.font = '600 36px "Barlow Condensed",sans-serif'; g.fillText('TITANIUMAPP.CL', W / 2, H - 70); g.fillStyle = '#d71f30'; g.fillRect(0, H - 16, W, 16);
+    const fA = it => (it ? 'italic ' : '') + '400 14px Barlow,sans-serif', lhA = 18;
+    // posición de cada palabra de la atribución
+    let ax = 0, al = 0; const pos = tk.map(([w, it], j) => { g.font = fA(it); const sp = j ? g.measureText(' ').width : 0, ww = g.measureText(w).width; if (ax + sp + ww > CW - 34 && ax > 0) { ax = 0; al++; } else ax += sp; const p = [w, it, ax, al]; ax += ww; return p; });
+    const logoH = 30, logoBlock = 2 + logoH + 6 + 1;
+    const txH = 13 + 4 + 32 + (onl ? 4 + 21 : 0) + (meta ? 18 : 0), hdH = Math.max(48, txH);
+    const cardH = 16 + 15 + 10 + lq.length * lhQ + 10 + (al + 1) * lhA + 16 + 2;
+    const total = logoBlock + 14 + hdH + 14 + cardH; let y = Math.round((H - total) / 2 - 20);
+    // logo + línea
+    try { const svg = TL_LOGO.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="1011" height="200" '); const lg = await carga('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)); const lw = logoH * 2331 / 461; g.drawImage(lg, (W - lw) / 2, y + 2, lw, logoH); } catch (_) {}
+    y += 2 + logoH + 6; g.fillStyle = C.line; g.fillRect(X, y, CW, 1); y += 1 + 14;
+    // encabezado: foto + fecha + Hola + etiqueta
+    const ay = y + (hdH - 48) / 2; g.save(); g.beginPath(); g.arc(X + 24, ay + 24, 24, 0, Math.PI * 2); g.clip();
+    const u = S.perfil?.avatar && S.urls[S.perfil.avatar]; let avOk = false;
+    if (u) try { const im = await carga(u); const m = Math.min(im.width, im.height); g.drawImage(im, (im.width - m) / 2, (im.height - m) / 2, m, m, X, ay, 48, 48); avOk = true; } catch (_) {}
+    if (!avOk) { g.fillStyle = C.red; g.fillRect(X, ay, 48, 48); g.fillStyle = '#fff'; g.font = '700 20px "Barlow Condensed",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText((nombre || '?').charAt(0).toUpperCase(), X + 24, ay + 25); }
+    g.restore(); g.beginPath(); g.arc(X + 24, ay + 24, 23, 0, Math.PI * 2); g.lineWidth = 2; g.strokeStyle = C.line; g.stroke();
+    g.textAlign = 'left'; g.textBaseline = 'alphabetic'; const tx = X + 48 + 12; let ty = y + (hdH - txH) / 2;
+    g.fillStyle = C.muted; g.font = '400 12px Barlow,sans-serif'; ls('0.96px'); g.fillText(longD(today()).toUpperCase(), tx, ty + 11); ls('0px'); ty += 17;
+    g.fillStyle = C.fg; g.font = '700 32px "Barlow Condensed",sans-serif'; g.fillText('Hola, ' + nombreC, tx, ty + 27); ty += 32;
+    if (onl) { ty += 4; g.font = '700 12px Barlow,sans-serif'; ls('0.72px'); const bt = '🌐 ' + ONL_NOMBRE.toUpperCase(), bw = g.measureText(bt).width + 20; rr(tx, ty, bw, 21, 11); g.fillStyle = 'rgba(215,31,48,.12)'; g.fill(); g.lineWidth = 1; g.strokeStyle = 'rgba(215,31,48,.55)'; g.stroke(); g.fillStyle = C.fg; g.fillText(bt, tx + 10, ty + 15); ls('0px'); ty += 21; }
+    if (meta) { g.fillStyle = C.muted; g.font = '400 14px Barlow,sans-serif'; g.fillText('🎯 ' + meta, tx, ty + 15); }
+    y += hdH + 14;
+    // tarjeta del pensamiento, igual a la app
+    const gr = g.createLinearGradient(X, y, X + CW, y + cardH); gr.addColorStop(0, '#2a0d12'); gr.addColorStop(0.6, '#1b181c'); gr.addColorStop(1, '#1b181c');
+    rr(X + .5, y + .5, CW - 1, cardH - 1, 16); g.fillStyle = gr; g.fill(); g.lineWidth = 1; g.strokeStyle = '#4a1d24'; g.stroke();
+    const px = X + 17; let cy = y + 17;
+    g.fillStyle = C.redT; g.font = '400 12px Barlow,sans-serif'; ls('0.96px'); g.fillText('PENSAMIENTO DEL DÍA', px, cy + 12); ls('0px');
+    g.textAlign = 'right'; g.fillStyle = C.muted; g.font = '400 14px Barlow,sans-serif'; g.fillText(tit, X + CW - 17, cy + 12); g.textAlign = 'left'; cy += 15 + 10;
+    g.fillStyle = C.fg; g.font = fQ; lq.forEach((l, i) => g.fillText(l, px, cy + i * lhQ + 19)); cy += lq.length * lhQ + 10;
+    g.fillStyle = C.muted; pos.forEach(([w, it, x, l]) => { g.font = fA(it); g.fillText(w, px + x, cy + l * lhA + 14); });
     const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.92)); if (!blob) throw new Error('canvas');
     const file = new File([blob], 'titanium-pensamiento.jpg', { type: 'image/jpeg' });
     let ok = false; if (navigator.canShare && navigator.canShare({ files: [file] })) ok = await navigator.share({ files: [file] }).then(() => true, e => e && e.name === 'AbortError');
-    if (!ok) { const u = URL.createObjectURL(blob); const l = document.createElement('a'); l.href = u; l.download = file.name; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); toast('Imagen descargada ✓'); }
+    if (!ok) { const u2 = URL.createObjectURL(blob); const l = document.createElement('a'); l.href = u2; l.download = file.name; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u2), 60000); toast('Imagen descargada ✓'); }
   } catch (e) { console.error(e); toast('No se pudo armar la imagen. Intenta de nuevo.'); }
   btn.disabled = false; btn.innerHTML = t0;
 }
