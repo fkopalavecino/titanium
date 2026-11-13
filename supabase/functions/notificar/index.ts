@@ -1,4 +1,4 @@
-// Titanium Sport · avisos push a alumnos (evento nuevo, recordatorios, clases, mensajes grupales y personales, pagos, recuperaciones) y al profe (confirmaciones, recuperaciones, comprobantes, ingresos nuevos, resumen de pagos)
+// Titanium Sport · avisos push a alumnos (evento nuevo, recordatorios, clases, mensajes grupales y personales, pagos, recuperaciones) y al profe (confirmaciones, recuperaciones, agenda libre, comprobantes, ingresos nuevos, resumen de pagos)
 import webpush from 'npm:web-push@3.6.7';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -167,9 +167,10 @@ Deno.serve(async (req) => {
       const { data: a } = await sb.from('alumnos').select('nombre').eq('codigo', String(b.alumno)).maybeSingle();
       const nom = String(a?.nombre || b.alumno).trim(); const f = String(b.fecha), h = hora(String(b.hora));
       const cuando = f === diaCL() ? 'hoy' : f === diaCL(1) ? 'mañana' : fechaTxt(f);
-      const ag = b.accion === 'agenda';
+      // accion: 'agenda' | 'cancela' (recuperación) · 'agenda_flex' | 'cancela_flex' (alumno de agenda libre)
+      const ag = String(b.accion).startsWith('agenda'), flex = String(b.accion).endsWith('_flex');
       return json(await enviar(await subsProfe(), {
-        title: ag ? `🔁 ${nom} recupera una clase` : `↩️ ${nom} canceló su recuperación`,
+        title: flex ? (ag ? `📅 ${nom} agendó una clase` : `↩️ ${nom} canceló su clase`) : ag ? `🔁 ${nom} recupera una clase` : `↩️ ${nom} canceló su recuperación`,
         body: `${ag ? 'Viene' : 'Ya no viene'} ${cuando} a las ${h}`, url: urlClase(f, h), tag: `rc-${b.alumno}-${f}-${h}` }));
     }
     if (b.modo === 'ingreso') {
