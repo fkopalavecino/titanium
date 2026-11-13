@@ -1048,8 +1048,7 @@ VIEWS.inicio = () => {
     </div>
     <div class="tools"><a class="btn pri" href="#clase">Abrir clase de hoy</a><a class="btn" href="#pagos">Registrar pago</a></div>
   </section>
-  <div class="grid2" style="align-items:start">${confirmacionesHTML()}${proximosAgendaHTML()}</div>
-  ${agendadasAppHTML()}
+  <!-- 1 · lo de ahora: tu próximo bloque y lo pendiente -->
   <div class="grid2">
     <section class="card pad" style="display:grid;gap:12px;align-content:start">
       <div class="eyebrow">Tu próximo bloque</div>
@@ -1067,13 +1066,13 @@ VIEWS.inicio = () => {
       </div>
     </section>
   </div>
-  <section class="kpis">
-    <div class="card kpi"><div class="l">Alumnos activos</div><div class="v">${al.length}</div><div class="s">${S.alumnos.size - al.length} inactivos</div></div>
-    <div class="card kpi"><div class="l">Recibido · ${esc(fmtMes(mes))} ${ojoMontos()}</div><div class="v">${mClp(recibido)}</div><div class="s">de ${mClp(acordado)} acordado</div></div>
-    <div class="card kpi ${acordado-recibido > 0 ? 'alert' : ''}"><div class="l">Falta por cobrar ${ojoMontos()}</div><div class="v">${mClp(Math.max(0,acordado-recibido))}</div><div class="s">${saldos.length} alumnos con saldo</div></div>
-    <div class="card kpi"><div class="l">Asistencias hoy</div><div class="v">${presHoy}</div><div class="s">${hoyH.length} bloques con alumnos</div></div>
-  </section>
-  <div class="grid2">
+  <!-- 2 · quién viene: asistencia, agenda de eventos y lo que agendaron desde la app -->
+  <div class="grid2" style="align-items:start"><div style="display:grid;gap:14px;align-content:start">${confirmacionesHTML()}${proximosAgendaHTML()}</div>${agendadasAppHTML()}</div>
+  ${S.nuRes && S.nuRes.size && nuRev.length ? (() => { const ls = [...S.nuRes].filter(([k]) => S.alumnos.has(k)).sort((x, y) => (y[1].revisar - x[1].revisar) || (x[1].dias - y[1].dias)); if (!ls.length) return '';
+    return `<details class="sec" id="nu-card" ${nuAbierta() ? 'open' : ''} style="background:var(--surface);border:1px solid var(--line);border-left:4px solid ${nuRev.length ? 'var(--warn)' : 'var(--ok)'};margin-bottom:14px"><summary><span>🥗 Nutrición · últimos 7 días</span>${nuRev.length ? `<span class="small" style="color:var(--warn);font-weight:700">${nuRev.length} pauta${nuRev.length > 1 ? 's' : ''} por revisar</span>` : `<span class="small muted" style="font-weight:500">${ls.length} alumno${ls.length > 1 ? 's' : ''}</span>`}<span class="muted" style="margin-left:auto">▾</span></summary>
+      <div style="display:grid;gap:4px">${ls.slice(0, 10).map(([k, r]) => `<button type="button" data-act="nu-ir" data-id="${esc(k)}" style="display:flex;justify-content:space-between;align-items:center;gap:8px;border:0;border-top:1px solid var(--line);background:none;color:var(--fg);padding:8px 0;cursor:pointer;text-align:left;font:inherit"><span>${esc(firstName(S.alumnos.get(k).nombre))}${r.revisar ? ' <span class="pill" style="background:var(--warn-soft);color:var(--warn)">revisar pauta</span>' : ''}</span><span class="small"><b style="color:${r.dias >= 5 ? 'var(--ok)' : r.dias >= 3 ? 'var(--warn)' : 'var(--crit)'}">${r.dias}/7 días</b>${r.conMeta ? ` <span class="muted">· ${r.enMeta} en meta</span>` : ' <span class="muted">· sin metas</span>'} ›</span></button>`).join('')}</div><button type="button" class="btn sm" data-rc="abrir" style="margin-top:8px">🍲 Recetario</button></details>`; })() : ''}
+  <!-- 3 · renovaciones y clases reagendadas -->
+  <div class="grid2" style="align-items:start">
     <section class="card pad">
       <h2 style="font-size:22px;margin-bottom:2px">Renovaciones y vencidos</h2>
       <p class="muted small" style="margin:0 0 6px">Planes que vencen en los próximos 7 días o ya vencieron.</p>
@@ -1101,6 +1100,9 @@ VIEWS.inicio = () => {
         ${x.tipo === 'rec' ? '<span class="sc-ic sc-rec">🔁 Recuperación</span>' : '<span class="sc-ic">↻ Movida</span>'}<span class="muted">›</span></a>`).join('')}</div>`).join('')}</div>`; })()
         : '<div class="small muted">No hay clases reagendadas por ahora.</div>'}
     </section>`; })()}
+  </div>
+  <!-- 4 · seguimiento -->
+  <div class="grid2">
     <section class="card pad">
       <h2 style="font-size:22px;margin-bottom:2px">Seguimiento de tus alumnos</h2>
       <p class="muted small" style="margin:0 0 6px">Cumpleaños, récords de la semana, programas por terminar y quién dejó de venir.</p>
@@ -1122,9 +1124,15 @@ VIEWS.inicio = () => {
       <p class="muted small" style="margin:0 0 6px">Sesiones terminadas esta semana (de lunes a hoy) y su última sesión. Toca el nombre para ver sus cargas.</p>
       <div>${ons.map(fila).join('')}</div></section>`; })()}
   </div>
-  ${S.nuRes && S.nuRes.size ? (() => { const ls = [...S.nuRes].filter(([k]) => S.alumnos.has(k)).sort((x, y) => (y[1].revisar - x[1].revisar) || (x[1].dias - y[1].dias)); if (!ls.length) return '';
+  ${S.nuRes && S.nuRes.size && !nuRev.length ? (() => { const ls = [...S.nuRes].filter(([k]) => S.alumnos.has(k)).sort((x, y) => (y[1].revisar - x[1].revisar) || (x[1].dias - y[1].dias)); if (!ls.length) return '';
     return `<details class="sec" id="nu-card" ${nuAbierta() ? 'open' : ''} style="background:var(--surface);border:1px solid var(--line);border-left:4px solid ${nuRev.length ? 'var(--warn)' : 'var(--ok)'};margin-bottom:14px"><summary><span>🥗 Nutrición · últimos 7 días</span>${nuRev.length ? `<span class="small" style="color:var(--warn);font-weight:700">${nuRev.length} pauta${nuRev.length > 1 ? 's' : ''} por revisar</span>` : `<span class="small muted" style="font-weight:500">${ls.length} alumno${ls.length > 1 ? 's' : ''}</span>`}<span class="muted" style="margin-left:auto">▾</span></summary>
       <div style="display:grid;gap:4px">${ls.slice(0, 10).map(([k, r]) => `<button type="button" data-act="nu-ir" data-id="${esc(k)}" style="display:flex;justify-content:space-between;align-items:center;gap:8px;border:0;border-top:1px solid var(--line);background:none;color:var(--fg);padding:8px 0;cursor:pointer;text-align:left;font:inherit"><span>${esc(firstName(S.alumnos.get(k).nombre))}${r.revisar ? ' <span class="pill" style="background:var(--warn-soft);color:var(--warn)">revisar pauta</span>' : ''}</span><span class="small"><b style="color:${r.dias >= 5 ? 'var(--ok)' : r.dias >= 3 ? 'var(--warn)' : 'var(--crit)'}">${r.dias}/7 días</b>${r.conMeta ? ` <span class="muted">· ${r.enMeta} en meta</span>` : ' <span class="muted">· sin metas</span>'} ›</span></button>`).join('')}</div><button type="button" class="btn sm" data-rc="abrir" style="margin-top:8px">🍲 Recetario</button></details>`; })() : ''}
+  <section class="kpis">
+    <div class="card kpi"><div class="l">Alumnos activos</div><div class="v">${al.length}</div><div class="s">${S.alumnos.size - al.length} inactivos</div></div>
+    <div class="card kpi"><div class="l">Recibido · ${esc(fmtMes(mes))} ${ojoMontos()}</div><div class="v">${mClp(recibido)}</div><div class="s">de ${mClp(acordado)} acordado</div></div>
+    <div class="card kpi ${acordado-recibido > 0 ? 'alert' : ''}"><div class="l">Falta por cobrar ${ojoMontos()}</div><div class="v">${mClp(Math.max(0,acordado-recibido))}</div><div class="s">${saldos.length} alumnos con saldo</div></div>
+    <div class="card kpi"><div class="l">Asistencias hoy</div><div class="v">${presHoy}</div><div class="s">${hoyH.length} bloques con alumnos</div></div>
+  </section>
   <div class="grid2">
     <section class="card pad" style="display:grid;gap:10px;align-content:start">
       <div class="eyebrow">Una idea para tu día</div>
@@ -3482,7 +3490,7 @@ document.addEventListener('toggle', e => { if (e.target.id === 'ap-card') apAbie
 function agendadasAppHTML() {
   const t = today(), m = addDays(t, 1), hasta = addDays(t, 14), ahora = Date.now(); const L = [];
   S.dias.forEach((d, f) => { if (f < t || f > hasta) return; Object.entries(d.bloques || {}).forEach(([h, al]) => Object.entries(al || {}).forEach(([code, r]) => {
-    const rd = r && r.reagDe; if (!rd || !(rd.flex || rd.recup) || !S.alumnos.has(code)) return;
+    const rd = r && r.reagDe; if (!rd || !rd.flex || !S.alumnos.has(code)) return; // las recuperaciones van en «Clases reagendadas»
     const at = rd.at ? Date.parse(rd.at) : NaN;
     if (r.quitado) { if (rd.cancel && at && ahora - at < 48 * 3600e3) L.push({ f, h, code, tipo: 'cancel', at }); return; }
     if (r.extra && !r.asis) L.push({ f, h, code, tipo: rd.flex ? 'flex' : 'recup', at }); })); });
@@ -3491,10 +3499,10 @@ function agendadasAppHTML() {
   const nuevo = x => x.at && ahora - x.at < 24 * 3600e3; const nNuevo = L.filter(nuevo).length;
   const abierta = apAbierta ?? nNuevo > 0;
   const cuando = f => f === t ? 'Hoy' : f === m ? 'Mañana' : DNAME[DKEYS[parseISO(f).getDay()]].slice(0, 3) + ' ' + fmtD(f);
-  const TAG = { flex: ['📅 Agenda libre', 'ok'], recup: ['🔁 Recupera', 'warn'], cancel: ['↩️ Canceló', 'crit'] };
+  const TAG = { flex: ['📅 Agendó', 'ok'], cancel: ['↩️ Canceló', 'crit'] };
   const ag = L.filter(x => x.tipo !== 'cancel').length, ca = L.length - ag;
   return `<details class="sec" id="ap-card" ${abierta ? 'open' : ''} style="background:var(--sunk);border:1px solid var(--line)">
-    <summary><span>📲 Agendadas desde la app</span><span class="pill ok">${ag} próxima${ag === 1 ? '' : 's'}</span>${ca ? `<span class="pill crit">${ca} cancelada${ca === 1 ? '' : 's'}</span>` : ''}${nNuevo ? `<span class="pill warn">🆕 ${nNuevo}</span>` : ''}</summary>
+    <summary><span>📲 Agenda libre: agendadas desde la app</span><span class="pill ok">${ag} próxima${ag === 1 ? '' : 's'}</span>${ca ? `<span class="pill crit">${ca} cancelada${ca === 1 ? '' : 's'}</span>` : ''}${nNuevo ? `<span class="pill warn">🆕 ${nNuevo}</span>` : ''}</summary>
     <div style="display:grid;gap:2px">${L.map(x => `<button type="button" class="li" data-act="abrir-bloque" data-fecha="${esc(x.f)}" data-hora="${esc(x.h)}" style="width:100%;border:0;border-bottom:1px solid var(--line);background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;padding:9px 0;min-height:44px;${x.tipo === 'cancel' ? 'opacity:.7' : ''}">
       <span style="min-width:96px;font-weight:700;font-variant-numeric:tabular-nums">${esc(cuando(x.f))} · ${esc(x.h)}</span>
       <span class="grow"><b>${esc(nombre(x.code))}</b>${nuevo(x) ? ' <span class="pill warn" style="font-size:11px">🆕 nuevo</span>' : ''}</span>
