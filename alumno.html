@@ -91,6 +91,7 @@ h2{font-size:22px}
 .set input::placeholder{color:#5b5358;font-weight:600}
 .set .chk{height:42px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:18px;cursor:pointer}
 .set.done .chk{background:var(--ok);border-color:var(--ok);color:#0e0c0f}
+.dp{display:grid;gap:14px;margin-top:12px}.dp-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px}.dp-d{min-width:0;display:grid;gap:2px;justify-items:center;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer;font-family:Barlow,sans-serif}.dp-d small{font-size:12px;font-weight:600;color:var(--muted)}.dp-d b{white-space:nowrap;font:700 17px/1.1 'Barlow Condensed',sans-serif}.dp-d[aria-pressed=true]{background:var(--red);border-color:var(--red);color:#fff}.dp-d[aria-pressed=true] small{color:rgba(255,255,255,.85)}.dp-h{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
 details.blk>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px}
 details.blk>summary::-webkit-details-marker{display:none}
 details.blk>summary .chev{transition:transform .2s;color:var(--muted);font-size:20px}
@@ -1643,6 +1644,9 @@ async function confirmar(k, estado) { const [f, h] = k.split('_');
   const gano = (S.recup?.disponibles || 0) > antes;
   toast(estado === 'voy' ? '¡Te esperamos! 💪 Franco ya sabe que vienes.' : gano ? 'Listo, Franco ya sabe. Ganaste 1 clase para recuperar 🔁' : S.recup?.activo ? 'Franco ya sabe que no vienes. Avisaste con menos de 2 horas: esta no se puede recuperar.' : 'Listo, Franco ya sabe que no vienes.');
   render(); return true; }
+/* selector de día (tarjetas con día arriba y fecha abajo) para recuperar y agenda libre */
+function diasPick(dias, sel, attr) { const t = today();
+  return `<div class="dp-row">${dias.map(f => `<button class="dp-d" ${attr}="${esc(f)}" aria-pressed="${f === sel}"><small>${f === t ? 'Hoy' : f === addDays(t, 1) ? 'Mañana' : DL[dayKey(f)]}</small><b>${esc(fmtD(f))}</b></button>`).join('')}</div>`; }
 function recupHTML() { const R = S.recup; if (!R || !R.activo || ONL()) return '';
   const t = today(), ahora = new Date();
   const prox = (R.usadas || []).filter(u => u.f >= t && !u.asis);
@@ -1656,8 +1660,8 @@ function recupHTML() { const R = S.recup; if (!R || !R.activo || ONL()) return '
     ${R.disponibles ? `<div class="small muted">Elige un bloque de esta semana o la próxima. Lo que no recuperes antes de que termine tu plan se pierde.</div>
       ${ops.length ? (() => { const dias = [...new Set(ops.filter(o => o.libres).map(o => o.f))]; if (!dias.length) return '<div class="note small">Los bloques disponibles están llenos. Revisa más tarde.</div>';
         const sel = dias.includes(S.rDia) ? S.rDia : dias[0];
-        return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;min-width:0">${dias.map(f => `<button class="chip" data-rdia="${esc(f)}" aria-pressed="${f === sel}" style="justify-content:center;min-width:0;padding:0 6px;font-size:13px">${esc(f === t ? 'Hoy' : f === addDays(t, 1) ? 'Mañana' : DL[dayKey(f)] + ' ' + fmtD(f))}</button>`).join('')}</div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px">${ops.filter(o => o.f === sel && o.libres).map(o => `<button class="btn" data-rec="${esc(o.f + '_' + o.h)}" style="flex-direction:column;min-height:54px"><b>${esc(o.h)}</b><span class="small ok">${o.libres} cupo${o.libres === 1 ? '' : 's'}</span></button>`).join('')}</div>`; })()
+        return `<div class="dp">${diasPick(dias, sel, 'data-rdia')}
+          <div class="dp-h">${ops.filter(o => o.f === sel && o.libres).map(o => `<button class="btn" data-rec="${esc(o.f + '_' + o.h)}" style="flex-direction:column;min-height:54px"><b>${esc(o.h)}</b><span class="small ok">${o.libres} cupo${o.libres === 1 ? '' : 's'}</span></button>`).join('')}</div></div>`; })()
         : '<div class="note small">No quedan bloques para recuperar esta semana ni la próxima. Revisa de nuevo el lunes, cuando se abre una semana más.</div>'}` : ''}
     ${prox.length ? `<div style="display:grid;gap:6px"><div class="small muted">Tus recuperaciones agendadas</div>${prox.map(u => `<div class="row" style="align-items:center"><span>✅ <b>${esc(dia(u.f))} · ${esc(u.h)}</b></span><span class="small muted">agendada</span></div>`).join('')}</div>` : ''}
   </details>`; }
@@ -1671,8 +1675,8 @@ function flexHTML() { const R = S.flex; if (!R || !R.activo || ONL()) return '';
   const tit = R.disponibles ? `Te quedan ${R.disponibles} de ${R.total} clases por agendar` : `Agendaste tus ${R.total} clases del plan`;
   return `<details class="card blk" data-sec="flex" id="flex-card" style="border-color:#f2b44f;background:rgba(242,180,79,.07)" ${secAbiertos.has('flex') || (R.disponibles && !prox.length) ? 'open' : ''}><summary><span class="blk-l" style="border-color:#f2b44f;color:#f2b44f">📅</span><div style="flex:1;min-width:0"><div class="blk-t">${esc(tit)}</div><div class="small muted">${prox.length ? 'Próxima: ' + esc(dia(prox[0].f)) + ' ' + esc(prox[0].h) + ' · ' : ''}tu plan vence el ${esc(fmtD(R.vence))}</div></div><span class="chev" aria-hidden="true">›</span></summary>
     ${R.bloqueado ? '<div class="note small">Tienes un pago pendiente. Regulariza tu plan para agendar.</div>' : R.disponibles ? `<div class="small muted">Elige día y bloque (esta semana y la próxima). Puedes cancelar hasta 2 horas antes y la clase vuelve a tu saldo.</div>
-      ${dias.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;min-width:0">${dias.map(f => `<button class="chip" data-fdia="${esc(f)}" aria-pressed="${f === sel}" style="justify-content:center;min-width:0;padding:0 6px;font-size:13px">${esc(dia(f))}</button>`).join('')}</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px">${ops.filter(o => o.f === sel).map(o => `<button class="btn" data-flx="${esc(o.f + '_' + o.h)}" style="flex-direction:column;min-height:54px"><b>${esc(o.h)}</b><span class="small ok">${o.libres} cupo${o.libres === 1 ? '' : 's'}</span></button>`).join('')}</div>`
+      ${dias.length ? `<div class="dp">${diasPick(dias, sel, 'data-fdia')}
+        <div class="dp-h">${ops.filter(o => o.f === sel).map(o => `<button class="btn" data-flx="${esc(o.f + '_' + o.h)}" style="flex-direction:column;min-height:54px"><b>${esc(o.h)}</b><span class="small ok">${o.libres} cupo${o.libres === 1 ? '' : 's'}</span></button>`).join('')}</div></div>`
         : '<div class="note small">No quedan bloques con cupo esta semana ni la próxima.</div>'}` : ''}
     ${prox.length ? `<div style="display:grid;gap:6px"><div class="small muted">Tus clases agendadas · ${R.cancelQuedan ? `te quedan <b>${R.cancelQuedan}</b> cancelaci${R.cancelQuedan === 1 ? 'ón' : 'ones'} con devolución en este plan` : '<b class="warn">ya usaste tus cancelaciones con devolución</b>'}</div>${prox.map(u => `<div class="row" style="align-items:center"><span>✅ <b>${esc(dia(u.f))} · ${esc(u.h)}</b></span>${u.cancelable ? `<button class="chip" data-flxc="${esc(u.f + '_' + u.h)}">Cancelar</button>` : '<span class="small muted">no cancelable</span>'}</div>`).join('')}</div>` : ''}
   </details>`; }
