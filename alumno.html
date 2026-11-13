@@ -2025,8 +2025,8 @@ document.addEventListener('click', async ev => {
     if (error) { ibd.disabled = false; toast(error.message || 'No se pudo borrar.'); return; }
     if (img) { try { await sb.storage.from('fotos').remove([img]); } catch (_) {} }
     S.ibVer = null; await load(); toast('InBody borrado. Puedes subirlo de nuevo.'); render(); return; }
-  const ibv = ev.target.closest('[data-ibv]'); if (ibv) { S.ibVer = S.ibVer === ibv.dataset.ibv ? null : ibv.dataset.ibv; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
-  const ibi = ev.target.closest('[data-ibi]'); if (ibi) { S.ibInfo = S.ibInfo === ibi.dataset.ibi ? null : ibi.dataset.ibi; render(); document.getElementById('ib-card')?.scrollIntoView({ block: 'start' }); return; }
+  const ibv = ev.target.closest('[data-ibv]'); if (ibv) { S.ibVer = S.ibVer === ibv.dataset.ibv ? null : ibv.dataset.ibv; render(true); return; }
+  const ibi = ev.target.closest('[data-ibi]'); if (ibi) { S.ibInfo = S.ibInfo === ibi.dataset.ibi ? null : ibi.dataset.ibi; render(true); return; }
   if (ev.target.id === 'fup-open') { S.fotoUp = !S.fotoUp; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'ib-cancel') { if (S.ibNew?.prev) URL.revokeObjectURL(S.ibNew.prev); S.ibNew = null; render(); return; }
   if (ev.target.closest('[data-entrenar]')) { const pe = progEstado(); if (!pe) return; const id = pe.next[0]; S.evSel = null; S.foco = null; S.ses = { f: today(), h: 'libre', id }; S.rutSel = id; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
