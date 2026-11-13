@@ -241,7 +241,7 @@ details.ses summary::-webkit-details-marker{display:none}
 <script src="supa-shim.js"></script>
 <script src="inbody-ocr.js?v=20261113a"></script>
 <script src="sonidos.js?v=2"></script>
-<script src="alimentos.js?v=20261113a"></script>
+<script src="alimentos.js?v=20261113b"></script>
 <script src="nutri-calc.js?v=20261113c"></script>
 <script>
 (async () => {
@@ -2281,7 +2281,7 @@ function nuPautaHTML() { const N = NUT(), P = S.nu.pauta, m0 = S.nu.meta || {};
   const meals = P.comidas.map((c, ci) => { const ck = NU_COMLOG(c.k); const lista = hoy.filter(r => r.comida === ck); const okC = lista.length > 0;
     return `<section class="card" style="gap:8px${okC ? ';border-color:var(--ok)' : ''}"><div class="row"><h2 style="font-size:20px">${okC ? '✅ ' : ''}${esc(c.l)}</h2><span class="small muted">≈ ${nuNf.format(desc ? N.metasDescanso(c.meta).kcal : c.meta.kcal)} kcal${okC ? ' · anotaste ' + nuNf.format(nuTot(lista).kcal) : ''}</span></div>
       ${c.ops.map((op0, oi) => { const op = desc ? N.opDescanso(op0) : op0; const tt = N.suma(op.items); const hecha = hoy.some(r => r.pauta_op === ci + '.' + oi); const malo = op.items.some(it => N.excluido(it.n, ex));
-        return `<div style="border:1px solid ${hecha ? 'var(--ok)' : malo ? 'var(--warn)' : 'var(--line)'};border-radius:12px;padding:10px 12px;background:var(--sunk);display:grid;gap:4px"><div class="row" style="align-items:center;gap:6px"><b>Opción ${oi + 1}${hecha ? ' <span class="ok small">✓ anotada</span>' : ''}${op0.t ? `<span style="display:block;font-weight:600;font-size:14px;color:var(--red,#ea203a)">${esc(op0.t)}</span>` : ''}</b><span style="display:flex;gap:6px">${hecha ? '' : `<button class="btn" data-nuvar="${ci}|${oi}" style="width:auto;min-height:34px;padding:0 10px;font-size:14px" aria-label="Variar opción ${oi + 1}">🎲</button>`}${hecha ? `<button class="btn" data-nudeshacer="${ci}|${oi}" style="width:auto;min-height:34px;padding:0 12px;font-size:14px">↺ Deshacer</button>` : `<button class="btn" data-nucomi="${ci}|${oi}" style="width:auto;min-height:34px;padding:0 12px;font-size:14px">✓ Anotar</button>`}</span></div>
+        return `<div style="border:1px solid ${hecha ? 'var(--ok)' : malo ? 'var(--warn)' : 'var(--line)'};border-radius:12px;padding:10px 12px;background:var(--sunk);display:grid;gap:4px"><div class="row" style="align-items:center;gap:6px"><b>Opción ${oi + 1}${hecha ? ' <span class="ok small">✓ anotada</span>' : ''}${op0.t ? `<span style="display:block;font-weight:600;font-size:14px;color:var(--red-t)">${esc(op0.t)}</span>` : ''}</b><span style="display:flex;gap:6px">${hecha ? '' : `<button class="btn" data-nuvar="${ci}|${oi}" style="width:auto;min-height:34px;padding:0 10px;font-size:14px" aria-label="Variar opción ${oi + 1}">🎲</button>`}${hecha ? `<button class="btn" data-nudeshacer="${ci}|${oi}" style="width:auto;min-height:34px;padding:0 12px;font-size:14px">↺ Deshacer</button>` : `<button class="btn" data-nucomi="${ci}|${oi}" style="width:auto;min-height:34px;padding:0 12px;font-size:14px">✓ Anotar</button>`}</span></div>
           ${malo ? '<div class="small warn">⚠️ Tiene algo que no comes: toca 🎲 para cambiarla.</div>' : ''}
           ${op.items.map(it => `<div class="small"><b>${nuNf.format(it.g)} g</b> ${esc(N.nombre(it.n, it.e))} <span class="muted">${esc(N.medida(it.n, it.e, it.g))}</span></div>`).join('')}
           <div class="small muted" style="font-size:12px">${nuNf.format(tt.kcal)} kcal · P ${nuNf.format(tt.prot)} · C ${nuNf.format(tt.carb)} · G ${nuNf.format(tt.gras)}</div></div>`; }).join('')}</section>`; }).join('');
@@ -2293,17 +2293,17 @@ function nuRecMeta(com) { const P = S.nu?.pauta; const c = P && (P.comidas || []
   const desc = nuTipoDia(today()) === 'descanso'; if (c && c.meta && c.meta.kcal) return desc ? NUT().metasDescanso(c.meta) : c.meta;
   const m = nuMetaDia(today()); return m.kcal ? { kcal: m.kcal * (NU_REP[com] || .2) } : null; }
 function nuRecEsc(r, f) { return (r.items || []).map(it => ({ n: it.n, e: it.e || '', g: Math.max(1, Math.round(it.g * f)) })); }
-function nuRecFactor(r, com) { const sel = (S.nuRecPor || {})[r.id]; if (sel && sel !== 'medida') return Number(sel);
+function nuRecFactor(r, com) { const sel = (S.nuRecPor || {})[r.id] || (nuRecMeta(com) ? 'medida' : ''); if (sel && sel !== 'medida') return Number(sel);
   const mt = nuRecMeta(com), k = NUT().suma(r.items || []).kcal; if (sel === 'medida' && mt && k) return Math.min(2.5, Math.max(.5, Math.round(mt.kcal / k * 20) / 20)); return 1; }
 function nuRecCom(r) { const ok = r.comidas || []; return (S.nuRecCom || {})[r.id] || (ok.includes(nuComidaAhora()) ? nuComidaAhora() : ok[0] || nuComidaAhora()); }
 function nuRecetarioHTML() { const N = NUT(), rs = S.nuRecs || [], fil = S.nuRecFil || '', ex = nuExcl();
   if (!rs.length) return `<section class="card"><h2>🍲 Recetario</h2><div class="small muted">Tu profe aún no carga recetas.</div></section>`;
-  const vis = rs.filter(r => !fil || (r.comidas || []).includes(fil));
-  const chips = `<div class="chips" style="flex-wrap:wrap"><button class="chip" data-nurecfil="" aria-pressed="${!fil}">Todas</button>${NU_COM.map(([k, l, ic]) => `<button class="chip" data-nurecfil="${k}" aria-pressed="${fil === k}">${ic} ${l}</button>`).join('')}</div>`;
+  const tip = S.nuRecTipo || ''; const vis = rs.filter(r => (!fil || (r.comidas || []).includes(fil)) && (!tip || r.tipo === tip));
+  const chips = `<div class="chips" style="flex-wrap:wrap"><button class="chip" data-nurecfil="" aria-pressed="${!fil}">Todas</button>${NU_COM.map(([k, l, ic]) => `<button class="chip" data-nurecfil="${k}" aria-pressed="${fil === k}">${ic} ${l}</button>`).join('')}</div><div class="chips">${[['dulce', '🍫 Dulces'], ['salada', '🧂 Saladas']].map(([k, l]) => `<button class="chip" data-nurectipo="${k}" aria-pressed="${tip === k}">${l}</button>`).join('')}</div>`;
   const cards = vis.map(r => { const ab = S.nuRecAb === r.id, com = nuRecCom(r), f = ab ? nuRecFactor(r, com) : 1, its = nuRecEsc(r, f), t = N.suma(its); const malo = (r.items || []).some(it => N.excluido(it.n, ex));
     const head = `<button data-nurecab="${esc(r.id)}" style="display:flex;gap:12px;align-items:center;border:0;background:none;color:var(--fg);padding:0;text-align:left;cursor:pointer;width:100%"><span style="font-size:30px;line-height:1">${esc(r.emoji || '🍽️')}</span><span style="min-width:0;flex:1"><b style="display:block;font-size:16px">${esc(r.nombre)}</b><span class="small muted">${nuNf.format(t.kcal)} kcal · P ${nuNf.format(t.prot)} · C ${nuNf.format(t.carb)} · G ${nuNf.format(t.gras)}${r.minutos ? ' · ⏱ ' + r.minutos + ' min' : ''}</span>${malo ? '<span class="small warn" style="display:block">⚠️ Tiene algo que no comes</span>' : ''}</span><span class="muted" style="font-size:20px">${ab ? '▴' : '▾'}</span></button>`;
     if (!ab) return `<section class="card" style="gap:6px">${head}</section>`;
-    const sel = (S.nuRecPor || {})[r.id] || '1', mt = nuRecMeta(com);
+    const mt = nuRecMeta(com), sel = (S.nuRecPor || {})[r.id] || (mt ? 'medida' : '1');
     const por = `<div class="seg" role="tablist" style="margin:0">${[['0.5', '½'], ['1', '1'], ['1.5', '1½'], ['2', '2']].map(([v, l]) => `<button role="tab" data-nurecpor="${esc(r.id)}|${v}" aria-selected="${sel === v}">${l}</button>`).join('')}${mt ? `<button role="tab" data-nurecpor="${esc(r.id)}|medida" aria-selected="${sel === 'medida'}">🎯 Mi medida</button>` : ''}</div>`;
     const coms = (r.comidas || []).length > 1 ? `<div class="chips" style="flex-wrap:wrap">${r.comidas.map(k => { const x = NU_COM.find(c => c[0] === k); return x ? `<button class="chip" data-nureccom="${esc(r.id)}|${k}" aria-pressed="${com === k}">${x[2]} ${x[1]}</button>` : ''; }).join('')}</div>` : '';
     const lbl = (NU_COM.find(c => c[0] === com) || [, 'comida'])[1];
@@ -2312,9 +2312,10 @@ function nuRecetarioHTML() { const N = NUT(), rs = S.nuRecs || [], fil = S.nuRec
       <div style="display:grid;gap:3px">${its.map(it => `<div class="small"><b>${nuNf.format(it.g)} g</b> ${esc(N.nombre(it.n, it.e))} <span class="muted">${esc(N.medida(it.n, it.e, it.g) || '')}</span></div>`).join('')}</div>
       ${(r.pasos || []).length ? `<ol class="small" style="margin:0;padding-left:20px;display:grid;gap:4px">${r.pasos.map(p => `<li>${esc(p)}</li>`).join('')}</ol>` : ''}
       ${coms}<button class="btn pri" data-nurecan="${esc(r.id)}">+ Anotar en ${esc(lbl)} de hoy</button></section>`; }).join('');
-  return `<div class="small muted" style="padding:0 4px">Recetas de tu profe. Elige la porción (o 🎯 a tu medida) y anótala con un toque.</div>${chips}${cards || '<div class="small muted" style="padding:4px">No hay recetas para esta comida.</div>'}`; }
+  return `<div class="small muted" style="padding:0 4px">Recetas de tu profe, dulces y saladas. 🎯 Mi medida ajusta la porción a tus macros; anótala con un toque.</div>${chips}${cards || '<div class="small muted" style="padding:4px">No hay recetas para esta comida.</div>'}`; }
 document.addEventListener('click', async ev => { const t = ev.target;
   const fl = t.closest('[data-nurecfil]'); if (fl) { S.nuRecFil = fl.dataset.nurecfil; render(true); return; }
+  const tp = t.closest('[data-nurectipo]'); if (tp) { S.nuRecTipo = S.nuRecTipo === tp.dataset.nurectipo ? '' : tp.dataset.nurectipo; render(true); return; }
   const ab = t.closest('[data-nurecab]'); if (ab) { S.nuRecAb = S.nuRecAb === ab.dataset.nurecab ? null : ab.dataset.nurecab; render(true); return; }
   const po = t.closest('[data-nurecpor]'); if (po) { const [id, v] = po.dataset.nurecpor.split('|'); S.nuRecPor = Object.assign({}, S.nuRecPor, { [id]: v }); render(true); return; }
   const cm = t.closest('[data-nureccom]'); if (cm) { const [id, k] = cm.dataset.nureccom.split('|'); S.nuRecCom = Object.assign({}, S.nuRecCom, { [id]: k }); render(true); return; }

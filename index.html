@@ -585,7 +585,7 @@ td.crit{color:var(--crit);font-weight:700}
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supa-shim.js"></script><script src="inbody-ocr.js?v=20261113a"></script><script src="alimentos.js?v=20261113a"></script><script src="nutri-calc.js?v=20261113c"></script><script src="sonidos.js?v=2"></script>
+<script src="supa-shim.js"></script><script src="inbody-ocr.js?v=20261113a"></script><script src="alimentos.js?v=20261113b"></script><script src="nutri-calc.js?v=20261113c"></script><script src="sonidos.js?v=2"></script>
 <script>
 (() => {
 'use strict';
@@ -1831,6 +1831,7 @@ async function nuPanel(code) {
   nuPintarPanel(code);
 }
 /* ---------- recetario (lo ven en la pestaña 🍲 Recetas de la app los alumnos con nutrición activa) ---------- */
+const RC_TIPO = [['dulce', '🍫 Dulce'], ['salada', '🧂 Salada']];
 const RC_COM = [['desayuno', '🍳 Desayuno'], ['almuerzo', '🍽️ Almuerzo'], ['once', '☕ Once'], ['cena', '🌙 Cena'], ['snack', '🍎 Snack']];
 const RC = { list: [], ed: null, q: '' };
 const rcNorm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -1850,7 +1851,7 @@ function rcPintar() { const b = document.getElementById('rc-box'); if (!b) retur
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${act} visible${act === 1 ? '' : 's'} de ${RC.list.length}</b><button type="button" class="btn pri" data-rc="nueva">+ Nueva receta</button></div>
       <div style="display:grid;gap:6px">${RC.list.map((r, i) => `<div style="display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--surface);opacity:${r.activo ? 1 : .5}">
         <span style="font-size:26px">${esc(r.emoji || '🍽️')}</span>
-        <button type="button" data-rc="edit" data-i="${i}" style="flex:1;min-width:0;border:0;background:none;color:var(--fg);text-align:left;cursor:pointer;padding:0;font:inherit"><b style="display:block">${esc(r.nombre)}</b><span class="small muted">${rcMac(rcTot(r.items))} · ${(r.comidas || []).map(k => (RC_COM.find(c => c[0] === k) || [, k])[1]).join(', ')}</span></button>
+        <button type="button" data-rc="edit" data-i="${i}" style="flex:1;min-width:0;border:0;background:none;color:var(--fg);text-align:left;cursor:pointer;padding:0;font:inherit"><b style="display:block">${esc(r.nombre)}</b><span class="small muted">${r.tipo === 'dulce' ? '🍫 · ' : r.tipo === 'salada' ? '🧂 · ' : ''}${rcMac(rcTot(r.items))} · ${(r.comidas || []).map(k => (RC_COM.find(c => c[0] === k) || [, k])[1]).join(', ')}</span></button>
         <button type="button" class="chip" data-rc="vis" data-i="${i}" aria-pressed="${r.activo}" title="Mostrar u ocultar en la app">${r.activo ? '👁 Visible' : 'Oculta'}</button>
         <button type="button" class="btn sm" data-rc="edit" data-i="${i}">✏️</button></div>`).join('') || '<div class="small muted">Aún no hay recetas.</div>'}</div></div>`; return; }
   const e = RC.ed, t = rcTot(e.items), q = rcNorm(RC.q).split(/\s+/).filter(Boolean);
@@ -1862,6 +1863,7 @@ function rcPintar() { const b = document.getElementById('rc-box'); if (!b) retur
       <label class="f">Nombre<input type="text" class="rc-f" data-k="nombre" value="${esc(e.nombre)}" maxlength="80" placeholder="Ej: Pollo con arroz"></label>
       <label class="f">Minutos<input type="text" inputmode="numeric" class="rc-f" data-k="minutos" value="${e.minutos ?? ''}"></label></div>
     <div><div class="small muted" style="margin-bottom:4px">Para qué comida</div><div class="chips" style="flex-wrap:wrap">${RC_COM.map(([k, l]) => `<button type="button" class="chip" data-rc="com" data-v="${k}" aria-pressed="${e.comidas.includes(k)}">${l}</button>`).join('')}</div></div>
+    <div><div class="small muted" style="margin-bottom:4px">Tipo</div><div class="chips">${RC_TIPO.map(([k, l]) => `<button type="button" class="chip" data-rc="tipo" data-v="${k}" aria-pressed="${e.tipo === k}">${l}</button>`).join('')}</div></div>
     <div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b>Ingredientes (1 porción)</b><span class="small" id="rc-tot"><b>${rcMac(t)}</b></span></div>
       ${e.items.map((it, ii) => `<div style="display:grid;grid-template-columns:64px minmax(0,1fr) 34px;gap:6px;align-items:center"><input type="text" inputmode="numeric" class="rc-g" data-ii="${ii}" value="${it.g}" style="height:34px;padding:0 6px;text-align:right" aria-label="gramos"><span class="small">g · ${esc(N ? N.nombre(it.n, it.e) : it.n)}<span class="muted" style="display:block;font-size:12px">${esc(N ? N.medida(it.n, it.e, it.g) || '' : '')}</span></span><button type="button" data-rc="quitar" data-ii="${ii}" aria-label="Quitar" style="border:0;background:none;cursor:pointer;font-size:16px">✕</button></div>`).join('') || '<div class="small muted">Agrega ingredientes con el buscador.</div>'}
@@ -1876,19 +1878,20 @@ function rcLeer() { const e = RC.ed; if (!e) return; document.querySelectorAll('
 async function rcGuardar(el) { rcLeer(); const e = RC.ed;
   if (!e.nombre) { toast('Ponle nombre a la receta', true); return; } if (!e.items.length) { toast('Agrega al menos un ingrediente', true); return; } if (!e.comidas.length) { toast('Elige para qué comida es', true); return; }
   const id = e.id || (rcNorm(e.nombre).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) + '-' + Date.now().toString(36).slice(-4));
-  const row = { id, nombre: e.nombre.slice(0, 80), emoji: e.emoji || '🍽️', comidas: e.comidas, minutos: e.minutos, items: e.items, pasos: e.pasos, activo: e.activo, orden: e.orden ?? (Math.max(0, ...RC.list.map(r => r.orden || 0)) + 1), updated_at: new Date().toISOString() };
+  const row = { id, nombre: e.nombre.slice(0, 80), emoji: e.emoji || '🍽️', tipo: e.tipo || '', comidas: e.comidas, minutos: e.minutos, items: e.items, pasos: e.pasos, activo: e.activo, orden: e.orden ?? (Math.max(0, ...RC.list.map(r => r.orden || 0)) + 1), updated_at: new Date().toISOString() };
   el.disabled = true; const { data, error } = await window.__sb.from('recetario').upsert(row).select().single(); el.disabled = false;
   if (error) { toast('No se pudo guardar: ' + error.message, true); return; }
   const i = RC.list.findIndex(r => r.id === id); if (i >= 0) RC.list[i] = data; else RC.list.push(data); RC.ed = null; RC.q = ''; rcPintar(); toast('Receta guardada ✓ Los alumnos la ven al abrir su app'); }
 document.addEventListener('click', async ev => { const el = ev.target.closest('[data-rc]'); if (!el) return; ev.preventDefault(); const a = el.dataset.rc;
   if (a === 'abrir') { recetarioAbrir(); return; }
-  if (a === 'nueva') { RC.ed = { id: null, nombre: '', emoji: '🍽️', comidas: [], minutos: null, items: [], pasos: [], activo: true }; RC.q = ''; rcPintar(); return; }
-  if (a === 'edit') { const r = RC.list[+el.dataset.i]; RC.ed = JSON.parse(JSON.stringify({ id: r.id, nombre: r.nombre, emoji: r.emoji, comidas: r.comidas || [], minutos: r.minutos, items: r.items || [], pasos: r.pasos || [], activo: r.activo, orden: r.orden })); RC.q = ''; rcPintar(); return; }
+  if (a === 'nueva') { RC.ed = { id: null, nombre: '', emoji: '🍽️', tipo: '', comidas: [], minutos: null, items: [], pasos: [], activo: true }; RC.q = ''; rcPintar(); return; }
+  if (a === 'edit') { const r = RC.list[+el.dataset.i]; RC.ed = JSON.parse(JSON.stringify({ id: r.id, nombre: r.nombre, emoji: r.emoji, tipo: r.tipo || '', comidas: r.comidas || [], minutos: r.minutos, items: r.items || [], pasos: r.pasos || [], activo: r.activo, orden: r.orden })); RC.q = ''; rcPintar(); return; }
   if (a === 'volver') { RC.ed = null; rcPintar(); return; }
   if (a === 'vis') { const r = RC.list[+el.dataset.i]; el.disabled = true; const { error } = await window.__sb.from('recetario').update({ activo: !r.activo, updated_at: new Date().toISOString() }).eq('id', r.id); el.disabled = false;
     if (error) { toast('No se pudo guardar: ' + error.message, true); return; } r.activo = !r.activo; rcPintar(); toast(r.activo ? 'Visible en la app ✓' : 'Oculta para los alumnos'); return; }
   rcLeer(); const e = RC.ed; if (!e) return;
   if (a === 'com') { const k = el.dataset.v; e.comidas = e.comidas.includes(k) ? e.comidas.filter(x => x !== k) : [...e.comidas, k]; rcPintar(); return; }
+  if (a === 'tipo') { e.tipo = e.tipo === el.dataset.v ? '' : el.dataset.v; rcPintar(); return; }
   if (a === 'quitar') { e.items.splice(+el.dataset.ii, 1); rcPintar(); return; }
   if (a === 'add') { e.items.push({ n: el.dataset.n, e: el.dataset.e || '', g: Math.round(Number(el.dataset.g)) || 100 }); RC.q = ''; rcPintar(); return; }
   if (a === 'guardar') { rcGuardar(el).catch(err => { el.disabled = false; toast('No se pudo guardar: ' + (err?.message || err), true); }); return; }
