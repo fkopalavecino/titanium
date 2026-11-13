@@ -585,7 +585,7 @@ td.crit{color:var(--crit);font-weight:700}
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supa-shim.js"></script><script src="inbody-ocr.js?v=20261113a"></script><script src="alimentos.js?v=20261113b"></script><script src="nutri-calc.js?v=20261113f"></script><script src="sonidos.js?v=2"></script>
+<script src="supa-shim.js"></script><script src="inbody-ocr.js?v=20261113a"></script><script src="alimentos.js?v=20261113b"></script><script src="nutri-calc.js?v=20261113g"></script><script src="sonidos.js?v=2"></script>
 <script>
 (() => {
 'use strict';
@@ -1922,7 +1922,7 @@ function nuPintarPanel(code) {
     <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px">${box4}</div>
     ${dsc ? `<div class="small muted">😴 Día de descanso: ${nuN(dsc.kcal)} kcal · C ${nuN(dsc.carb)} g (el alumno lo elige en su app)</div>` : ''}
     ${d && metas && ed.metasIb && ed.metasIb !== d.f ? `<div class="small" style="background:var(--warn-soft);border-radius:10px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>⚠️ Estas metas son del InBody <b>${fmtD(ed.metasIb)}</b>. ¿Las recalculo con el del <b>${fmtD(d.f)}</b>?</span><button type="button" class="btn sm pri" data-act="nu-ib" data-id="${esc(code)}" data-v="${esc(d.f)}">Usar InBody ${fmtD(d.f)}</button></div>` : ''}
-    ${ed.cambio ? `<div class="small" style="color:var(--warn);font-weight:600">Las metas cambiaron: toca <b>↻ Nueva pauta</b> para rehacer las comidas.</div>` : ''}`);
+    ${ed.cambio ? `<div class="small" style="color:var(--warn);font-weight:600">Cambiaste el número de comidas: toca <b>↻ Nueva pauta</b> para rehacerla.</div>` : ''}`);
   // 2 · cálculo (plegado): InBody, evolución, objetivo, actividad y ajustes
   const ev = N.evolucion(a.inbody, o.obj, d && d.f); const fs = v => v == null ? '—' : (v > 0 ? '+' : '') + String(Math.round(v * 10) / 10).replace('.', ',') + ' kg';
   const calculo = `<details ${S.ui.nuCalc ? 'open' : ''} data-nucalc="1" style="border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 14px"><summary style="cursor:pointer;font-weight:700;display:flex;justify-content:space-between;gap:8px"><span>⚙️ Cálculo</span><span class="small muted" style="font-weight:500">${d ? 'InBody ' + fmtD(d.f) + ' · ' + f1(d.peso) + ' kg' : 'sin InBody'}</span></summary>
@@ -1980,7 +1980,14 @@ function nuPintarPanel(code) {
 }
 // las metas siguen al cálculo (objetivo, actividad, ajustes); la pauta se rehace solo cuando el profe toca «Nueva pauta»
 function nuRecalc(code) { const ed = NU_ED[code], N = NUC(); const d = nuIB(code); const c = d && N.calcMetas(d, ed.o); if (c) ed.metasIb = d.f;
-  if (c) { ed.metas = { kcal: c.kcal, prot: c.prot, carb: c.carb, gras: c.gras }; ed.cambio = !!ed.pauta; } nuPintarPanel(code); }
+  if (c) { ed.metas = { kcal: c.kcal, prot: c.prot, carb: c.carb, gras: c.gras }; nuAjustarPauta(code); } nuPintarPanel(code); }
+// metas cambiadas: la pauta mantiene sus platos y se reajustan los gramos (si cambió el número de comidas, hay que rehacerla)
+function nuAjustarPauta(code) { const ed = NU_ED[code]; if (!ed.pauta || !ed.metas) return;
+  if (ed.pauta.comidas.length !== (ed.o.nCom === 5 ? 5 : 4)) { ed.cambio = true; return; } NUC().reescalar(ed.pauta, ed.metas); ed.cambio = false; }
+// antes de enviar o exportar: la pauta debe calzar con las metas y el número de comidas
+function nuPautaAlDia(code) { const ed = NU_ED[code]; nuLeerMetas(code); if (!ed.cambio || !ed.pauta || !ed.metas) return true;
+  if (!confirm('Cambiaste el número de comidas: hay que crear la pauta de nuevo. ¿La creo ahora?')) return false;
+  ed.pauta = NUC().generar(ed.metas, ed.o.nCom, ed.excl); ed.cambio = false; nuPintarPanel(code); return true; }
 function nuLeerMetas(code) { const ed = NU_ED[code]; const v = {}; document.querySelectorAll(`#fa-nu .nu-m`).forEach(i => { v[i.dataset.k] = Math.round(Number(String(i.value).replace(',', '.')) || 0); });
   if (!v.kcal && (v.prot || v.carb || v.gras)) v.kcal = v.prot * 4 + v.carb * 4 + v.gras * 9; ed.metas = v.kcal ? v : null; const nt = document.querySelector('#fa-nu .nu-nota'); if (nt) ed.nota = nt.value.trim().slice(0, 160); return ed.metas; }
 async function nuGuardar(code, el, conPauta) { const ed = NU_ED[code]; const m = nuLeerMetas(code);
@@ -2018,6 +2025,7 @@ function nuAccion(act, code, el) { const ed = NU_ED[code]; if (!ed) { toast('Cie
   if (act === 'nu-swapto') { const s = ed.swap; if (!s || !ed.pauta) return; const c = ed.pauta.comidas[s.ci], op = c.ops[s.oi]; const alt = N.alternativas(op.items[s.ii]).filter(x => !N.excluido(x.n, ed.excl))[+el.dataset.k]; if (!alt) return;
     N.cambiar(op, s.ii, alt.n, alt.e, c.meta); ed.swap = null; nuPintarPanel(code); toast(N.nombre(alt.n, alt.e) + ': gramos ajustados ✓'); return; }
   if (act === 'nu-var') { const [ci, oi] = el.dataset.k.split('|').map(Number); if (!ed.pauta) return; const c = ed.pauta.comidas[ci]; c.ops[oi] = N.variar(c.ops[oi], c.meta, c.k, ed.excl, c.ops.map(x => x.t)); ed.swap = null; nuPintarPanel(code); return; }
+  if ((act === 'nu-enviar' || act === 'nu-pdf') && !nuPautaAlDia(code)) return;
   if (act === 'nu-enviar') { toast('Enviando pauta…'); nuGuardar(code, el, true).catch(err => { el.disabled = false; toast('No se pudo enviar: ' + (err?.message || err), true); }); return; }
   if (act === 'nu-meta') { nuGuardar(code, el, false).catch(err => { el.disabled = false; toast('No se pudo guardar: ' + (err?.message || err), true); }); return; }
   if (act === 'nu-pdf') { nuPdf(code); return; } }
@@ -2026,9 +2034,9 @@ document.addEventListener('change', e => { const t = e.target; if (!t.classList?
   const k = t.dataset.k, v = Number(String(t.value).replace(',', '.'));
   if (k === 'nCom') ed.o.nCom = v === 5 ? 5 : 4; else if (k === 'aj') { const r = NUC().OBJ[ed.o.obj].aj; ed.o.aj = isFinite(v) ? Math.min(r[1], Math.max(r[0], v)) : null; }
   else if (k === 'pkg') ed.o.pkg = isFinite(v) && v > 0 ? v : null; else if (k === 'gkg') ed.o.gkg = isFinite(v) && v > 0 ? Math.min(1, Math.max(0.8, v)) : 0.9;
-  if (k === 'nCom') { ed.cambio = !!ed.pauta; nuPintarPanel(code); } else nuRecalc(code); });
+  if (k === 'nCom') { ed.cambio = !!ed.pauta && ed.pauta.comidas.length !== ed.o.nCom; nuPintarPanel(code); } else nuRecalc(code); });
 // metas editadas a mano: se marca que hay que rehacer la pauta
-document.addEventListener('change', e => { const t = e.target; if (!t.classList?.contains('nu-m')) return; const ed = NU_ED[t.dataset.nu]; if (!ed) return; nuLeerMetas(t.dataset.nu); ed.cambio = !!ed.pauta; nuPintarPanel(t.dataset.nu); });
+document.addEventListener('change', e => { const t = e.target; if (!t.classList?.contains('nu-m')) return; const ed = NU_ED[t.dataset.nu]; if (!ed) return; nuLeerMetas(t.dataset.nu); nuAjustarPauta(t.dataset.nu); nuPintarPanel(t.dataset.nu); });
 document.addEventListener('toggle', e => { if (e.target.dataset?.nucalc) S.ui.nuCalc = e.target.open; }, true);
 // Enter (o «Ir»/«Enviar» del teclado del iPhone) dentro de Nutrición no debe guardar ni cerrar la ficha
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.closest?.('#fa-nu')) { e.preventDefault(); e.stopPropagation(); e.target.blur(); } }, true);

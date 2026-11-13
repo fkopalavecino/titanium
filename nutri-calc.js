@@ -112,14 +112,15 @@
   // unidades (se redondea a unidades enteras o medias) y topes razonables
   const UNI = { 'Huevo entero': [50, 'huevo', 'huevos'], 'Clara de huevo': [33, 'clara', 'claras'], 'Pan marraqueta': [50, '½ marraqueta', ''], 'Pan de molde integral': [30, 'rebanada', 'rebanadas'], 'Pan hallulla': [45, '½ hallulla', ''], 'Galletas de arroz': [9, 'galleta', 'galletas'] };
   const PASO = n => UNI[n] ? UNI[n][0] : /Aceite|Mantequilla de maní|Almendras|Nueces|Maní|chía|Linaza|whey|Proteína vegetal/.test(n) ? 5 : 10;
-  const TOPE = n => /Aceite/.test(n) ? 25 : /whey|Proteína vegetal/.test(n) ? 50 : /Jamón de pavo/.test(n) ? 120 : /Quesillo/.test(n) ? 150 : /Tortilla de trigo/.test(n) ? 120 : /Galletas de arroz/.test(n) ? 54 : /Plátano|Manzana|Pera|Piña|Mandarina|Arándanos/.test(n) ? 250 : /Chía|chía/.test(n) ? 30 : /Mantequilla de maní|Almendras|Nueces|Maní/.test(n) ? 40 : /Palta/.test(n) ? 120 : /Clara/.test(n) ? 330 : /Pan/.test(n) ? 200 : /Avena/.test(n) ? 120 : /Yogur/.test(n) ? 400 : 450;
+  const FRUTA = /Plátano|Manzana|Pera|Piña|Mandarina|Naranja|Kiwi|Durazno|Uvas|Mango|Melón|Sandía|Arándanos|Frutillas|Frambuesas/;
+  const TOPE = n => /Aceite/.test(n) ? 25 : /Tofu/.test(n) ? 250 : /Tempeh|Seitán|Edamame/.test(n) ? 200 : /Lentejas|Porotos|Garbanzos/.test(n) ? 350 : /cottage/.test(n) ? 300 : FRUTA.test(n) ? 250 : /Pan de molde|Pan pita/.test(n) ? 150 : /whey|Proteína vegetal/.test(n) ? 50 : /Jamón de pavo/.test(n) ? 120 : /Quesillo/.test(n) ? 150 : /Tortilla de trigo/.test(n) ? 180 : /Galletas de arroz/.test(n) ? 54 : /Plátano|Manzana|Pera|Piña|Mandarina|Arándanos/.test(n) ? 250 : /Chía|chía/.test(n) ? 30 : /Mantequilla de maní|Almendras|Nueces|Maní/.test(n) ? 40 : /Palta/.test(n) ? 120 : /Clara/.test(n) ? 330 : /Huevo entero/.test(n) ? 200 : /Pan/.test(n) ? 200 : /Avena/.test(n) ? 120 : /Yogur/.test(n) ? 400 : 450;
   const mac = (f, g) => ({ kcal: f.kcal * g / 100, prot: f.prot * g / 100, carb: f.carb * g / 100, gras: f.gras * g / 100 });
   function suma(items) { return items.reduce((t, it) => { const f = food(it.n, it.e); if (!f) return t; const m = mac(f, it.g); return { kcal: t.kcal + m.kcal, prot: t.prot + m.prot, carb: t.carb + m.carb, gras: t.gras + m.gras }; }, { kcal: 0, prot: 0, carb: 0, gras: 0 }); }
   // mínimos cuadrados con pesos por kcal (prot y carb ×4, grasa ×9) sobre las variables libres, con límites
-  function resolver(fs, obj) {
+  function resolver(fs, obj, lo) { lo = lo || [0, 0, 0];
     const W = [4, 4, 9]; const col = f => [f.prot / 100, f.carb / 100, f.gras / 100];
     const fijo = [null, null, null];
-    for (let it = 0; it < 6; it++) {
+    for (let it = 0; it < 10; it++) {
       const libres = [0, 1, 2].filter(i => fijo[i] == null && fs[i].n !== '_'); [0, 1, 2].forEach(i => { if (fs[i].n === '_') fijo[i] = 0; });
       const rest = [0, 1, 2].map(k => obj[k] - [0, 1, 2].reduce((s, i) => s + (fijo[i] != null ? col(fs[i])[k] * fijo[i] : 0), 0));
       // normal equations: (AᵀWA) x = AᵀW b
@@ -127,7 +128,9 @@
       const n = libres.length; const M = [...Array(n)].map((_, a) => [...Array(n)].map((_, c) => A.reduce((s, row) => s + row[a] * row[c], 0)));
       const y = [...Array(n)].map((_, a) => A.reduce((s, row, k) => s + row[a] * b[k], 0));
       const x = gauss(M, y); if (!x) { libres.forEach(i => { fijo[i] = 0; }); break; }
-      let mal = false; libres.forEach((i, j) => { const tp = TOPE(fs[i].n); if (x[j] < 0) { fijo[i] = 0; mal = true; } else if (x[j] > tp) { fijo[i] = tp; mal = true; } });
+      // primero se fijan los que pasan su tope o no llegan a su mínimo; un negativo se saca de a uno (el peor), así no se pierden alimentos de más
+      let mal = false; libres.forEach((i, j) => { const tp = TOPE(fs[i].n), mn = Math.min(lo[i] || 0, tp); if (mn > 0 && x[j] < mn) { fijo[i] = mn; mal = true; } else if (x[j] > tp) { fijo[i] = tp; mal = true; } });
+      if (!mal) { let peor = -1; libres.forEach((i, j) => { if (x[j] < 0 && (peor < 0 || x[j] < x[libres.indexOf(peor)])) peor = i; }); if (peor >= 0) { fijo[peor] = 0; mal = true; } }
       if (!mal) { libres.forEach((i, j) => { fijo[i] = x[j]; }); break; }
       if (libres.length === 0) break;
     }
@@ -143,13 +146,15 @@
     while (fs.length < 3) { fs.push({ n: '_', e: '', prot: 0, carb: 0, gras: 0 }); roles.push(null); }
     const obj = [meta.prot - fm.prot, meta.carb - fm.carb, meta.gras - fm.gras];
     const redo = (x, i) => { const st = PASO(fs[i].n); let g = Math.round(x / st) * st; if (g === 0 && x >= st * 0.35) g = st; return g; };
-    let x = resolver(fs, obj);
+    // la proteína que da nombre al plato nunca desaparece: aporta al menos ~30 % de la proteína de la comida
+    const lo = fs.map((f, i) => roles[i] === 'p' && f.prot > 4 && meta.prot > 0 ? Math.round(meta.prot * 0.3 / (f.prot / 100)) : 0);
+    let x = resolver(fs, obj, lo);
     // 1º se redondean los alimentos por unidad (claras, pan) y se reajustan los demás para compensar
     const uni = fs.map((f, i) => !!UNI[f.n] && x[i] > 0);
     if (uni.some(Boolean)) { const fijo = fs.map((f, i) => uni[i] ? redo(x[i], i) : f.n === '_' ? 0 : null);
       const rest = [0, 1, 2].map(k => obj[k] - fs.reduce((sm, f, i) => sm + (fijo[i] ? [f.prot, f.carb, f.gras][k] / 100 * fijo[i] : 0), 0));
       const libres = fs.map((f, i) => fijo[i] == null ? i : -1).filter(i => i >= 0);
-      if (libres.length) { const sub = resolver([...libres.map(i => fs[i]), ...Array(3 - libres.length).fill(null)].map(f => f || { n: '_', prot: 0, carb: 0, gras: 0 }), rest); libres.forEach((i, j) => { fijo[i] = sub[j]; }); }
+      if (libres.length) { const sub = resolver([...libres.map(i => fs[i]), ...Array(3 - libres.length).fill(null)].map(f => f || { n: '_', prot: 0, carb: 0, gras: 0 }), rest, [...libres.map(i => lo[i]), 0, 0, 0].slice(0, 3)); libres.forEach((i, j) => { fijo[i] = sub[j]; }); }
       x = fijo; }
     const vars = fs.map((f, i) => f.n === '_' ? null : { n: f.n, e: f.e, g: redo(x[i], i), r: roles[i] }).filter(it => it && it.g > 0);
     return [...vars, ...fijos];
@@ -187,6 +192,12 @@
       const fo = food(it.n, it.e), fnw = food(n, e); const st = PASO(n);
       nuevo.g = r !== 'v' && fo && fnw && fnw.kcal ? Math.max(st, Math.round(it.g * fo.kcal / fnw.kcal / st) * st) : it.g; }
     const o = reajustar(op.items.map((x, i) => i === ii ? nuevo : x), meta); op.items = o.items; delete op.t; return op; }
+  // metas nuevas sobre una pauta ya armada: mismos platos y alimentos, gramos reajustados
+  function reescalar(pauta, metas) { const cs = COMIDAS[pauta.comidas.length === 5 ? 5 : 4];
+    pauta.comidas.forEach((c, i) => { const p = c.p || (cs[i] || [])[2]; if (!p) return; c.p = p;
+      c.meta = { kcal: r(metas.kcal * p), prot: r(metas.prot * p), carb: r(metas.carb * p), gras: r(metas.gras * p) };
+      c.ops = c.ops.map(op => { const o = reajustar(op.items.map(x => Object.assign({}, x)), c.meta); return op.t ? { t: op.t, items: o.items } : { items: o.items }; }); });
+    return pauta; }
   function quitar(op, ii, meta) { const o = reajustar(op.items.filter((_, i) => i !== ii), meta); op.items = o.items; delete op.t; return op; }
   const DES_P = /Clara|Huevo|Yogur|cottage|Atún|whey/, DES_C = /Pan|Avena|Galletas|Tortilla|Plátano/;
   const COM_P = /Pechuga|Trutro|Carne molida|Vacuno|Lomo de cerdo|Merluza|Salmón|Atún|Jurel|Huevo|Clara/, COM_C = /Arroz|Fideos|Quínoa|Papa|Camote|Choclo|Lentejas|Porotos|Garbanzos|Cuscús|Mote/;
@@ -217,7 +228,7 @@
     return limpiar(o, meta, comida, ex); }
   function generar(metas, nCom, ex) {
     const cs = COMIDAS[nCom === 5 ? 5 : 4];
-    return { fecha: new Date().toISOString().slice(0, 10), nCom: cs.length, comidas: cs.map(([k, l, p]) => {
+    return { fecha: (d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))(new Date()), nCom: cs.length, comidas: cs.map(([k, l, p]) => {
       const meta = { kcal: r(metas.kcal * p), prot: r(metas.prot * p), carb: r(metas.carb * p), gras: r(metas.gras * p) };
       return { k, l, p, meta, ops: elegir(k, ex, 3).map(t => limpiar(opcion(t, meta), meta, k, ex)) }; }) };
   }
@@ -385,5 +396,5 @@ ${pauta.comidas.map(c => `<div class="blk"><div class="ml"><h2>${esc(c.l)}</h2><
     const st = document.createElement('style'); st.id = 'tl-print-css';
     st.textContent = '#tl-print{display:none}@media print{@page{size:A4;margin:0}html,body{background:#0e0c0f!important;margin:0!important;padding:0!important;zoom:1!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}body>*:not(#tl-print){display:none!important}#tl-print{display:block!important}}';
     document.head.appendChild(st); setTimeout(() => window.print(), 60); } // queda oculto en pantalla; se borra al cerrar la vista
-  window.TL_NUTRI = { verPDF, imprimir, EXCL, DIETAS, dietaDe, coincide, exLabel, excluido, limpiar, metasDescanso, opDescanso, evolucion, OBJ, ACT, COMIDAS, CAT_L, datos, basal, calcMetas, generar, suma, medida, nombre, food, pdfHTML, factor, rol, rolDe, alternativas, cambiar, quitar, variar };
+  window.TL_NUTRI = { verPDF, imprimir, reescalar, EXCL, DIETAS, dietaDe, coincide, exLabel, excluido, limpiar, metasDescanso, opDescanso, evolucion, OBJ, ACT, COMIDAS, CAT_L, datos, basal, calcMetas, generar, suma, medida, nombre, food, pdfHTML, factor, rol, rolDe, alternativas, cambiar, quitar, variar };
 })();
