@@ -585,7 +585,7 @@ td.crit{color:var(--crit);font-weight:700}
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supa-shim.js"></script><script src="inbody-ocr.js?v=20261113a"></script><script src="alimentos.js?v=20261113b"></script><script src="nutri-calc.js?v=20261113c"></script><script src="sonidos.js?v=2"></script>
+<script src="supa-shim.js"></script><script src="inbody-ocr.js?v=20261113a"></script><script src="alimentos.js?v=20261113b"></script><script src="nutri-calc.js?v=20261113d"></script><script src="sonidos.js?v=2"></script>
 <script>
 (() => {
 'use strict';
@@ -1816,7 +1816,9 @@ async function nuPanel(code) {
   if (!n || !n.activo) { lbl.textContent = '· desactivada';
     box.innerHTML = `<div class="small muted" style="margin-bottom:8px">Al activarla aparece la pestaña <b>Nutri</b> en su app: elige su objetivo con su InBody, recibe su pauta y registra lo que come. Tú revisas, ajustas, envías y exportas el PDF.</div><button type="button" class="btn pri" data-act="nu-on" data-id="${esc(code)}">🥗 Activar nutrición</button>`; return; }
   const m = n.meta || {}; const a = S.alumnos.get(code) || {}; const d = NUC().datos(a.inbody);
-  const ed = NU_ED[code] = NU_ED[code] || {};
+  // si en la base cambió la meta (p. ej. el alumno eligió objetivo en su app) se descarta lo que había en memoria
+  const firma = JSON.stringify([m, n.pauta_at]); if (NU_ED[code] && NU_ED[code].firma !== firma) delete NU_ED[code];
+  const ed = NU_ED[code] = NU_ED[code] || {}; ed.firma = firma;
   ed.o = ed.o || { ib: d ? d.f : null, obj: m.obj || 'recomp', aj: m.aj ?? null, dias: m.dias || '3-5', fisico: !!m.fisico, pkg: m.pkg || null, gkg: m.gkg || 0.9, nCom: (n.pauta && n.pauta.nCom) || 4 };
   ed.metas = ed.metas || (m.kcal ? { kcal: m.kcal, prot: m.prot, carb: m.carb, gras: m.gras } : null);
   if (ed.metasIb === undefined) ed.metasIb = m.ib || null; // InBody con que se calcularon las metas guardadas

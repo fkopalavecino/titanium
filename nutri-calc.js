@@ -33,7 +33,9 @@
     const pRango = aj < 0 ? [2.0, 2.4] : [1.6, 2.2];
     const pkg = Math.min(pRango[1], Math.max(pRango[0], o.pkg ? +o.pkg : (aj < 0 ? 2.2 : obj === 'subir' ? 2.0 : 1.8)));
     const gkg = Math.min(1, Math.max(0.8, o.gkg ? +o.gkg : 0.9));
-    const prot = r(d.peso * pkg); const gras = Math.max(r(d.peso * gkg), Math.ceil(kcal * 0.2 / 9));
+    // con % de grasa alto, proteína y grasa van sobre un peso de referencia (su masa magra a 25 % de grasa), no el peso total
+    const pRef = d.mlg && d.pgc > 25 ? Math.min(d.peso, d.mlg / 0.75) : d.peso;
+    const prot = r(pRef * pkg); const gras = Math.max(r(pRef * gkg), Math.ceil(kcal * 0.2 / 9));
     const carb = Math.max(0, r((kcal - prot * 4 - gras * 9) / 4));
     return { kcal, prot, carb, gras, obj, dias: o.dias || '3-5', fisico: !!o.fisico, aj, pkg, gkg, factor: fac, basal: r(b.v), basalSrc: b.src, get: r(get), peso: d.peso, ib: d.f };
   }
