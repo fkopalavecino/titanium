@@ -585,7 +585,7 @@ td.crit{color:var(--crit);font-weight:700}
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supa-shim.js"></script><script src="inbody-ocr.js?v=20261111"></script><script src="alimentos.js?v=20261111"></script><script src="nutri-calc.js?v=20261112a"></script><script src="sonidos.js?v=2"></script>
+<script src="supa-shim.js"></script><script src="inbody-ocr.js?v=20261111"></script><script src="alimentos.js?v=20261113a"></script><script src="nutri-calc.js?v=20261113a"></script><script src="sonidos.js?v=2"></script>
 <script>
 (() => {
 'use strict';
@@ -1907,6 +1907,7 @@ function nuPintarPanel(code) {
     </div></details>`;
   // 3 · no come (plegado)
   const nocome = `<details style="border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 14px"><summary style="cursor:pointer;font-weight:700;display:flex;justify-content:space-between;gap:8px"><span>🚫 No come</span><span class="small muted" style="font-weight:500">${ed.excl.length ? ed.excl.map(k => (N.EXCL[k] || [k])[0].split(' ')[0]).join(' ') : 'nada marcado'}</span></summary>
+    <div class="chips" style="flex-wrap:wrap;margin-top:10px">${Object.entries(N.DIETAS || {}).map(([k, [l, ks]]) => `<button type="button" class="chip" data-act="nu-ex" data-id="${esc(code)}" data-v="${ks.join(',')}" aria-pressed="${N.dietaDe(ed.excl) === k}">${esc(l)}</button>`).join('')}</div>
     <div class="chips" style="flex-wrap:wrap;margin-top:10px">${Object.entries(N.EXCL).map(([k, [l]]) => `<button type="button" class="chip" data-act="nu-ex" data-id="${esc(code)}" data-v="${k}" aria-pressed="${ed.excl.includes(k)}">${esc(l)}</button>`).join('')}</div></details>`;
   // 4 · pauta
   const pauta = P ? P.comidas.map((c, ci) => `<div style="display:grid;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:6px"><b style="font:700 18px var(--display);letter-spacing:.04em;text-transform:uppercase">${esc(c.l)}</b><span class="small muted">≈ ${nuN(c.meta.kcal)} kcal · P ${nuN(c.meta.prot)} · C ${nuN(c.meta.carb)} · G ${nuN(c.meta.gras)}</span></div>
@@ -1967,7 +1968,7 @@ function nuAccion(act, code, el) { const ed = NU_ED[code]; if (!ed) { toast('Cie
   if (act === 'nu-usar') { const d = nuIB(code); const c = d && N.calcMetas(d, ed.o); if (!c) return; nuLeerMetas(code);
     ed.metas = { kcal: c.kcal, prot: c.prot, carb: c.carb, gras: c.gras }; ed.pauta = N.generar(ed.metas, ed.o.nCom, ed.excl); nuPintarPanel(code); toast('Pauta generada: revísala y envíala'); return; }
   if (act === 'nu-gen') { const m = nuLeerMetas(code); if (!m) { toast('Faltan las metas: sube el InBody o escríbelas', true); return; } if (ed.pauta && !confirm('¿Crear una pauta nueva? Se pierden los cambios hechos a mano en la actual.')) return; ed.pauta = N.generar(m, ed.o.nCom, ed.excl); ed.cambio = false; nuPintarPanel(code); toast('Pauta nueva lista: revísala y envíala'); return; }
-  if (act === 'nu-ex') { const k = el.dataset.v; ed.excl = ed.excl.includes(k) ? ed.excl.filter(x => x !== k) : [...ed.excl, k];
+  if (act === 'nu-ex') { const ks = el.dataset.v.split(','), quita = ks.every(x => ed.excl.includes(x)); ed.excl = quita ? ed.excl.filter(x => !ks.includes(x)) : [...new Set([...ed.excl, ...ks])]; const k = quita ? '__no' : ks[0];
     window.__sb.from('nutricion').update({ prefs: { excluir: ed.excl } }).eq('alumno', code).then(({ error }) => { if (error) toast('No se pudo guardar: ' + error.message, true); });
     if (ed.pauta && ed.excl.includes(k)) { let n = 0; ed.pauta.comidas.forEach(c => { c.ops = c.ops.map(op => { if (!op.items.some(it => N.excluido(it.n, ed.excl))) return op; n++; return N.limpiar({ items: op.items.map(x => Object.assign({}, x)) }, c.meta, c.k, ed.excl); }); }); if (n) toast(`Cambié ${n} ${n === 1 ? 'opción' : 'opciones'} de la pauta`); }
     nuPintarPanel(code); return; }

@@ -69,6 +69,11 @@ window.TL_ALIMENTOS = [
   ['Jamón de cerdo', '', 120, 18, 2, 4, '1 lámina', 20],
   ['Vienesa', '', 270, 12, 2, 24, '1 unidad', 45],
   ['Tofu', '', 76, 8, 1.9, 4.8, '1 porción', 100],
+  ['Tempeh', '', 192, 20, 8, 11, '1 porción', 100],
+  ['Seitán', '', 140, 25, 6, 2, '1 porción', 100],
+  ['Proteína de soya texturizada', 'crudo', 330, 50, 30, 1, '1/2 taza', 25],
+  ['Edamame', 'cocido', 121, 12, 9, 5, '1/2 taza', 75],
+  ['Proteína vegetal (polvo)', '', 380, 75, 8, 6, '1 scoop', 30],
   // ---- lácteos ----
   ['Leche entera', '', 61, 3.2, 4.8, 3.3, '1 taza', 200],
   ['Leche semidescremada', '', 46, 3.3, 4.8, 1.5, '1 taza', 200],

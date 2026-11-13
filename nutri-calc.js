@@ -122,7 +122,7 @@
   }
   /* ---------- variar: cambiar un alimento por otro del mismo tipo manteniendo los macros ---------- */
   const CAT = {
-    p: [['Pechuga de pollo', 'cocido'], ['Pechuga de pavo', 'cocido'], ['Trutro de pollo sin piel', 'cocido'], ['Carne molida 5% grasa', 'cocido'], ['Vacuno magro (posta, lomo)', 'cocido'], ['Lomo de cerdo', 'cocido'], ['Merluza / reineta', 'cocido'], ['Salmón', 'cocido'], ['Atún en agua (escurrido)'], ['Jurel en lata'], ['Clara de huevo'], ['Huevo entero'], ['Yogur griego natural 0%'], ['Yogur proteico'], ['Queso cottage'], ['Quesillo'], ['Jamón de pavo'], ['Proteína whey (polvo)'], ['Tofu']],
+    p: [['Pechuga de pollo', 'cocido'], ['Pechuga de pavo', 'cocido'], ['Trutro de pollo sin piel', 'cocido'], ['Carne molida 5% grasa', 'cocido'], ['Vacuno magro (posta, lomo)', 'cocido'], ['Lomo de cerdo', 'cocido'], ['Merluza / reineta', 'cocido'], ['Salmón', 'cocido'], ['Atún en agua (escurrido)'], ['Jurel en lata'], ['Clara de huevo'], ['Huevo entero'], ['Yogur griego natural 0%'], ['Yogur proteico'], ['Queso cottage'], ['Quesillo'], ['Jamón de pavo'], ['Proteína whey (polvo)'], ['Tofu'], ['Tempeh'], ['Seitán'], ['Proteína de soya texturizada', 'crudo'], ['Edamame', 'cocido'], ['Proteína vegetal (polvo)']],
     c: [['Arroz blanco', 'cocido'], ['Arroz integral', 'cocido'], ['Fideos / pasta', 'cocido'], ['Fideos integrales', 'cocido'], ['Quínoa', 'cocido'], ['Papa', 'cocido'], ['Camote', 'cocido'], ['Choclo', 'cocido'], ['Lentejas', 'cocido'], ['Porotos', 'cocido'], ['Garbanzos', 'cocido'], ['Cuscús', 'cocido'], ['Mote de trigo', 'cocido'], ['Pan marraqueta'], ['Pan hallulla'], ['Pan de molde integral'], ['Pan pita integral'], ['Tortilla de trigo (wrap)'], ['Galletas de arroz'], ['Avena en hojuelas'], ['Plátano'], ['Manzana'], ['Pera'], ['Naranja'], ['Mandarina'], ['Kiwi'], ['Uvas'], ['Mango'], ['Piña'], ['Frutillas'], ['Arándanos'], ['Dátiles']],
     g: [['Aceite de oliva'], ['Palta'], ['Almendras'], ['Nueces'], ['Maní tostado'], ['Mantequilla de maní'], ['Semillas de chía'], ['Linaza molida'], ['Aceitunas'], ['Queso gauda / mantecoso']],
     v: [[ENS], ['Lechuga'], ['Tomate'], ['Pepino'], ['Zanahoria', 'crudo'], ['Brócoli', 'cocido'], ['Coliflor', 'cocido'], ['Zapallo italiano'], ['Espinaca'], ['Porotos verdes', 'cocido'], ['Betarraga', 'cocido'], ['Repollo'], ['Champiñones'], ['Pimentón']],
@@ -193,15 +193,18 @@
     pollo: ['🍗 Pollo y pavo', /pollo|pavo/i],
     carne: ['🥩 Carne de vacuno', /Carne molida|Vacuno/],
     cerdo: ['🐖 Cerdo', /cerdo|Vienesa/i],
-    gluten: ['🌾 Gluten (pan, fideos, avena)', /Pan |Pan$|Fideos|Avena|Cuscús|Tortilla|Galletas de agua|Mote|Harina|Cereal|Granola|Pizza|Empanada|Sopaipilla/],
+    gluten: ['🌾 Gluten (pan, fideos, avena)', /Seitán|Pan |Pan$|Fideos|Avena|Cuscús|Tortilla|Galletas de agua|Mote|Harina|Cereal|Granola|Pizza|Empanada|Sopaipilla/],
     frutos_secos: ['🌰 Frutos secos', /Almendras|Nueces/],
     mani: ['🥜 Maní', /Maní/],
     legumbres: ['🫘 Legumbres', /Lentejas|Porotos|Garbanzos|Hummus|Arvejas/],
-    soya: ['🌱 Soya / tofu', /Tofu/],
+    soya: ['🌱 Soya / tofu', /Tofu|Tempeh|[Ss]oya|Edamame/],
   };
+  // dietas: un toque marca varios grupos
+  const DIETAS = { vegetariana: ['🥗 Vegetariana', ['pollo', 'carne', 'cerdo', 'pescado']], vegana: ['🌱 Vegana', ['pollo', 'carne', 'cerdo', 'pescado', 'huevo', 'lacteos']] };
+  const dietaDe = ex => { const e = ex || []; return ['vegana', 'vegetariana'].find(k => DIETAS[k][1].every(x => e.includes(x))) || ''; };
   const excluido = (n, ex) => (ex || []).some(k => EXCL[k] && EXCL[k][1].test(n));
-  const DES_OK = { p: /Clara|Huevo|Yogur|cottage|Atún|whey|Quesillo|Pechuga de pavo/, c: /Pan|Avena|Galletas|Tortilla|Plátano|Manzana|Pera|Kiwi|Mandarina|Naranja/, g: /Almendras|Nueces|Maní|Mantequilla de maní|Palta|chía|Linaza/ };
-  const COM_OK = { p: /Pechuga|Trutro|Carne molida|Vacuno|Lomo de cerdo|Merluza|Salmón|Atún|Jurel|Huevo|Clara|Tofu/, c: /Arroz|Fideos|Quínoa|Papa|Camote|Choclo|Lentejas|Porotos|Garbanzos|Cuscús|Mote/, g: /Aceite de oliva|Palta|Aceitunas/ };
+  const DES_OK = { p: /Clara|Huevo|Yogur|cottage|Atún|whey|Quesillo|Pechuga de pavo|Proteína vegetal|Tofu|Tempeh/, c: /Pan|Avena|Galletas|Tortilla|Plátano|Manzana|Pera|Kiwi|Mandarina|Naranja/, g: /Almendras|Nueces|Maní|Mantequilla de maní|Palta|chía|Linaza/ };
+  const COM_OK = { p: /Pechuga|Trutro|Carne molida|Vacuno|Lomo de cerdo|Merluza|Salmón|Atún|Jurel|Huevo|Clara|Tofu|Tempeh|Seitán|soya texturizada|Edamame/, c: /Arroz|Fideos|Quínoa|Papa|Camote|Choclo|Lentejas|Porotos|Garbanzos|Cuscús|Mote/, g: /Aceite de oliva|Palta|Aceitunas/ };
   // cambia los alimentos que no come por otros del mismo tipo que sí calcen con esa comida
   function limpiar(op, meta, comida, ex) { if (!(ex || []).length) return op;
     const fuerte = comida === 'almuerzo' || comida === 'cena';
@@ -279,5 +282,5 @@ ${pauta.comidas.map(c => `<div class="blk"><div class="ml"><h2>${esc(c.l)}</h2><
     v.addEventListener('click', e => { const b = e.target.closest('[data-pv]'); if (!b) return; if (b.dataset.pv === 'x') { removeEventListener('resize', ajustar); v.remove(); return; }
       zoom(1); try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (_) { window.print(); } setTimeout(ajustar, 500); });
   }
-  window.TL_NUTRI = { verPDF, EXCL, excluido, limpiar, metasDescanso, opDescanso, evolucion, OBJ, ACT, COMIDAS, CAT_L, datos, basal, calcMetas, generar, suma, medida, nombre, food, pdfHTML, factor, rol, rolDe, alternativas, cambiar, quitar, variar };
+  window.TL_NUTRI = { verPDF, EXCL, DIETAS, dietaDe, excluido, limpiar, metasDescanso, opDescanso, evolucion, OBJ, ACT, COMIDAS, CAT_L, datos, basal, calcMetas, generar, suma, medida, nombre, food, pdfHTML, factor, rol, rolDe, alternativas, cambiar, quitar, variar };
 })();
