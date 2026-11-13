@@ -42,38 +42,75 @@
   const COMIDAS = { 4: [['desayuno', 'Desayuno', 0.25], ['almuerzo', 'Almuerzo', 0.30], ['once', 'Once', 0.20], ['cena', 'Cena', 0.25]],
     5: [['desayuno', 'Desayuno', 0.22], ['colacion', 'Colación', 0.10], ['almuerzo', 'Almuerzo', 0.28], ['once', 'Once', 0.18], ['cena', 'Cena', 0.22]] };
   const ENS = 'Ensalada surtida (lechuga, tomate, pepino)';
-  // cada opción: alimentos fijos [nombre, estado, g] + 3 que se ajustan (proteína, carbohidrato, grasa)
+  // cada plato: nombre (t), alimentos fijos [nombre, estado, g] + 3 que se ajustan (proteína, carbohidrato, grasa)
+  // veg: solo se usa en pautas vegetarianas/veganas. Cada pauta toma 3 platos distintos al azar.
   const T = {
     desayuno: [
-      { fijo: [['Frutillas', '', 100]], v: [['Yogur griego natural 0%'], ['Avena en hojuelas'], ['Almendras']] },
-      { fijo: [['Huevo entero', '', 100], ['Tomate', '', 60]], v: [['Clara de huevo'], ['Pan marraqueta'], ['Palta']] },
-      { fijo: [['Plátano', '', 60]], v: [['Yogur proteico'], ['Pan de molde integral'], ['Mantequilla de maní']] },
+      { t: 'Bowl de yogur griego, avena y frutillas', fijo: [['Frutillas', '', 100]], v: [['Yogur griego natural 0%'], ['Avena en hojuelas'], ['Almendras']] },
+      { t: 'Huevos revueltos con tomate, marraqueta y palta', fijo: [['Huevo entero', '', 100], ['Tomate', '', 60]], v: [['Clara de huevo'], ['Pan marraqueta'], ['Palta']] },
+      { t: 'Tostadas integrales con maní, plátano y yogur proteico', fijo: [['Plátano', '', 60]], v: [['Yogur proteico'], ['Pan de molde integral'], ['Mantequilla de maní']] },
+      { t: 'Omelette de claras con espinaca y champiñones + tostada con palta', fijo: [['Huevo entero', '', 50], ['Espinaca', '', 40], ['Champiñones', '', 60]], v: [['Clara de huevo'], ['Pan de molde integral'], ['Palta']] },
+      { t: 'Avena proteica con arándanos y nueces', fijo: [['Arándanos', '', 75]], v: [['Proteína whey (polvo)'], ['Avena en hojuelas'], ['Nueces']] },
+      { t: 'Panqueques de avena, plátano y claras con almendras', fijo: [['Plátano', '', 60], ['Huevo entero', '', 50]], v: [['Clara de huevo'], ['Avena en hojuelas'], ['Almendras']] },
+      { t: 'Tostadas de quesillo, tomate y palta', fijo: [['Tomate', '', 80]], v: [['Quesillo'], ['Pan de molde integral'], ['Palta']] },
+      { t: 'Cottage con kiwi, pan pita integral y almendras', fijo: [['Kiwi', '', 100]], v: [['Queso cottage'], ['Pan pita integral'], ['Almendras']] },
+      { t: 'Wrap de huevo, espinaca y palta', fijo: [['Huevo entero', '', 100], ['Espinaca', '', 30]], v: [['Clara de huevo'], ['Tortilla de trigo (wrap)'], ['Palta']] },
+      { t: 'Batido de proteína vegetal, avena y plátano con chía', veg: 1, fijo: [['Plátano', '', 80]], v: [['Proteína vegetal (polvo)'], ['Avena en hojuelas'], ['Semillas de chía']] },
     ],
     colacion: [
-      { fijo: [], v: [['Yogur griego natural 0%'], ['Manzana'], ['Almendras']] },
-      { fijo: [], v: [['Yogur proteico'], ['Plátano'], ['Nueces']] },
-      { fijo: [['Huevo entero', '', 50]], v: [['Clara de huevo'], ['Galletas de arroz'], ['Maní tostado']] },
+      { t: 'Yogur griego con manzana y almendras', fijo: [], v: [['Yogur griego natural 0%'], ['Manzana'], ['Almendras']] },
+      { t: 'Yogur proteico con plátano y nueces', fijo: [], v: [['Yogur proteico'], ['Plátano'], ['Nueces']] },
+      { t: 'Huevo duro con galletas de arroz y maní', fijo: [['Huevo entero', '', 50]], v: [['Clara de huevo'], ['Galletas de arroz'], ['Maní tostado']] },
+      { t: 'Batido de proteína con plátano y mantequilla de maní', fijo: [], v: [['Proteína whey (polvo)'], ['Plátano'], ['Mantequilla de maní']] },
+      { t: 'Cottage con piña y nueces', fijo: [], v: [['Queso cottage'], ['Piña'], ['Nueces']] },
+      { t: 'Galletas de arroz con pavo, tomate y palta', fijo: [['Tomate', '', 40]], v: [['Jamón de pavo'], ['Galletas de arroz'], ['Palta']] },
+      { t: 'Yogur proteico con arándanos y chía', fijo: [], v: [['Yogur proteico'], ['Arándanos'], ['Semillas de chía']] },
+      { t: 'Edamame con mandarina y almendras', veg: 1, fijo: [], v: [['Edamame', 'cocido'], ['Mandarina'], ['Almendras']] },
     ],
     almuerzo: [
-      { fijo: [[ENS, '', 200]], v: [['Pechuga de pollo', 'cocido'], ['Arroz blanco', 'cocido'], ['Aceite de oliva']] },
-      { fijo: [[ENS, '', 200]], v: [['Carne molida 5% grasa', 'cocido'], ['Papa', 'cocido'], ['Palta']] },
-      { fijo: [['Brócoli', 'cocido', 150]], v: [['Atún en agua (escurrido)'], ['Arroz integral', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Pollo a la plancha con arroz y ensalada', fijo: [[ENS, '', 200]], v: [['Pechuga de pollo', 'cocido'], ['Arroz blanco', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Carne molida con papas y ensalada con palta', fijo: [[ENS, '', 200]], v: [['Carne molida 5% grasa', 'cocido'], ['Papa', 'cocido'], ['Palta']] },
+      { t: 'Atún con arroz integral y brócoli', fijo: [['Brócoli', 'cocido', 150]], v: [['Atún en agua (escurrido)'], ['Arroz integral', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Salmón al horno con camote y verduras', fijo: [['Brócoli', 'cocido', 100], ['Zanahoria', 'cocido', 60]], v: [['Salmón', 'cocido'], ['Camote', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Charquicán magro de vacuno', fijo: [['Zapallo camote', 'cocido', 100], ['Porotos verdes', 'cocido', 60], ['Cebolla', '', 30]], v: [['Vacuno magro (posta, lomo)', 'cocido'], ['Papa', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Lentejas guisadas con pollo y verduras', fijo: [['Zanahoria', 'cocido', 50], ['Pimentón', '', 40], ['Cebolla', '', 30]], v: [['Pechuga de pollo', 'cocido'], ['Lentejas', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Fideos integrales a la boloñesa', fijo: [['Tomate', '', 100], ['Champiñones', '', 60], ['Cebolla', '', 30]], v: [['Carne molida 5% grasa', 'cocido'], ['Fideos integrales', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Merluza a la plancha con quínoa y ensalada', fijo: [[ENS, '', 200]], v: [['Merluza / reineta', 'cocido'], ['Quínoa', 'cocido'], ['Palta']] },
+      { t: 'Trutro de pollo al horno con cuscús y verduras', fijo: [['Zapallo italiano', '', 100], ['Pimentón', '', 50]], v: [['Trutro de pollo sin piel', 'cocido'], ['Cuscús', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Lomo de cerdo con arroz integral y ensalada de repollo', fijo: [['Repollo', '', 100], ['Zanahoria', 'crudo', 50]], v: [['Lomo de cerdo', 'cocido'], ['Arroz integral', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Porotos con zapallo y huevo', veg: 1, fijo: [['Zapallo camote', 'cocido', 80], [ENS, '', 150]], v: [['Huevo entero'], ['Porotos', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Tofu salteado con arroz integral y verduras', veg: 1, fijo: [['Brócoli', 'cocido', 100], ['Pimentón', '', 50]], v: [['Tofu'], ['Arroz integral', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Tempeh con quínoa y ensalada', veg: 1, fijo: [[ENS, '', 200]], v: [['Tempeh'], ['Quínoa', 'cocido'], ['Palta']] },
     ],
     once: [
-      { fijo: [['Tomate', '', 60]], v: [['Atún en agua (escurrido)'], ['Pan marraqueta'], ['Palta']] },
-      { fijo: [['Arándanos', '', 75]], v: [['Yogur griego natural 0%'], ['Avena en hojuelas'], ['Nueces']] },
-      { fijo: [['Huevo entero', '', 50]], v: [['Clara de huevo'], ['Pan de molde integral'], ['Palta']] },
+      { t: 'Marraqueta con atún, tomate y palta', fijo: [['Tomate', '', 60]], v: [['Atún en agua (escurrido)'], ['Pan marraqueta'], ['Palta']] },
+      { t: 'Yogur griego con avena, arándanos y nueces', fijo: [['Arándanos', '', 75]], v: [['Yogur griego natural 0%'], ['Avena en hojuelas'], ['Nueces']] },
+      { t: 'Huevos con pan integral y palta', fijo: [['Huevo entero', '', 50]], v: [['Clara de huevo'], ['Pan de molde integral'], ['Palta']] },
+      { t: 'Sándwich integral de pavo, lechuga y palta', fijo: [['Tomate', '', 50], ['Lechuga', '', 20]], v: [['Jamón de pavo'], ['Pan de molde integral'], ['Palta']] },
+      { t: 'Wrap de pollo con lechuga, tomate y palta', fijo: [['Lechuga', '', 30], ['Tomate', '', 50]], v: [['Pechuga de pollo', 'cocido'], ['Tortilla de trigo (wrap)'], ['Palta']] },
+      { t: 'Batido de proteína con avena, frutillas y maní', fijo: [['Frutillas', '', 100]], v: [['Proteína whey (polvo)'], ['Avena en hojuelas'], ['Mantequilla de maní']] },
+      { t: 'Tostadas con cottage, pera y nueces', fijo: [['Pera', '', 80]], v: [['Queso cottage'], ['Pan de molde integral'], ['Nueces']] },
+      { t: 'Marraqueta con jurel, tomate y cebolla', fijo: [['Tomate', '', 60], ['Cebolla', '', 20]], v: [['Jurel en lata'], ['Pan marraqueta'], ['Palta']] },
+      { t: 'Pan pita con tofu, pepino y palta', veg: 1, fijo: [['Pepino', '', 60], ['Tomate', '', 50]], v: [['Tofu'], ['Pan pita integral'], ['Palta']] },
     ],
     cena: [
-      { fijo: [['Zapallo italiano', '', 150]], v: [['Pechuga de pollo', 'cocido'], ['Papa', 'cocido'], ['Aceite de oliva']] },
-      { fijo: [[ENS, '', 200]], v: [['Carne molida 5% grasa', 'cocido'], ['Arroz blanco', 'cocido'], ['Aceite de oliva']] },
-      { fijo: [[ENS, '', 150], ['Huevo entero', '', 100]], v: [['Clara de huevo'], ['Pan marraqueta'], ['Palta']] },
+      { t: 'Pollo con papas y zapallo italiano', fijo: [['Zapallo italiano', '', 150]], v: [['Pechuga de pollo', 'cocido'], ['Papa', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Carne molida con arroz y ensalada', fijo: [[ENS, '', 200]], v: [['Carne molida 5% grasa', 'cocido'], ['Arroz blanco', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Huevos con ensalada, pan y palta', fijo: [[ENS, '', 150], ['Huevo entero', '', 100]], v: [['Clara de huevo'], ['Pan marraqueta'], ['Palta']] },
+      { t: 'Salmón con quínoa y brócoli', fijo: [['Brócoli', 'cocido', 150]], v: [['Salmón', 'cocido'], ['Quínoa', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Tortilla de claras con verduras y papas', fijo: [['Huevo entero', '', 50], ['Espinaca', '', 40], ['Champiñones', '', 60], ['Pimentón', '', 40]], v: [['Clara de huevo'], ['Papa', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Merluza al horno con camote y porotos verdes', fijo: [['Porotos verdes', 'cocido', 150]], v: [['Merluza / reineta', 'cocido'], ['Camote', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Fajitas de vacuno con pimentón y palta', fijo: [['Pimentón', '', 80], ['Cebolla', '', 40]], v: [['Vacuno magro (posta, lomo)', 'cocido'], ['Tortilla de trigo (wrap)'], ['Palta']] },
+      { t: 'Pavo salteado con arroz integral y verduras', fijo: [['Zapallo italiano', '', 100], ['Zanahoria', 'cocido', 50]], v: [['Pechuga de pavo', 'cocido'], ['Arroz integral', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Pollo al jugo con fideos integrales y champiñones', fijo: [['Champiñones', '', 80], ['Espinaca', '', 40]], v: [['Pechuga de pollo', 'cocido'], ['Fideos integrales', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Garbanzos salteados con tofu y verduras', veg: 1, fijo: [['Zapallo italiano', '', 100], ['Pimentón', '', 50]], v: [['Tofu'], ['Garbanzos', 'cocido'], ['Aceite de oliva']] },
+      { t: 'Tempeh con camote y brócoli', veg: 1, fijo: [['Brócoli', 'cocido', 150]], v: [['Tempeh'], ['Camote', 'cocido'], ['Aceite de oliva']] },
     ],
   };
   // unidades (se redondea a unidades enteras o medias) y topes razonables
   const UNI = { 'Huevo entero': [50, 'huevo', 'huevos'], 'Clara de huevo': [33, 'clara', 'claras'], 'Pan marraqueta': [50, '½ marraqueta', ''], 'Pan de molde integral': [30, 'rebanada', 'rebanadas'], 'Pan hallulla': [45, '½ hallulla', ''], 'Galletas de arroz': [9, 'galleta', 'galletas'] };
-  const PASO = n => UNI[n] ? UNI[n][0] : /Aceite|Mantequilla de maní|Almendras|Nueces|Maní/.test(n) ? 5 : 10;
-  const TOPE = n => /Aceite/.test(n) ? 25 : /Mantequilla de maní|Almendras|Nueces|Maní/.test(n) ? 40 : /Palta/.test(n) ? 120 : /Clara/.test(n) ? 330 : /Pan/.test(n) ? 200 : /Avena/.test(n) ? 120 : /Yogur/.test(n) ? 400 : 450;
+  const PASO = n => UNI[n] ? UNI[n][0] : /Aceite|Mantequilla de maní|Almendras|Nueces|Maní|chía|Linaza|whey|Proteína vegetal/.test(n) ? 5 : 10;
+  const TOPE = n => /Aceite/.test(n) ? 25 : /whey|Proteína vegetal/.test(n) ? 50 : /Jamón de pavo/.test(n) ? 120 : /Quesillo/.test(n) ? 150 : /Tortilla de trigo/.test(n) ? 120 : /Galletas de arroz/.test(n) ? 54 : /Plátano|Manzana|Pera|Piña|Mandarina|Arándanos/.test(n) ? 250 : /Chía|chía/.test(n) ? 30 : /Mantequilla de maní|Almendras|Nueces|Maní/.test(n) ? 40 : /Palta/.test(n) ? 120 : /Clara/.test(n) ? 330 : /Pan/.test(n) ? 200 : /Avena/.test(n) ? 120 : /Yogur/.test(n) ? 400 : 450;
   const mac = (f, g) => ({ kcal: f.kcal * g / 100, prot: f.prot * g / 100, carb: f.carb * g / 100, gras: f.gras * g / 100 });
   function suma(items) { return items.reduce((t, it) => { const f = food(it.n, it.e); if (!f) return t; const m = mac(f, it.g); return { kcal: t.kcal + m.kcal, prot: t.prot + m.prot, carb: t.carb + m.carb, gras: t.gras + m.gras }; }, { kcal: 0, prot: 0, carb: 0, gras: 0 }); }
   // mínimos cuadrados con pesos por kcal (prot y carb ×4, grasa ×9) sobre las variables libres, con límites
@@ -118,14 +155,14 @@
   function opcion(tpl, meta) {
     const esc = Math.min(1, meta.kcal / 550); // en comidas chicas los fijos (huevos, fruta) se achican
     const fijos = tpl.fijo.map(([n, e, g]) => { const st = PASO(n); return { n, e: e || '', g: Math.max(st, Math.round(g * esc / st) * st), r: rolFijo(n, e) }; });
-    return { items: ajustar(tpl.v.map(([n, e], i) => ({ n, e: e || '', r: 'pcg'[i] })), fijos, meta) };
+    return { t: tpl.t, items: ajustar(tpl.v.map(([n, e], i) => ({ n, e: e || '', r: 'pcg'[i] })), fijos, meta) };
   }
   /* ---------- variar: cambiar un alimento por otro del mismo tipo manteniendo los macros ---------- */
   const CAT = {
     p: [['Pechuga de pollo', 'cocido'], ['Pechuga de pavo', 'cocido'], ['Trutro de pollo sin piel', 'cocido'], ['Carne molida 5% grasa', 'cocido'], ['Vacuno magro (posta, lomo)', 'cocido'], ['Lomo de cerdo', 'cocido'], ['Merluza / reineta', 'cocido'], ['Salmón', 'cocido'], ['Atún en agua (escurrido)'], ['Jurel en lata'], ['Clara de huevo'], ['Huevo entero'], ['Yogur griego natural 0%'], ['Yogur proteico'], ['Queso cottage'], ['Quesillo'], ['Jamón de pavo'], ['Proteína whey (polvo)'], ['Tofu'], ['Tempeh'], ['Seitán'], ['Proteína de soya texturizada', 'crudo'], ['Edamame', 'cocido'], ['Proteína vegetal (polvo)']],
     c: [['Arroz blanco', 'cocido'], ['Arroz integral', 'cocido'], ['Fideos / pasta', 'cocido'], ['Fideos integrales', 'cocido'], ['Quínoa', 'cocido'], ['Papa', 'cocido'], ['Camote', 'cocido'], ['Choclo', 'cocido'], ['Lentejas', 'cocido'], ['Porotos', 'cocido'], ['Garbanzos', 'cocido'], ['Cuscús', 'cocido'], ['Mote de trigo', 'cocido'], ['Pan marraqueta'], ['Pan hallulla'], ['Pan de molde integral'], ['Pan pita integral'], ['Tortilla de trigo (wrap)'], ['Galletas de arroz'], ['Avena en hojuelas'], ['Plátano'], ['Manzana'], ['Pera'], ['Naranja'], ['Mandarina'], ['Kiwi'], ['Uvas'], ['Mango'], ['Piña'], ['Frutillas'], ['Arándanos'], ['Dátiles']],
     g: [['Aceite de oliva'], ['Palta'], ['Almendras'], ['Nueces'], ['Maní tostado'], ['Mantequilla de maní'], ['Semillas de chía'], ['Linaza molida'], ['Aceitunas'], ['Queso gauda / mantecoso']],
-    v: [[ENS], ['Lechuga'], ['Tomate'], ['Pepino'], ['Zanahoria', 'crudo'], ['Brócoli', 'cocido'], ['Coliflor', 'cocido'], ['Zapallo italiano'], ['Espinaca'], ['Porotos verdes', 'cocido'], ['Betarraga', 'cocido'], ['Repollo'], ['Champiñones'], ['Pimentón']],
+    v: [[ENS], ['Lechuga'], ['Tomate'], ['Pepino'], ['Zanahoria', 'crudo'], ['Brócoli', 'cocido'], ['Coliflor', 'cocido'], ['Zapallo italiano'], ['Espinaca'], ['Porotos verdes', 'cocido'], ['Betarraga', 'cocido'], ['Repollo'], ['Champiñones'], ['Pimentón'], ['Cebolla'], ['Zapallo camote', 'cocido']],
     fr: [['Frutillas'], ['Arándanos'], ['Frambuesas'], ['Plátano'], ['Manzana'], ['Pera'], ['Naranja'], ['Mandarina'], ['Kiwi'], ['Durazno'], ['Uvas'], ['Piña'], ['Mango'], ['Melón'], ['Sandía']],
   };
   const CAT_L = { p: 'Proteína', c: 'Carbohidrato', g: 'Grasa', v: 'Verdura', fr: 'Fruta' };
@@ -147,12 +184,24 @@
     if (r === 'v' || r === 'fr' || r === 'f') { // fijos: verdura con los mismos gramos; fruta con las mismas kcal
       const fo = food(it.n, it.e), fnw = food(n, e); const st = PASO(n);
       nuevo.g = r !== 'v' && fo && fnw && fnw.kcal ? Math.max(st, Math.round(it.g * fo.kcal / fnw.kcal / st) * st) : it.g; }
-    const o = reajustar(op.items.map((x, i) => i === ii ? nuevo : x), meta); op.items = o.items; return op; }
-  function quitar(op, ii, meta) { const o = reajustar(op.items.filter((_, i) => i !== ii), meta); op.items = o.items; return op; }
+    const o = reajustar(op.items.map((x, i) => i === ii ? nuevo : x), meta); op.items = o.items; delete op.t; return op; }
+  function quitar(op, ii, meta) { const o = reajustar(op.items.filter((_, i) => i !== ii), meta); op.items = o.items; delete op.t; return op; }
   const DES_P = /Clara|Huevo|Yogur|cottage|Atún|whey/, DES_C = /Pan|Avena|Galletas|Tortilla|Plátano/;
   const COM_P = /Pechuga|Trutro|Carne molida|Vacuno|Lomo de cerdo|Merluza|Salmón|Atún|Jurel|Huevo|Clara/, COM_C = /Arroz|Fideos|Quínoa|Papa|Camote|Choclo|Lentejas|Porotos|Garbanzos|Cuscús|Mote/;
   // variar toda la opción: proteína y carbohidrato al azar (y a veces la grasa), con alimentos que calcen con esa comida
-  function variar(op, meta, comida, ex) {
+  // elige platos: sin alimentos excluidos primero, al azar y con proteínas distintas
+  const esVeg = ex => (ex || []).includes('pollo') && (ex || []).includes('carne');
+  const malos = (t, ex) => [...t.fijo, ...t.v].filter(([n]) => excluido(n, ex)).length;
+  function elegir(k, ex, cant, no) { const veg = esVeg(ex); no = no || [];
+    const ls = (T[k] || []).filter(t => (!t.veg || veg) && !no.includes(t.t)).map(t => ({ t, s: malos(t, ex) - (veg && t.veg ? 0.5 : 0) + Math.random() * 0.4 })).sort((a, b) => a.s - b.s).map(x => x.t);
+    const fam = n => (n.match(/pollo|pavo|Carne|Vacuno|cerdo|Salmón|Merluza|Atún|Jurel|Huevo|Clara|Yogur|cottage|Quesillo|whey|Tofu|Tempeh|Edamame|vegetal/) || [n])[0].replace(/Clara/, 'Huevo').replace(/Carne/, 'Vacuno').replace(/Salmón|Merluza|Atún|Jurel/, 'pez');
+    const out = [], prot = new Set(); ls.forEach(t => { const f = fam(t.v[0][0]); if (out.length < cant && !prot.has(f)) { out.push(t); prot.add(f); } }); ls.forEach(t => { if (out.length < cant && !out.includes(t)) out.push(t); }); return out; }
+  // variar toda la opción: otro plato distinto (usados = nombres de las otras opciones de esa comida), con los mismos macros
+  function variar(op, meta, comida, ex, usados) {
+    const nuevo = elegir(comida, ex, 1, [op.t, ...(usados || [])].filter(Boolean))[0];
+    if (nuevo && !malos(nuevo, ex)) return limpiar(opcion(nuevo, meta), meta, comida, ex);
+    return variarAlimentos(op, meta, comida, ex); }
+  function variarAlimentos(op, meta, comida, ex) {
     const comidaFuerte = comida === 'almuerzo' || comida === 'cena';
     const pick = (r, it) => { let ls = alternativas(it).filter(x => !excluido(x.n, ex));
       if (r === 'p') ls = ls.filter(x => (comidaFuerte ? COM_P : DES_P).test(x.n)); else if (r === 'c') ls = ls.filter(x => (comidaFuerte ? COM_C : DES_C).test(x.n)); else ls = ls.filter(x => (comidaFuerte ? /Aceite de oliva|Palta|Aceitunas/ : /Almendras|Nueces|Maní|Mantequilla de maní|Palta|chía|Linaza/).test(x.n));
@@ -168,7 +217,7 @@
     const cs = COMIDAS[nCom === 5 ? 5 : 4];
     return { fecha: new Date().toISOString().slice(0, 10), nCom: cs.length, comidas: cs.map(([k, l, p]) => {
       const meta = { kcal: r(metas.kcal * p), prot: r(metas.prot * p), carb: r(metas.carb * p), gras: r(metas.gras * p) };
-      return { k, l, p, meta, ops: T[k].map(t => limpiar(opcion(t, meta), meta, k, ex)) }; }) };
+      return { k, l, p, meta, ops: elegir(k, ex, 3).map(t => limpiar(opcion(t, meta), meta, k, ex)) }; }) };
   }
   // medida casera para mostrar junto a los gramos
   const FR = q => { const e = Math.floor(q), f = q - e; const s = f >= 0.875 ? '' : f >= 0.625 ? '¾' : f >= 0.375 ? '½' : f >= 0.125 ? '¼' : ''; const ee = f >= 0.875 ? e + 1 : e; return (ee ? ee : '') + s || '¼'; };
@@ -223,7 +272,7 @@
   /* ---------- día de descanso: ¾ de los carbohidratos ---------- */
   const DESC = 0.75;
   const metasDescanso = m => m && m.kcal ? { kcal: Math.round((m.kcal - m.carb * (1 - DESC) * 4) / 10) * 10, prot: m.prot, carb: Math.round(m.carb * DESC), gras: m.gras } : m;
-  function opDescanso(op) { return { items: op.items.map(x => { if (rol(x) !== 'c') return x; const st = PASO(x.n); return Object.assign({}, x, { g: Math.max(st, Math.round(x.g * DESC / st) * st) }); }) }; }
+  function opDescanso(op) { return { t: op.t, items: op.items.map(x => { if (rol(x) !== 'c') return x; const st = PASO(x.n); return Object.assign({}, x, { g: Math.max(st, Math.round(x.g * DESC / st) * st) }); }) }; }
   /* ---------- evolución entre los dos últimos InBody y sugerencia ---------- */
   // compara el InBody elegido (f, o el último) con el anterior a él
   function evolucion(inbody, obj, f) {
@@ -249,7 +298,7 @@
     const datos = [['Nombre', per.nombre], ['Fecha', fd(pauta.fecha)], ['Edad', per.edad ? per.edad + ' años' : ''], ['Estatura', per.estatura ? per.estatura + ' cm' : ''],
       ['Peso', per.peso ? String(per.peso).replace('.', ',') + ' kg' : ''], ['% Grasa', per.pgc != null ? String(per.pgc).replace('.', ',') + ' %' : ''], ['Masa muscular', per.mme ? String(per.mme).replace('.', ',') + ' kg' : ''],
       ['Objetivo', (OBJ[metas.obj] || {}).l || '']].filter(x => x[1]);
-    const cel = op => { const t = suma(op.items); return `<td><ul>${op.items.map(it => `<li><b>${nf(it.g)} g</b> ${esc(nombre(it.n, it.e))}${medida(it.n, it.e, it.g) ? ` <span>(${esc(medida(it.n, it.e, it.g))})</span>` : ''}</li>`).join('')}</ul><div class="tt">${nf(t.kcal)} kcal · P ${nf(t.prot)} · C ${nf(t.carb)} · G ${nf(t.gras)}</div></td>`; };
+    const cel = op => { const t = suma(op.items); return `<td>${op.t ? `<div class="pl">${esc(op.t)}</div>` : ''}<ul>${op.items.map(it => `<li><b>${nf(it.g)} g</b> ${esc(nombre(it.n, it.e))}${medida(it.n, it.e, it.g) ? ` <span>(${esc(medida(it.n, it.e, it.g))})</span>` : ''}</li>`).join('')}</ul><div class="tt">${nf(t.kcal)} kcal · P ${nf(t.prot)} · C ${nf(t.carb)} · G ${nf(t.gras)}</div></td>`; };
     return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Pauta nutricional · ${esc(per.nombre)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
 <style>@page{size:A4;margin:9mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}html,body{background:#0e0c0f;color:#f2eef0;margin:0;font:13px/1.4 Barlow,system-ui,sans-serif}
@@ -261,7 +310,7 @@ table{width:100%;border-collapse:collapse;table-layout:fixed}td,th{border:1px so
 .mt{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.mt div{background:#1b181c;border:1px solid #2f2a2e;border-radius:10px;padding:10px;text-align:center}.mt b{display:block;font:800 26px/1 'Barlow Condensed',sans-serif}.mt span{color:#a69ea3;font-size:12px}
 .ml{display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 6px}.ml h2{margin:0}.ml span{color:#a69ea3;font-size:12px}
 ul{margin:0;padding:0;list-style:none}li{padding:2px 0}li span{color:#a69ea3}.tt{margin-top:6px;padding-top:5px;border-top:1px dashed #2f2a2e;color:#a69ea3;font-size:11.5px}
-.ft{margin-top:18px;color:#6d656a;font-size:11px;text-align:center}.blk{break-inside:avoid}
+.pl{font:700 14px 'Barlow Condensed',sans-serif;letter-spacing:.03em;color:#f2eef0;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid #d71f30}.ft{margin-top:18px;color:#6d656a;font-size:11px;text-align:center}.blk{break-inside:avoid}
 @media print{.pg{padding:0}.noprint{display:none}}
 .noprint{position:fixed;right:16px;bottom:16px;background:#d71f30;color:#fff;border:0;border-radius:12px;padding:14px 20px;font:700 16px Barlow,sans-serif;cursor:pointer}</style></head>
 <body><div class="pg"><div class="hd">${MK}<div><div class="sub">Titanium Sport Center</div><h1>Pauta nutricional</h1></div></div>
