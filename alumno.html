@@ -1604,7 +1604,9 @@ function asisBtns(f, h) { const k = f + '_' + h, e = S.conf?.get(k), wa = waNoVo
     : e ? `<div class="small muted">Puedes cambiarla 1 vez, hasta las ${hl}${f !== today() ? ' del ' + esc(fmtD(f)) : ''}.</div>` : '';
   if (e === 'voy') return `<div class="note small" style="display:grid;gap:6px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b class="ok">✅ Confirmaste que vienes</b>${fija ? waBtn('Escribir') : `<button class="chip" data-nov="${k}">No puedo ir</button>`}</div>${nota}</div>`;
   if (e === 'no_voy') return `<div class="note small" style="display:grid;gap:8px"><b class="warn">❌ Avisaste que no vienes</b>${fija ? waBtn('Escribirle a ' + esc(S.cfg?.coach?.split(' ')[0] || 'tu profe')) : `<div class="grid2">${waBtn('Escribirle a ' + esc(S.cfg?.coach?.split(' ')[0] || 'tu profe'))}<button class="btn" data-voy="${k}">Al final sí voy</button></div>`}${nota}</div>`;
-  return `<div class="grid2"><button class="btn pri" data-voy="${k}">✅ Voy</button>${waBtn('❌ No puedo ir', `data-nov="${k}"`)}</div>`; }
+  // Voy en verde (sí) y No puedo ir en gris neutro, para que no se confundan
+  const no = wa ? `<a class="btn" data-nov="${k}" href="${wa}" target="_blank" rel="noopener">❌ No puedo ir</a>` : `<button class="btn" data-nov="${k}">❌ No puedo ir</button>`;
+  return `<div class="grid2"><button class="btn" data-voy="${k}" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">✅ Voy</button>${no}</div>`; }
 /* ventana propia de la app (en vez de Cancelar / OK del teléfono) */
 function dialogo({ titulo, sub = '', avisos = [], ok = 'Aceptar', no = 'Rechazar' }) { return new Promise(res => { const d = document.createElement('div');
   d.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;justify-content:center;padding:16px';
