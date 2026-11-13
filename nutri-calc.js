@@ -303,17 +303,17 @@
     const cel = op => { const t = suma(op.items); return `<td>${op.t ? `<div class="pl">${esc(op.t)}</div>` : ''}<ul>${op.items.map(it => `<li><b>${nf(it.g)} g</b> ${esc(nombre(it.n, it.e))}${medida(it.n, it.e, it.g) ? ` <span>(${esc(medida(it.n, it.e, it.g))})</span>` : ''}</li>`).join('')}</ul><div class="tt">${nf(t.kcal)} kcal · P ${nf(t.prot)} · C ${nf(t.carb)} · G ${nf(t.gras)}</div></td>`; };
     return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Pauta nutricional · ${esc(per.nombre)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
-<style>@page{size:A4;margin:9mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}html,body{background:#0e0c0f;color:#f2eef0;margin:0;font:13px/1.4 Barlow,system-ui,sans-serif}
+<style>@page{size:A4;margin:0}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}html,body{background:#0e0c0f;color:#f2eef0;margin:0;font:13px/1.4 Barlow,system-ui,sans-serif}
 .pg{max-width:900px;min-width:860px;margin:0 auto;padding:22px}@media print{.pg{min-width:0}}.hd{display:flex;align-items:center;gap:14px;border-bottom:2px solid #d71f30;padding-bottom:12px;margin-bottom:14px}
 h1{font:800 30px/1 'Barlow Condensed',sans-serif;margin:0;letter-spacing:.02em;text-transform:uppercase}.sub{color:#a69ea3;font:600 12px 'Barlow Condensed',sans-serif;letter-spacing:.2em;text-transform:uppercase}
 h2{font:700 15px 'Barlow Condensed',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#ff5a68;margin:16px 0 8px}
 table{width:100%;border-collapse:collapse;table-layout:fixed}td,th{border:1px solid #2f2a2e;padding:7px 9px;vertical-align:top;text-align:left}th{background:#1b181c;font:700 13px 'Barlow Condensed',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#cbcbcb}
 .dt td{background:#161317}.dt td:nth-child(odd){color:#a69ea3;width:16%}.dt td:nth-child(even){font-weight:600}
 .mt{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.mt div{background:#1b181c;border:1px solid #2f2a2e;border-radius:10px;padding:10px;text-align:center}.mt b{display:block;font:800 26px/1 'Barlow Condensed',sans-serif}.mt span{color:#a69ea3;font-size:12px}
-.ml{display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 6px}.ml h2{margin:0}.ml span{color:#a69ea3;font-size:12px}
+.ml{display:flex;flex-wrap:wrap;gap:2px 12px;justify-content:space-between;align-items:baseline;margin:16px 0 6px}.ml h2{margin:0}.ml span{color:#a69ea3;font-size:12px}
 ul{margin:0;padding:0;list-style:none}li{padding:2px 0}li span{color:#a69ea3}.tt{margin-top:6px;padding-top:5px;border-top:1px dashed #2f2a2e;color:#a69ea3;font-size:11.5px}
 .pl{font:700 14px 'Barlow Condensed',sans-serif;letter-spacing:.03em;color:#f2eef0;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid #d71f30}.ft{margin-top:18px;color:#6d656a;font-size:11px;text-align:center}.blk{break-inside:avoid}
-@media print{.pg{padding:0}.noprint{display:none}}
+@media print{.pg{max-width:none;padding:9mm 9mm 6mm}.blk{padding-top:7mm}.blk .ml{margin-top:0}.noprint{display:none}}
 .noprint{position:fixed;right:16px;bottom:16px;background:#d71f30;color:#fff;border:0;border-radius:12px;padding:14px 20px;font:700 16px Barlow,sans-serif;cursor:pointer}</style></head>
 <body><div class="pg"><div class="hd">${MK}<div><div class="sub">Titanium Sport Center</div><h1>Pauta nutricional</h1></div></div>
 <h2>Datos personales</h2><table class="dt">${datos.reduce((rows, d, i) => { if (i % 2 === 0) rows.push([]); rows[rows.length - 1].push(d); return rows; }, []).map(row => `<tr>${row.map(([l, v]) => `<td>${esc(l)}</td><td>${esc(v)}</td>`).join('')}${row.length < 2 ? '<td></td><td></td>' : ''}</tr>`).join('')}</table>
@@ -336,8 +336,18 @@ ${pauta.comidas.map(c => `<div class="blk"><div class="ml"><h2>${esc(c.l)}</h2><
     const zoom = z => { try { const b = fr.contentDocument.body; b.style.zoom = z; } catch (_) {} };
     const ajustar = () => zoom(Math.min(1, (fr.clientWidth - 4) / 900));
     fr.addEventListener('load', ajustar); addEventListener('resize', ajustar);
-    v.addEventListener('click', e => { const b = e.target.closest('[data-pv]'); if (!b) return; if (b.dataset.pv === 'x') { removeEventListener('resize', ajustar); v.remove(); return; }
-      zoom(1); try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (_) { window.print(); } setTimeout(ajustar, 500); });
+    v.addEventListener('click', e => { const b = e.target.closest('[data-pv]'); if (!b) return; if (b.dataset.pv === 'x') { removeEventListener('resize', ajustar); v.remove(); document.getElementById('tl-print')?.remove(); document.getElementById('tl-print-css')?.remove(); return; }
+      imprimir(html); });
   }
-  window.TL_NUTRI = { verPDF, EXCL, DIETAS, dietaDe, coincide, exLabel, excluido, limpiar, metasDescanso, opDescanso, evolucion, OBJ, ACT, COMIDAS, CAT_L, datos, basal, calcMetas, generar, suma, medida, nombre, food, pdfHTML, factor, rol, rolDe, alternativas, cambiar, quitar, variar };
+  // imprime desde la página principal (en iPhone/iPad imprimir un iframe saca la pantalla de la app, no la pauta)
+  function imprimir(html) {
+    document.getElementById('tl-print')?.remove(); document.getElementById('tl-print-css')?.remove();
+    const d = new DOMParser().parseFromString(html, 'text/html'); d.querySelector('.noprint')?.remove();
+    const css = (d.querySelector('style')?.textContent || '').replace('html,body{', ':host{display:block;');
+    const host = document.createElement('div'); host.id = 'tl-print'; document.body.appendChild(host);
+    host.attachShadow({ mode: 'open' }).innerHTML = '<style>' + css + '</style>' + d.body.innerHTML;
+    const st = document.createElement('style'); st.id = 'tl-print-css';
+    st.textContent = '#tl-print{display:none}@media print{@page{size:A4;margin:0}html,body{background:#0e0c0f!important;margin:0!important;padding:0!important;zoom:1!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}body>*:not(#tl-print){display:none!important}#tl-print{display:block!important}}';
+    document.head.appendChild(st); setTimeout(() => window.print(), 60); } // queda oculto en pantalla; se borra al cerrar la vista
+  window.TL_NUTRI = { verPDF, imprimir, EXCL, DIETAS, dietaDe, coincide, exLabel, excluido, limpiar, metasDescanso, opDescanso, evolucion, OBJ, ACT, COMIDAS, CAT_L, datos, basal, calcMetas, generar, suma, medida, nombre, food, pdfHTML, factor, rol, rolDe, alternativas, cambiar, quitar, variar };
 })();
