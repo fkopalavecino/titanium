@@ -1049,6 +1049,7 @@ VIEWS.inicio = () => {
     <div class="tools"><a class="btn pri" href="#clase">Abrir clase de hoy</a><a class="btn" href="#pagos">Registrar pago</a></div>
   </section>
   <div class="grid2" style="align-items:start">${confirmacionesHTML()}${proximosAgendaHTML()}</div>
+  ${agendadasAppHTML()}
   <div class="grid2">
     <section class="card pad" style="display:grid;gap:12px;align-content:start">
       <div class="eyebrow">Tu próximo bloque</div>
@@ -3475,6 +3476,30 @@ async function cpDesactivar() { const s = await (await cpReg()).pushManager.getS
   S.cpush = false; toast('Avisos de asistencia desactivados'); schedule(); }
 /* ---------- Inicio: lo próximo en la agenda de alumnos (7 días) ---------- */
 const EV_ICO = { 'Reunión': '👥', 'Evaluación': '📋', 'Nutrición': '🥗', 'Documento': '📄', 'Actividad': '🏃', 'Evento': '⭐', 'Otro': '📌' };
+/* clases que los alumnos agendaron (agenda libre o recuperación) o cancelaron desde su app */
+let apAbierta = null; // null: se abre sola si hay algo nuevo (últimas 24 h)
+document.addEventListener('toggle', e => { if (e.target.id === 'ap-card') apAbierta = e.target.open; }, true);
+function agendadasAppHTML() {
+  const t = today(), m = addDays(t, 1), hasta = addDays(t, 14), ahora = Date.now(); const L = [];
+  S.dias.forEach((d, f) => { if (f < t || f > hasta) return; Object.entries(d.bloques || {}).forEach(([h, al]) => Object.entries(al || {}).forEach(([code, r]) => {
+    const rd = r && r.reagDe; if (!rd || !(rd.flex || rd.recup) || !S.alumnos.has(code)) return;
+    const at = rd.at ? Date.parse(rd.at) : NaN;
+    if (r.quitado) { if (rd.cancel && at && ahora - at < 48 * 3600e3) L.push({ f, h, code, tipo: 'cancel', at }); return; }
+    if (r.extra && !r.asis) L.push({ f, h, code, tipo: rd.flex ? 'flex' : 'recup', at }); })); });
+  if (!L.length) return '';
+  L.sort((a, b) => (a.f + a.h).localeCompare(b.f + b.h));
+  const nuevo = x => x.at && ahora - x.at < 24 * 3600e3; const nNuevo = L.filter(nuevo).length;
+  const abierta = apAbierta ?? nNuevo > 0;
+  const cuando = f => f === t ? 'Hoy' : f === m ? 'Mañana' : DNAME[DKEYS[parseISO(f).getDay()]].slice(0, 3) + ' ' + fmtD(f);
+  const TAG = { flex: ['📅 Agenda libre', 'ok'], recup: ['🔁 Recupera', 'warn'], cancel: ['↩️ Canceló', 'crit'] };
+  const ag = L.filter(x => x.tipo !== 'cancel').length, ca = L.length - ag;
+  return `<details class="sec" id="ap-card" ${abierta ? 'open' : ''} style="background:var(--sunk);border:1px solid var(--line)">
+    <summary><span>📲 Agendadas desde la app</span><span class="pill ok">${ag} próxima${ag === 1 ? '' : 's'}</span>${ca ? `<span class="pill crit">${ca} cancelada${ca === 1 ? '' : 's'}</span>` : ''}${nNuevo ? `<span class="pill warn">🆕 ${nNuevo}</span>` : ''}</summary>
+    <div style="display:grid;gap:2px">${L.map(x => `<button type="button" class="li" data-act="abrir-bloque" data-fecha="${esc(x.f)}" data-hora="${esc(x.h)}" style="width:100%;border:0;border-bottom:1px solid var(--line);background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;padding:9px 0;min-height:44px;${x.tipo === 'cancel' ? 'opacity:.7' : ''}">
+      <span style="min-width:96px;font-weight:700;font-variant-numeric:tabular-nums">${esc(cuando(x.f))} · ${esc(x.h)}</span>
+      <span class="grow"><b>${esc(nombre(x.code))}</b>${nuevo(x) ? ' <span class="pill warn" style="font-size:11px">🆕 nuevo</span>' : ''}</span>
+      <span class="pill ${TAG[x.tipo][1]}">${TAG[x.tipo][0]}</span></button>`).join('')}
+    <div class="small muted" style="margin-top:6px">Toca una para abrir ese bloque. Próximos 14 días · las cancelaciones se muestran por 48 h.</div></div></details>`; }
 let agAbierta = true;
 document.addEventListener('toggle', e => { if (e.target.id === 'ag-card') agAbierta = e.target.open; }, true);
 async function cargarProxEventos() { if (!window.__sb) return; const t = today();

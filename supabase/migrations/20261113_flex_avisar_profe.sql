@@ -1,3 +1,4 @@
 -- alumnos de agenda libre (flex): al agendar o cancelar se avisa al profe por push
 -- (se agregó «perform public._avisar_recup(c, p_fecha, p_hora, 'agenda_flex' | 'cancela_flex')» antes del return
 --  en public.agendar_flex y public.cancelar_flex; la función notificar distingue el texto por el sufijo _flex)
+-- agendar_flex además guarda reag_de.at (cuándo se agendó) para marcar «nuevo» en el Inicio del profe
