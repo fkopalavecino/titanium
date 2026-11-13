@@ -326,18 +326,54 @@ ${pauta.comidas.map(c => `<div class="blk"><div class="ml"><h2>${esc(c.l)}</h2><
   }
 
   // muestra la pauta dentro de la app (sin abrir otra ventana): así siempre se puede volver
+  // el PDF se arma aquí mismo (hojas A4 negras, sin bordes blancos ni la dirección web que agrega Safari al imprimir) y se comparte
+  const cargarJS = src => new Promise((ok, ko) => { if (document.querySelector('script[src="' + src + '"]')) { setTimeout(ok, 0); return; } const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = ko; document.head.appendChild(s); });
+  async function libsPDF() {
+    if (!window.html2canvas) await cargarJS('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    if (!window.jspdf) await cargarJS('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); }
+  async function armarPDF(doc) {
+    await libsPDF(); try { await doc.fonts.ready; } catch (_) {}
+    const pg = doc.querySelector('.pg'); pg.style.margin = '0'; pg.style.width = '900px'; pg.style.maxWidth = pg.style.minWidth = '900px'; await new Promise(r => setTimeout(r, 50)); const W = pg.offsetWidth, H = Math.round(W * 297 / 210), M = 34, S = 2;
+    const y0 = pg.getBoundingClientRect().top; const units = [];
+    // cada comida va entera en una página; datos + metas van juntos al inicio
+    [...pg.children].forEach(el => { const r = el.getBoundingClientRect(); if (!r.height) return;
+      const corta = el.classList.contains('blk') || (el.classList.contains('ft') && !units.some(u => u.ft));
+      if (!units.length || corta) units.push({ a: r.top - y0, b: r.bottom - y0, ft: el.classList.contains('ft') }); else units[units.length - 1].b = r.bottom - y0; });
+    const cv = await window.html2canvas(pg, { scale: S, backgroundColor: '#0e0c0f', useCORS: true, logging: false, windowWidth: doc.documentElement.clientWidth, windowHeight: doc.documentElement.scrollHeight });
+    const pags = []; let cur = null;
+    units.forEach(u => { if (cur && u.b - cur.a > H - 2 * M) { pags.push(cur); cur = null; } if (!cur) cur = { a: u.a, b: u.b }; else cur.b = u.b; });
+    if (cur) pags.push(cur);
+    const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', compress: true });
+    pags.forEach((pp, k) => { const c = document.createElement('canvas'); c.width = W * S; c.height = H * S; const x = c.getContext('2d');
+      x.fillStyle = '#0e0c0f'; x.fillRect(0, 0, c.width, c.height); const h = Math.min(pp.b - pp.a, H - 2 * M);
+      x.drawImage(cv, 0, pp.a * S, W * S, h * S, 0, M * S, W * S, h * S);
+      x.fillStyle = '#6d656a'; x.font = (10 * S) + 'px Barlow, sans-serif'; x.textAlign = 'right'; if (pags.length > 1) x.fillText((k + 1) + ' / ' + pags.length, (W - 22) * S, (H - 14) * S);
+      if (k) pdf.addPage(); pdf.addImage(c.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, 210, 297); });
+    pg.style.margin = pg.style.width = pg.style.maxWidth = pg.style.minWidth = ''; return pdf.output('blob'); }
   function verPDF(html) {
     document.getElementById('tl-pdfv')?.remove();
     const v = document.createElement('div'); v.id = 'tl-pdfv';
     v.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#0e0c0f;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)';
-    v.innerHTML = '<div style="display:flex;gap:8px;padding:10px 12px;border-bottom:1px solid #2f2a2e;align-items:center"><button data-pv="x" style="height:44px;padding:0 16px;border-radius:12px;border:1px solid #2f2a2e;background:#1b181c;color:#f2eef0;font:600 16px Barlow,sans-serif">‹ Volver</button><span style="flex:1"></span><button data-pv="p" style="height:44px;padding:0 16px;border-radius:12px;border:0;background:#d71f30;color:#fff;font:700 16px Barlow,sans-serif">Guardar PDF / Compartir</button></div><iframe title="Pauta nutricional" style="flex:1;border:0;width:100%;background:#0e0c0f"></iframe>';
-    document.body.appendChild(v); const fr = v.querySelector('iframe'); fr.srcdoc = html.replace('<button class="noprint" onclick="window.print()">Guardar PDF / Imprimir</button>', '');
+    v.innerHTML = '<div style="display:flex;gap:8px;padding:10px 12px;border-bottom:1px solid #2f2a2e;align-items:center"><button data-pv="x" style="height:44px;padding:0 16px;border-radius:12px;border:1px solid #2f2a2e;background:#1b181c;color:#f2eef0;font:600 16px Barlow,sans-serif">‹ Volver</button><span style="flex:1"></span><button data-pv="p" style="height:44px;padding:0 16px;border-radius:12px;border:0;background:#d71f30;color:#fff;font:700 16px Barlow,sans-serif">⏳ Preparando PDF…</button></div><iframe title="Pauta nutricional" style="flex:1;border:0;width:100%;background:#0e0c0f"></iframe>';
+    document.body.appendChild(v); const fr = v.querySelector('iframe'), bt = v.querySelector('[data-pv="p"]');
+    fr.srcdoc = html.replace('<button class="noprint" onclick="window.print()">Guardar PDF / Imprimir</button>', '');
+    const titulo = ((html.match(/<title>([^<]*)<\/title>/) || [])[1] || 'Pauta nutricional').replace(/&[^;]+;/g, '').replace(/\s*·\s*/g, ' - ').replace(/[\\/:*?"<>|]/g, '').trim();
     // en el celular se ve como la hoja completa (achicada), igual que el PDF
-    const zoom = z => { try { const b = fr.contentDocument.body; b.style.zoom = z; } catch (_) {} };
-    const ajustar = () => zoom(Math.min(1, (fr.clientWidth - 4) / 900));
-    fr.addEventListener('load', ajustar); addEventListener('resize', ajustar);
-    v.addEventListener('click', e => { const b = e.target.closest('[data-pv]'); if (!b) return; if (b.dataset.pv === 'x') { removeEventListener('resize', ajustar); v.remove(); document.getElementById('tl-print')?.remove(); document.getElementById('tl-print-css')?.remove(); return; }
-      imprimir(html); });
+    let armando = false; const zoom = z => { try { fr.contentDocument.body.style.zoom = z; } catch (_) {} };
+    const ajustar = () => { if (!armando) zoom(Math.min(1, (fr.clientWidth - 4) / 900)); };
+    let blob = null, fallo = false;
+    fr.addEventListener('load', async () => { ajustar(); armando = true; zoom(1); fr.style.visibility = 'hidden'; fr.style.cssText += ';position:absolute;left:0;top:0;width:944px;height:100%;flex:none';
+      await new Promise(r => setTimeout(r, 120));
+      try { blob = await armarPDF(fr.contentDocument); bt.textContent = '📤 Guardar PDF / Compartir'; }
+      catch (e) { console.warn('PDF', e); fallo = true; bt.textContent = 'Guardar PDF / Imprimir'; }
+      armando = false; fr.style.position = fr.style.left = fr.style.top = fr.style.width = fr.style.height = ''; fr.style.flex = '1'; fr.style.visibility = ''; ajustar(); }, { once: true });
+    addEventListener('resize', ajustar);
+    v.addEventListener('click', async e => { const b = e.target.closest('[data-pv]'); if (!b) return;
+      if (b.dataset.pv === 'x') { removeEventListener('resize', ajustar); v.remove(); document.getElementById('tl-print')?.remove(); document.getElementById('tl-print-css')?.remove(); return; }
+      if (fallo) { imprimir(html); return; } if (!blob) return; // todavía se está armando
+      const f = new File([blob], titulo + '.pdf', { type: 'application/pdf' });
+      if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f], title: titulo }); } catch (_) {} return; }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000); });
   }
   // imprime desde la página principal (en iPhone/iPad imprimir un iframe saca la pantalla de la app, no la pauta)
   function imprimir(html) {
