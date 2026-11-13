@@ -654,6 +654,46 @@ async function compartirFotos(btn) {
   btn.disabled = false; btn.textContent = t0;
 }
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-fshare]'); if (b) { ev.preventDefault(); compartirFotos(b); } });
+// imagen para historias: el pensamiento del día con el mismo formato de la tarjeta + logo Titanium
+async function compartirFrase(btn) {
+  const [tit, txt] = fraseDelDia(); const t0 = btn.innerHTML; btn.disabled = true; btn.textContent = '⏳';
+  const carga = src => new Promise((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = rej; im.src = src; });
+  try {
+    try { await Promise.all(['600 60px Barlow', '400 40px Barlow', 'italic 400 40px Barlow', '700 60px "Barlow Condensed"'].map(f => document.fonts?.load(f))); } catch (_) {}
+    const W = 1080, H = 1920, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+    g.fillStyle = '#0e0c0f'; g.fillRect(0, 0, W, H); g.strokeStyle = 'rgba(215,31,48,.18)'; g.lineWidth = 60; g.beginPath(); g.arc(W + 40, -40, 300, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(-60, H + 60, 260, 0, Math.PI * 2); g.stroke();
+    const wrap = (s, max) => { const out = []; let l = ''; s.split(' ').forEach(w => { const t = l ? l + ' ' + w : w; if (g.measureText(t).width > max && l) { out.push(l); l = w; } else l = t; }); if (l) out.push(l); return out; };
+    // medir la tarjeta
+    const pad = 70, cx = 60, cw = W - cx * 2, iw = cw - pad * 2;
+    g.font = '600 64px Barlow,sans-serif'; const lq = wrap('«' + txt + '»', iw); const lhQ = 86;
+    g.font = 'italic 400 36px Barlow,sans-serif'; const lb = wrap('Inspirado en los principios de Napoleon Hill · Piense y hágase rico y Más astuto que el diablo', iw); const lhB = 50;
+    const ch = pad + 44 + 50 + lq.length * lhQ + 30 + lb.length * lhB + pad - 10;
+    // logo arriba
+    let lgH = 0, lg = null; try { lg = await carga('logo-titanium.png'); lgH = 720 * lg.height / lg.width; } catch (_) {}
+    const total = lgH + 110 + ch; let y = Math.max(140, (H - total) / 2 - 40);
+    if (lg) { g.drawImage(lg, (W - 720) / 2, y, 720, lgH); y += lgH + 110; }
+    // tarjeta igual a la app
+    const gr = g.createLinearGradient(cx, y, cx + cw, y + ch); gr.addColorStop(0, '#2a0d12'); gr.addColorStop(0.6, '#1b181c'); gr.addColorStop(1, '#1b181c');
+    g.beginPath(); g.roundRect ? g.roundRect(cx, y, cw, ch, 40) : g.rect(cx, y, cw, ch); g.fillStyle = gr; g.fill(); g.lineWidth = 3; g.strokeStyle = '#4a1d24'; g.stroke();
+    let ty = y + pad + 30;
+    g.textBaseline = 'alphabetic'; g.textAlign = 'left'; g.fillStyle = '#e0505f'; g.font = '500 34px Barlow,sans-serif'; if ('letterSpacing' in g) g.letterSpacing = '4px';
+    g.fillText('PENSAMIENTO DEL DÍA', cx + pad, ty); if ('letterSpacing' in g) g.letterSpacing = '0px';
+    g.textAlign = 'right'; g.fillStyle = '#a79fa4'; g.font = '400 38px Barlow,sans-serif'; g.fillText(tit, cx + cw - pad, ty); g.textAlign = 'left';
+    ty += 50 + 64; g.fillStyle = '#f4f1f2'; g.font = '600 64px Barlow,sans-serif'; lq.forEach((l, i) => g.fillText(l, cx + pad, ty + i * lhQ));
+    ty += (lq.length - 1) * lhQ + 30 + lhB; g.fillStyle = '#a79fa4';
+    // atribución con títulos en cursiva (igual a la tarjeta)
+    const tk = [...'Inspirado en los principios de Napoleon Hill ·'.split(' ').map(w => [w, 0]), ...'Piense y hágase rico'.split(' ').map(w => [w, 1]), ['y', 0], ...'Más astuto que el diablo'.split(' ').map(w => [w, 1])];
+    const fI = it => (it ? 'italic ' : '') + '400 36px Barlow,sans-serif'; let x = cx + pad, ly = ty;
+    tk.forEach(([w, it], j) => { g.font = fI(it); const sp = j ? g.measureText(' ').width : 0, ww = g.measureText(w).width; if (x + sp + ww > cx + cw - pad && x > cx + pad) { x = cx + pad; ly += lhB; } else x += sp; g.fillText(w, x, ly); x += ww; });
+    g.textAlign = 'center'; g.fillStyle = '#a79fa4'; g.font = '600 36px "Barlow Condensed",sans-serif'; g.fillText('TITANIUMAPP.CL', W / 2, H - 70); g.fillStyle = '#d71f30'; g.fillRect(0, H - 16, W, 16);
+    const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.92)); if (!blob) throw new Error('canvas');
+    const file = new File([blob], 'titanium-pensamiento.jpg', { type: 'image/jpeg' });
+    let ok = false; if (navigator.canShare && navigator.canShare({ files: [file] })) ok = await navigator.share({ files: [file] }).then(() => true, e => e && e.name === 'AbortError');
+    if (!ok) { const u = URL.createObjectURL(blob); const l = document.createElement('a'); l.href = u; l.download = file.name; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); toast('Imagen descargada ✓'); }
+  } catch (e) { console.error(e); toast('No se pudo armar la imagen. Intenta de nuevo.'); }
+  btn.disabled = false; btn.innerHTML = t0;
+}
+document.addEventListener('click', ev => { const b = ev.target.closest('[data-frshare]'); if (b) { ev.preventDefault(); ev.stopPropagation(); compartirFrase(b); } });
 // las 3 fotos de una vez, en el orden elegido: frente, perfil, espalda
 async function subirFotos3Alumno(input) { const f = $('#fu-f')?.value || today(); const files = [...(input.files || [])].slice(0, 3); if (!files.length) return;
   const lbl = input.closest('label'); lbl?.classList.add('busy'); if (lbl?.firstChild) lbl.firstChild.textContent = '⏳ Subiendo ' + files.length + ' fotos…';
@@ -897,7 +937,7 @@ V.hoy = () => {
   <div style="display:flex;justify-content:center;padding:2px 0 6px;border-bottom:1px solid var(--line)">${TL_LOGO}</div>
   <div class="row" style="align-items:center;justify-content:flex-start;gap:12px"><button data-go="plan" aria-label="Mi perfil" style="background:none;border:0;padding:0;cursor:pointer">${avatarHTML('')}</button><div style="flex:1"><div class="eyebrow">${esc(longD(t))}</div><h1>Hola, ${esc(nombreC)}</h1>${ONL() ? `<span style="display:inline-flex;align-items:center;gap:6px;margin-top:4px;padding:3px 10px;border-radius:999px;border:1px solid rgba(215,31,48,.55);background:rgba(215,31,48,.12);font:700 12px Barlow,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#f2eef0">🌐 ${ONL_NOMBRE}</span>` : ''}${S.perfil?.meta ? `<div class="small muted">🎯 ${esc(S.perfil.meta)}</div>` : ''}</div>
 </div>
-  ${(() => { const [tit, txt] = fraseDelDia(); return `<section class="card" style="background:linear-gradient(135deg,#2a0d12,#1b181c 60%);border-color:#4a1d24"><div class="row"><span class="eyebrow red">Pensamiento del día</span><span class="small muted">${esc(tit)}</span></div><div style="font:600 19px/1.35 Barlow,sans-serif">«${esc(txt)}»</div><div class="small muted">Inspirado en los principios de Napoleon Hill · <i>Piense y hágase rico</i> y <i>Más astuto que el diablo</i></div></section>`; })()}
+  ${(() => { const [tit, txt] = fraseDelDia(); return `<section class="card" style="background:linear-gradient(135deg,#2a0d12,#1b181c 60%);border-color:#4a1d24"><div class="row" style="align-items:center"><span class="eyebrow red">Pensamiento del día</span><span style="display:flex;align-items:center;gap:8px"><span class="small muted">${esc(tit)}</span><button data-frshare aria-label="Compartir en historias" style="display:inline-flex;align-items:center;gap:5px;min-height:34px;padding:0 12px;border-radius:999px;border:1px solid #4a1d24;background:rgba(215,31,48,.14);color:#f4f1f2;font:600 13px Barlow,sans-serif;cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 8l5-5 5 5M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>Compartir</button></span></div><div style="font:600 19px/1.35 Barlow,sans-serif">«${esc(txt)}»</div><div class="small muted">Inspirado en los principios de Napoleon Hill · <i>Piense y hágase rico</i> y <i>Más astuto que el diablo</i></div></section>`; })()}
   ${mensajesHTML()}
   ${(() => { const nac = S.perfil?.nac || S.a.nacimiento; return nac && nac.slice(5) === t.slice(5) ? `<section class="card" style="background:linear-gradient(135deg,#d71f30,#7a0f1a);border-color:#d71f30;text-align:center"><div style="font-size:40px">🎂</div><div class="disp" style="font-size:28px;color:#fff">¡Feliz cumpleaños, ${esc(nombreC)}!</div><div style="color:#ffe3e6">Todo el equipo Titanium te desea un gran día. Hoy celebra… y entrena con todo 💪</div></section>` : ''; })()}
   <section class="card">
