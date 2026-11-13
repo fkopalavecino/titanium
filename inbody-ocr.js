@@ -12,6 +12,7 @@
     ['pmm', '% Músculo', '%', [], [5, 80], 1, 'sube', 'calc'],
     ['visceral', 'Grasa visceral', 'nivel', ['nivel de grasa visceral', 'grasa visceral', 'visceral fat level', 'visceral'], [1, 30], 0, 'baja'],
     ['tmb', 'Metabolismo basal', 'kcal', ['tasa metabolica basal', 'metabolismo basal', 'basal metabolic rate', 'bmr', 'tmb'], [800, 4500], 0, null],
+    ['edad', 'Edad metabólica', 'años', ['edad metabolica', 'edad corporal', 'edad biologica', 'metabolic age', 'body age'], [10, 100], 0, 'baja'],
     ['cintura', 'Cintura', 'cm', ['perimetro de cintura', 'circunferencia de cintura', 'cintura', 'waist circumference'], [50, 200], 1, 'baja'],
   ];
   /* Explicación y zonas de referencia (ACE para % grasa, OMS para IMC, InBody para visceral). */
@@ -34,6 +35,9 @@
       tip: 'La meta es mantenerla o subirla mientras bajas grasa.' },
     tmb: { que: 'Las calorías que tu cuerpo gasta en reposo solo para funcionar. Es la base para calcular cuánto comer.', zona: () => null,
       tip: 'Más músculo = metabolismo basal más alto.' },
+    edad: { que: 'La edad que refleja tu cuerpo según tu composición (músculo, grasa y metabolismo). Si es menor que tu edad real, vas muy bien.',
+      zona: (v, sexo, real) => real ? Z(Math.max(10, real - 20), real + 20, [[real - 0.5, 'Más joven que tu edad', 'ok'], [real + 0.5, 'Igual a tu edad', 'mid'], [999, 'Mayor que tu edad', 'warn']]) : null,
+      tip: 'Baja al ganar músculo y bajar grasa: la fuerza constante es lo que más la mueve.' },
     cintura: { que: 'Perímetro de cintura medido con huincha a la altura del ombligo. Es el mejor reflejo de la grasa abdominal.',
       zona: (v, sexo) => sexo === 'm' ? Z(55, 120, [[80, 'Saludable', 'ok'], [88, 'Elevado', 'mid'], [999, 'Alto', 'warn']])
         : sexo === 'h' ? Z(65, 130, [[94, 'Saludable', 'ok'], [102, 'Elevado', 'mid'], [999, 'Alto', 'warn']]) : null,
