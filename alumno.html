@@ -242,7 +242,7 @@ details.ses summary::-webkit-details-marker{display:none}
 <script src="inbody-ocr.js?v=20261111"></script>
 <script src="sonidos.js?v=2"></script>
 <script src="alimentos.js?v=20261113a"></script>
-<script src="nutri-calc.js?v=20261113a"></script>
+<script src="nutri-calc.js?v=20261113b"></script>
 <script>
 (async () => {
 const sb = window.__sb;
@@ -2109,7 +2109,12 @@ function nuNoComoHTML(abierto) { const N = NUT(), ex = nuExcl();
     <div class="small muted">¿Sigues una dieta? Un toque y tu pauta se arma sin carnes (y sin huevo ni lácteos si eres vegana/o), con tofu, legumbres, soya, tempeh o seitán.</div>
     <div class="chips" style="flex-wrap:wrap">${Object.entries(N.DIETAS).map(([k, [l, ks]]) => `<button class="chip" data-nuex="${ks.join(',')}" aria-pressed="${N.dietaDe(ex) === k}">${esc(l)}</button>`).join('')}</div>
     <div class="small muted">Marca lo que no comes (alergia, intolerancia o gusto). Tu pauta no los va a incluir.</div>
-    <div class="chips" style="flex-wrap:wrap">${Object.entries(N.EXCL).map(([k, [l]]) => `<button class="chip" data-nuex="${k}" aria-pressed="${ex.includes(k)}">${esc(l)}</button>`).join('')}</div></details>`; }
+    <div class="chips" style="flex-wrap:wrap">${Object.entries(N.EXCL).map(([k, [l]]) => `<button class="chip" data-nuex="${k}" aria-pressed="${ex.includes(k)}">${esc(l)}</button>`).join('')}</div>
+    <div style="display:grid;gap:6px;margin-top:4px"><b style="font-size:15px">⚠️ Otra alergia o alimento</b>
+      ${ex.filter(k => k.startsWith('x:')).map(k => { const c = N.coincide(k.slice(2)); return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:6px 6px 6px 12px;background:var(--sunk)"><span style="min-width:0"><b>${esc(k.slice(2))}</b><span class="small muted" style="display:block">${c.length ? 'Fuera de tu pauta: ' + esc(c.slice(0, 4).join(', ')) + (c.length > 4 ? '…' : '') : 'No está en la lista de alimentos · tu profe lo verá'}</span></span><button class="btn" data-nuex="${esc(k)}" style="width:auto;min-height:36px;padding:0 12px" aria-label="Quitar ${esc(k.slice(2))}">✕</button></div>`; }).join('')}
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px"><input id="nu-xin" type="text" maxlength="40" placeholder="Ej: kiwi, frutilla, mariscos" autocomplete="off" style="min-height:44px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--fg);padding:0 12px;font:500 16px Barlow,sans-serif"><button class="btn pri" data-nuxadd="1" style="width:auto;min-height:44px;padding:0 16px">Agregar</button></div></div></details>`; }
+// textos escritos por el alumno: separa por coma o «y», sin comas internas
+const nuXTextos = v => String(v || '').split(/,|;|\s+y\s+/i).map(x => x.replace(/[^\p{L}\p{N} ]/gu, '').replace(/\s+/g, ' ').trim().toLowerCase()).filter(x => x.length >= 3).slice(0, 6);
 /* ---------- lista de compras: suma los gramos de la pauta para X días (lo cocido se pasa a crudo) ---------- */
 const NU_CMP_CAT = [['ver', '🥦 Verdulería'], ['car', '🍗 Proteínas: carnes, huevos y tofu'], ['lac', '🥛 Lácteos'], ['pan', '🍞 Panadería'], ['aba', '🍚 Abarrotes'], ['des', '🧂 Despensa · revisa si ya tienes'], ['otr', '🛒 Otros']];
 // sección del supermercado
@@ -2164,6 +2169,7 @@ function nuCompraHTML() { const N = NUT(), P = S.nu.pauta, D = S.nuCmpD || 7, L 
     <div class="small muted">Todo va en crudo (como se compra) y redondeado hacia arriba. Toca un alimento para marcarlo.</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn pri" data-nucmpsh="1" style="min-height:42px">📲 Compartir</button><button class="btn" data-nucmpclr="1" style="min-height:42px">↺ Desmarcar todo</button></div></section>
     ${grupos || '<div class="small muted" style="padding:4px">Tu pauta no tiene alimentos.</div>'}`; }
+document.addEventListener('keydown', ev => { if (ev.target.id === 'nu-xin' && ev.key === 'Enter') { ev.preventDefault(); document.querySelector('[data-nuxadd]')?.click(); } });
 document.addEventListener('click', async ev => { const t = ev.target;
   const cp = t.closest('[data-nucompra]'); if (cp) { S.nuCompra = cp.dataset.nucompra === '1'; render(); window.scrollTo(0, 0); return; }
   const cd = t.closest('[data-nucmpd]'); if (cd) { S.nuCmpD = Number(cd.dataset.nucmpd); render(true); return; }
@@ -2250,13 +2256,14 @@ document.addEventListener('click', async ev => { const t = ev.target;
     if (!S.nu.pauta.base) S.nu.pauta.base = JSON.parse(JSON.stringify(S.nu.pauta.comidas));
     c.ops[oi] = N.variar(ant, c.meta, c.k, nuExcl()); render(true); vr.disabled = true;
     const { error } = await sb.rpc('nutri_set_pauta', { p_pauta: S.nu.pauta }); if (error) { c.ops[oi] = ant; render(true); toast('No se pudo guardar: ' + error.message); } return; }
-  const ex = t.closest('[data-nuex]'); if (ex) { const ks = ex.dataset.nuex.split(','); const cur = nuExcl(); const quita = ks.every(x => cur.includes(x)); const nw = quita ? cur.filter(x => !ks.includes(x)) : [...new Set([...cur, ...ks])]; const k = quita ? ks[0] : '__nuevo';
+  const ex = t.closest('[data-nuex],[data-nuxadd]'); if (ex) { let ks; if (ex.dataset.nuxadd) { const inp = document.getElementById('nu-xin'); ks = nuXTextos(inp?.value).map(x => 'x:' + x).filter(x => !nuExcl().includes(x)); if (!ks.length) { inp?.focus(); toast('Escribe el alimento, por ejemplo: kiwi'); return; } if (nuExcl().length + ks.length > 20) { toast('Son demasiados: quita alguno antes'); return; } } else ks = ex.dataset.nuex.split(','); const cur = nuExcl(); const quita = ks.every(x => cur.includes(x)); const nw = quita ? cur.filter(x => !ks.includes(x)) : [...new Set([...cur, ...ks])]; const k = quita ? ks[0] : '__nuevo';
     ex.disabled = true; const { error } = await sb.rpc('nutri_prefs', { p_excluir: nw }); if (error) { ex.disabled = false; toast('No se pudo guardar: ' + error.message); return; }
     S.nu.prefs = Object.assign({}, S.nu.prefs, { excluir: nw });
     // si la pauta trae algo que ya no come, se cambia solo (mismos macros)
     let cambios = 0; if (S.nu.pauta && !cur.includes(k)) { const N = NUT(); if (!S.nu.pauta.base) S.nu.pauta.base = JSON.parse(JSON.stringify(S.nu.pauta.comidas)); S.nu.pauta.comidas.forEach(c => { c.ops = c.ops.map(op => { if (!op.items.some(it => N.excluido(it.n, nw))) return op; cambios++; return N.limpiar({ items: op.items.map(x => Object.assign({}, x)) }, c.meta, c.k, nw); }); });
       if (cambios) await sb.rpc('nutri_set_pauta', { p_pauta: S.nu.pauta }); }
-    render(true); toast(cambios ? `Listo: cambié ${cambios} ${cambios === 1 ? 'opción' : 'opciones'} de tu pauta` : 'Guardado ✓'); return; }
+    const sinBase = !quita && ks.some(x => x.startsWith('x:') && !NUT().coincide(x.slice(2)).length);
+    render(true); toast(cambios ? `Listo: cambié ${cambios} ${cambios === 1 ? 'opción' : 'opciones'} de tu pauta` : sinBase ? 'Guardado ✓ Tu profe lo verá en tu ficha' : 'Guardado ✓'); return; }
 });
 document.addEventListener('click', async ev => {
   const t = ev.target;

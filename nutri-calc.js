@@ -202,7 +202,13 @@
   // dietas: un toque marca varios grupos
   const DIETAS = { vegetariana: ['🥗 Vegetariana', ['pollo', 'carne', 'cerdo', 'pescado']], vegana: ['🌱 Vegana', ['pollo', 'carne', 'cerdo', 'pescado', 'huevo', 'lacteos']] };
   const dietaDe = ex => { const e = ex || []; return ['vegana', 'vegetariana'].find(k => DIETAS[k][1].every(x => e.includes(x))) || ''; };
-  const excluido = (n, ex) => (ex || []).some(k => EXCL[k] && EXCL[k][1].test(n));
+  // alergias o alimentos escritos a mano: se guardan como 'x:texto' y excluyen todo alimento cuyo nombre lo contenga
+  const nrm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  const raiz = t => { const w = nrm(t); return w.length > 4 ? w.replace(/(es|s)$/, '') : w; };
+  const xMatch = (n, t) => { const r = raiz(t); return r.length >= 3 && nrm(n).includes(r); };
+  const coincide = t => [...new Set(BASE.filter(a => xMatch(a.n, t)).map(a => a.n.replace(' (escurrido)', '')))];
+  const exLabel = k => String(k).startsWith('x:') ? '⚠️ ' + k.slice(2) : (EXCL[k] || [k])[0];
+  const excluido = (n, ex) => (ex || []).some(k => String(k).startsWith('x:') ? xMatch(n, k.slice(2)) : EXCL[k] && EXCL[k][1].test(n));
   const DES_OK = { p: /Clara|Huevo|Yogur|cottage|Atún|whey|Quesillo|Pechuga de pavo|Proteína vegetal|Tofu|Tempeh/, c: /Pan|Avena|Galletas|Tortilla|Plátano|Manzana|Pera|Kiwi|Mandarina|Naranja/, g: /Almendras|Nueces|Maní|Mantequilla de maní|Palta|chía|Linaza/ };
   const COM_OK = { p: /Pechuga|Trutro|Carne molida|Vacuno|Lomo de cerdo|Merluza|Salmón|Atún|Jurel|Huevo|Clara|Tofu|Tempeh|Seitán|soya texturizada|Edamame/, c: /Arroz|Fideos|Quínoa|Papa|Camote|Choclo|Lentejas|Porotos|Garbanzos|Cuscús|Mote/, g: /Aceite de oliva|Palta|Aceitunas/ };
   // cambia los alimentos que no come por otros del mismo tipo que sí calcen con esa comida
@@ -263,7 +269,7 @@ ul{margin:0;padding:0;list-style:none}li{padding:2px 0}li span{color:#a69ea3}.tt
 <h2>Metas diarias</h2><div class="mt"><div><b>${nf(metas.kcal)}</b><span>kcal</span></div><div><b style="color:#ff5a68">${nf(metas.prot)} g</b><span>Proteína</span></div><div><b style="color:#f3b45b">${nf(metas.carb)} g</b><span>Carbohidratos</span></div><div><b style="color:#7cc0ff">${nf(metas.gras)} g</b><span>Grasas</span></div></div>
 ${pauta.comidas.map(c => `<div class="blk"><div class="ml"><h2>${esc(c.l)}</h2><span>≈ ${nf(c.meta.kcal)} kcal · P ${nf(c.meta.prot)} · C ${nf(c.meta.carb)} · G ${nf(c.meta.gras)} — elige 1 opción</span></div>
 <table><tr><th>Opción 1</th><th>Opción 2</th><th>Opción 3</th></tr><tr>${c.ops.map(cel).join('')}</tr></table></div>`).join('')}
-<div class="ft" style="color:#a69ea3;font-size:12px">😴 Días de descanso: come ¾ de la porción de carbohidratos (arroz, papa, pan, avena, fruta) ≈ ${nf(metasDescanso(metas).kcal)} kcal · C ${nf(metasDescanso(metas).carb)} g.${per.excluir && per.excluir.length ? ' · No incluye: ' + esc(per.excluir.map(k => (EXCL[k] || [k])[0].replace(/^\S+\s/, '')).join(', ')) + '.' : ''}</div>
+<div class="ft" style="color:#a69ea3;font-size:12px">😴 Días de descanso: come ¾ de la porción de carbohidratos (arroz, papa, pan, avena, fruta) ≈ ${nf(metasDescanso(metas).kcal)} kcal · C ${nf(metasDescanso(metas).carb)} g.${per.excluir && per.excluir.length ? ' · No incluye: ' + esc(per.excluir.map(k => exLabel(k).replace(/^\S+\s/, '')).join(', ')) + '.' : ''}</div>
 <div class="ft">Pesos en gramos según se indica (cocido o crudo). Verduras libres. Agua 2–3 litros al día. · Titanium Sport Center · ${esc(per.coach || 'Franco Palavecino')}</div></div>
 <button class="noprint" onclick="window.print()">Guardar PDF / Imprimir</button></body></html>`;
   }
@@ -282,5 +288,5 @@ ${pauta.comidas.map(c => `<div class="blk"><div class="ml"><h2>${esc(c.l)}</h2><
     v.addEventListener('click', e => { const b = e.target.closest('[data-pv]'); if (!b) return; if (b.dataset.pv === 'x') { removeEventListener('resize', ajustar); v.remove(); return; }
       zoom(1); try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (_) { window.print(); } setTimeout(ajustar, 500); });
   }
-  window.TL_NUTRI = { verPDF, EXCL, DIETAS, dietaDe, excluido, limpiar, metasDescanso, opDescanso, evolucion, OBJ, ACT, COMIDAS, CAT_L, datos, basal, calcMetas, generar, suma, medida, nombre, food, pdfHTML, factor, rol, rolDe, alternativas, cambiar, quitar, variar };
+  window.TL_NUTRI = { verPDF, EXCL, DIETAS, dietaDe, coincide, exLabel, excluido, limpiar, metasDescanso, opDescanso, evolucion, OBJ, ACT, COMIDAS, CAT_L, datos, basal, calcMetas, generar, suma, medida, nombre, food, pdfHTML, factor, rol, rolDe, alternativas, cambiar, quitar, variar };
 })();
