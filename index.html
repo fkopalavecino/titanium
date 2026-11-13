@@ -1116,10 +1116,10 @@ VIEWS.inicio = () => {
         const rt = ult?.r.rutina && S.rutinas.get(ult.r.rutina);
         const det = ult ? `Última: ${diffDays(ult.f, t) === 0 ? 'hoy' : diffDays(ult.f, t) === 1 ? 'ayer' : esc(DSHORT[dayKey(ult.f)] + ' ' + fmtD(ult.f))}${rt ? ' · ' + esc(rt.tipo || '') : ''}${ult.r.rpe != null ? ' · RPE ' + esc(ult.r.rpe) : ' · sin terminar'}` : 'Aún no registra sesiones';
         const tono = !ult || diffDays(ult.f, t) >= 7 ? 'crit' : sem.length < Math.min(meta, ((parseISO(t).getDay() + 6) % 7) + 1) - 1 ? 'warn' : 'ok';
-        return `<div class="seg-row"><span class="ic">🌐</span><div class="grow" style="flex:1;min-width:0"><button class="st-name" data-act="ficha" data-id="${esc(a.codigo)}" style="border:0;background:none;padding:0;cursor:pointer;font-size:15px;text-align:left">${esc(a.nombre)}</button><div class="small muted">${det}${pe ? ' · sem ' + Math.min(pe.semana, pe.total) + '/' + pe.total : ''}</div></div><span class="count ${tono === 'crit' ? 'crit' : tono === 'warn' ? '' : 'zero'}" title="Sesiones terminadas esta semana">${sem.length}${meta ? '/' + meta : ''}</span></div>`; };
+        return `<div class="seg-row"><span class="ic">🌐</span><div class="grow" style="flex:1;min-width:0"><button class="st-name" data-act="ficha" data-id="${esc(a.codigo)}" style="border:0;background:none;padding:0;cursor:pointer;font-size:15px;text-align:left">${esc(a.nombre)}</button><div class="small muted">${det}${pe ? ' · sem ' + Math.min(pe.semana, pe.total) + '/' + pe.total : ''}</div></div><span class="count ${tono === 'crit' ? 'crit' : tono === 'warn' ? '' : 'zero'}" title="Sesiones terminadas esta semana">${sem.length}${meta ? '/' + meta : ''}</span>${ult ? `<button type="button" class="btn sm pri" data-act="on-ses" data-id="${esc(a.codigo)}" style="flex:none">Ver sesión</button>` : ''}</div>`; };
       return `<section class="card pad">
       <h2 style="font-size:22px;margin-bottom:2px">Alumnos online</h2>
-      <p class="muted small" style="margin:0 0 6px">Sesiones terminadas esta semana (de lunes a hoy) y su última sesión. Toca el nombre para ver sus cargas.</p>
+      <p class="muted small" style="margin:0 0 6px">Sesiones terminadas esta semana (de lunes a hoy). Toca «Ver sesión» para ver lo que hizo y anotó.</p>
       <div>${ons.map(fila).join('')}</div></section>`; })()}
   </div>
   ${S.nuRes && S.nuRes.size ? (() => { const ls = [...S.nuRes].filter(([k]) => S.alumnos.has(k)).sort((x, y) => (y[1].revisar - x[1].revisar) || (x[1].dias - y[1].dias)); if (!ls.length) return '';
@@ -1732,6 +1732,35 @@ VIEWS.registro = () => {
 
 /* ---------- modal ---------- */
 let modalSubmit = null;
+/* alumnos online: ver con un toque la sesión que hizo (series, cargas, RPE, nota) y compararla con la anterior */
+function onlineSesiones(code) { const out = []; for (const [f, d] of S.dias) { const r = d.bloques?.online?.[code]; if (r && (r.rpe != null || r.notas || r.nota || (r.ej || []).some(x => setsOf(x).length))) out.push({ f, r }); } return out.sort((a, b) => b.f.localeCompare(a.f)); }
+function verSesionOnline(code, f) {
+  const ses = onlineSesiones(code); if (!ses.length) { toast('Aún no registra sesiones'); return; }
+  const i = Math.max(0, ses.findIndex(x => x.f === f)), s = ses[i], prev = ses.slice(i + 1), t = today();
+  const rt = s.r.rutina && S.rutinas.get(s.r.rutina);
+  const cuando = x => diffDays(x, t) === 0 ? 'Hoy' : diffDays(x, t) === 1 ? 'Ayer' : DSHORT[dayKey(x)] + ' ' + fmtD(x);
+  const antDe = n => { const k = norm(limpiarEj(n)); for (const p of prev) { const e = (p.r.ej || []).find(x => norm(limpiarEj(x.n)) === k); if (e && setsOf(e).length) return { f: p.f, e }; } return null; };
+  const mejor = e => setsOf(e).reduce((m, x) => { const kg = Number(x.kg) || 0, r = Number(x.r) || 0, tt = Number(x.t) || 0; return Math.max(m, kg * 1000 + r + tt); }, 0);
+  const vol = e => setsOf(e).reduce((v, x) => v + (Number(x.kg) || 0) * (Number(x.r) || 0), 0);
+  const chips = ses.slice(0, 10).map(x => `<button type="button" class="chip" data-act="on-ses" data-id="${esc(code)}" data-f="${esc(x.f)}" aria-pressed="${x.f === s.f}" style="${x.f === s.f ? 'background:var(--red);border-color:var(--red);color:#fff' : ''}">${esc(cuando(x.f))}${x.r.rpe != null ? ' · ' + esc(x.r.rpe) : ''}</button>`).join('');
+  const ejs = (s.r.ej || []).filter(x => x && x.n);
+  const filas = ejs.map(e => { const ss = setsOf(e).filter(x => x.kg != null || x.r != null || x.t != null); const a = antDe(e.n);
+    let tr = ''; if (ss.length && a) { const d = mejor(e) - mejor(a.e), dv = vol(e) - vol(a.e); tr = d > 0 || (d === 0 && dv > 0) ? '<span style="color:var(--ok);font-weight:800">▲ subió</span>' : d < 0 ? '<span style="color:var(--crit);font-weight:800">▼ bajó</span>' : '<span class="muted" style="font-weight:700">= igual</span>'; }
+    return `<div style="border-top:1px solid var(--line);padding:10px 0;display:grid;gap:6px">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:15px">${esc(limpiarEj(e.n))}</b><span class="small muted" style="white-space:nowrap">${e.s ? esc(e.s) + ' × ' + esc(e.r ?? '') : ''}</span></div>
+      ${e.c ? `<div class="small muted">📝 ${esc(e.c)}</div>` : ''}
+      ${ss.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${ss.map((x, k) => `<span style="border:1px solid var(--line);background:var(--sunk);border-radius:8px;padding:5px 9px;font-weight:700;font-variant-numeric:tabular-nums"><span class="muted" style="font-weight:500">${k + 1}·</span> ${esc(fmtSetC(x))}</span>`).join('')}</div>` : '<div class="small" style="color:var(--warn)">Sin anotar</div>'}
+      ${a ? `<div class="small muted">Antes (${esc(cuando(a.f))}): ${esc(fmtSets(a.e))} ${tr}</div>` : ss.length ? '<div class="small muted">Primera vez que lo anota</div>' : ''}</div>`; }).join('');
+  const anot = ejs.filter(e => setsOf(e).length).length;
+  const body = `<div style="display:grid;gap:12px">
+    <div class="chips" style="overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px">${chips}</div>
+    <div style="display:grid;gap:4px"><div style="font:700 19px/1.2 inherit">${esc(rt?.tipo || s.r.rutina || 'Sesión')}</div>
+      <div class="small muted">${esc(longDate(s.f))} · ${anot}/${ejs.length} ejercicios anotados${rt?.minutos ? ' · ~' + esc(rt.minutos) + ' min' : ''}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${s.r.rpe != null ? `<span class="pill ${Number(s.r.rpe) >= 9 ? 'crit' : Number(s.r.rpe) >= 7 ? 'warn' : 'ok'}">RPE ${esc(s.r.rpe)}</span>` : '<span class="pill">Sin terminar</span>'}${s.r.carga ? `<span class="pill">⏱ ${esc(s.r.carga)}</span>` : ''}</div>
+      ${s.r.notas || s.r.nota ? `<div style="background:var(--red-soft);border-radius:8px;padding:8px 10px;margin-top:4px"><b class="small">💬 Nota del alumno</b><div>${esc(s.r.notas || s.r.nota)}</div></div>` : ''}</div>
+    <div>${filas || '<div class="small muted">No anotó ejercicios en esta sesión.</div>'}</div></div>`;
+  openModal('🌐 ' + nombre(code), body, { wide: true, cancel: 'Cerrar', extra: `<button type="button" class="btn" data-act="ficha" data-id="${esc(code)}" data-tab="progreso">Ver su progreso</button><button type="button" class="btn" data-act="msg" data-id="${esc(code)}">💬 Mensaje</button>` });
+}
 function openModal(title, body, {submit = 'Guardar', onSubmit = null, extra = '', wide = false, cancel = 'Cancelar'} = {}) {
   const m = $('#modal');
   // si abres algo desde el perfil de un alumno (abonar, reagendar, mensaje…), al cerrarlo vuelves a su perfil
@@ -3194,6 +3223,7 @@ document.addEventListener('click', e => {
       if (val('pf-obj') && !(v >= 30 && v <= 250)) { toast('Escribe un peso entre 30 y 250 kg.', true); break; }
       a.ingreso = Object.assign({}, a.ingreso || {}, {pesoObj: val('pf-obj') ? v : null}); saveAlumno(a); toast(val('pf-obj') ? `Objetivo: ${n1(v)} kg 🎯` : 'Objetivo quitado.'); refrescarCuerpo(id); break; }
     case 'ficha': fichaAlumno(id, el.dataset.tab); break;
+    case 'on-ses': verSesionOnline(id, el.dataset.f); break;
     case 'abrir-bloque': S.ui.claseFecha = el.dataset.fecha; S.ui.claseHora = el.dataset.hora; location.hash = '#clase'; if (S.view === 'clase') render(); break;
     case 'clase-hoy': e.preventDefault(); S.ui.claseFecha = null; S.ui.claseHora = null; render(); break;
     case 'clase-hora': S.ui.claseHora = el.dataset.hora; render(); break;
