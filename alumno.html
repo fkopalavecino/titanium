@@ -654,7 +654,7 @@ async function compartirFotos(btn) {
   btn.disabled = false; btn.textContent = t0;
 }
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-fshare]'); if (b) { ev.preventDefault(); compartirFotos(b); } });
-// imagen para historias: PNG recortado igual al inicio de la app (fecha, foto, "Hola, nombre" y el pensamiento del día)
+// imagen para historias: PNG recortado igual al inicio de la app (logo, fecha, foto, "Hola, nombre" y el pensamiento del día)
 async function compartirFrase(btn) {
   const [tit, txt] = fraseDelDia(); const t0 = btn.innerHTML; btn.disabled = true; btn.textContent = '⏳';
   const carga = src => new Promise((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = rej; im.src = src; });
@@ -676,7 +676,10 @@ async function compartirFrase(btn) {
     let ax = 0, al = 0; const pos = tk.map(([w, it], j) => { g.font = fA(it); const sp = j ? g.measureText(' ').width : 0, ww = g.measureText(w).width; if (ax + sp + ww > CW - 34 && ax > 0) { ax = 0; al++; } else ax += sp; const p = [w, it, ax, al]; ax += ww; return p; });
     const txH = 13 + 4 + 32 + (onl ? 4 + 21 : 0) + (meta ? 18 : 0), hdH = Math.max(48, txH);
     const cardH = 16 + 15 + 10 + lq.length * lhQ + 10 + (al + 1) * lhA + 16 + 2;
-    const M = 18, H = M + hdH + 14 + cardH + M; cv.height = Math.round(H * s); g = cv.getContext('2d'); g.scale(s, s); g.fillStyle = C.bg; g.fillRect(0, 0, W, H); let y = M;
+    const M = 18, logoH = 30, H = M + 2 + logoH + 6 + 1 + 14 + hdH + 14 + cardH + M; cv.height = Math.round(H * s); g = cv.getContext('2d'); g.scale(s, s); g.fillStyle = C.bg; g.fillRect(0, 0, W, H); let y = M;
+    // logo + línea, igual que arriba en la app
+    try { const svg = TL_LOGO.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="1011" height="200" '); const lg = await carga('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)); const lw = logoH * 2331 / 461; g.drawImage(lg, (W - lw) / 2, y + 2, lw, logoH); } catch (_) {}
+    y += 2 + logoH + 6; g.fillStyle = C.line; g.fillRect(X, y, CW, 1); y += 1 + 14;
     // encabezado: foto + fecha + Hola + etiqueta
     const ay = y + (hdH - 48) / 2; g.save(); g.beginPath(); g.arc(X + 24, ay + 24, 24, 0, Math.PI * 2); g.clip();
     const u = S.perfil?.avatar && S.urls[S.perfil.avatar]; let avOk = false;
