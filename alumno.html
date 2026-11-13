@@ -2109,31 +2109,57 @@ function nuNoComoHTML(abierto) { const N = NUT(), ex = nuExcl();
     <div class="small muted">Marca lo que no comes (alergia, intolerancia o gusto). Tu pauta no los va a incluir.</div>
     <div class="chips" style="flex-wrap:wrap">${Object.entries(N.EXCL).map(([k, [l]]) => `<button class="chip" data-nuex="${k}" aria-pressed="${ex.includes(k)}">${esc(l)}</button>`).join('')}</div></details>`; }
 /* ---------- lista de compras: suma los gramos de la pauta para X días (lo cocido se pasa a crudo) ---------- */
-const NU_CMP_CAT = [['p', '🍗 Proteínas'], ['c', '🍚 Carbohidratos y panes'], ['v', '🥦 Verduras'], ['fr', '🍎 Frutas'], ['g', '🥑 Grasas y frutos secos'], ['f', '🛒 Otros']];
+const NU_CMP_CAT = [['ver', '🥦 Verdulería'], ['car', '🍗 Carnes, pescados y huevos'], ['lac', '🥛 Lácteos'], ['pan', '🍞 Panadería'], ['aba', '🍚 Abarrotes'], ['des', '🧂 Despensa · revisa si ya tienes'], ['otr', '🛒 Otros']];
+// sección del supermercado
+function nuCmpSec(n) {
+  if (/^(Aceite|Mantequilla$|Mantequilla de maní|Mayonesa|Azúcar|Miel|Mermelada|Manjar|Ketchup|Semillas de chía|Linaza|Harina|Café|Proteína whey|Queso parmesano|Crema de leche)/.test(n)) return 'des';
+  if (/^(Pechuga|Trutro|Pollo|Carne molida|Vacuno|Lomo de cerdo|Salmón|Merluza|Huevo|Clara|Jamón|Vienesa|Tofu)/.test(n)) return 'car';
+  if (/^(Leche|Yogur|Queso|Quesillo|Bebida de almendras)/.test(n)) return 'lac';
+  if (/^(Pan |Tortilla de trigo|Galletas)/.test(n)) return 'pan';
+  if (/^(Papa$|Camote|Choclo|Palta|Plátano|Manzana|Naranja|Mandarina|Pera|Frutillas|Arándanos|Frambuesas|Kiwi|Uvas|Durazno|Piña|Sandía|Melón|Mango|Lechuga|Tomate|Pepino|Zanahoria|Brócoli|Coliflor|Zapallo|Espinaca|Cebolla|Pimentón|Champiñones|Porotos verdes|Betarraga|Repollo|Arvejas)/.test(n)) return 'ver';
+  if (/^(Arroz|Fideos|Quínoa|Avena|Lentejas|Porotos|Garbanzos|Cuscús|Mote|Atún|Jurel|Almendras|Nueces|Maní|Aceitunas|Hummus|Granola|Cereal|Pasas|Dátiles|Chocolate)/.test(n)) return 'aba';
+  return 'otr'; }
+// cómo se compra: [gramos por unidad, singular, plural]; lo que no está aquí se compra por peso
+const NU_BUY = { 'Huevo entero': [50, 'un.', 'un.'], 'Clara de huevo': [33, 'clara', 'claras'], 'Yogur natural': [125, 'un.', 'un.'], 'Yogur proteico': [155, 'un.', 'un.'], 'Yogur griego natural 0%': [150, 'un.', 'un.'], 'Yogur griego entero': [150, 'un.', 'un.'],
+  'Atún en agua (escurrido)': [120, 'lata', 'latas'], 'Atún en aceite (escurrido)': [120, 'lata', 'latas'], 'Jurel en lata': [250, 'lata', 'latas'], 'Pan marraqueta': [100, 'un.', 'un.'], 'Pan hallulla': [90, 'un.', 'un.'],
+  'Pan de molde blanco': [27, 'rebanada', 'rebanadas'], 'Pan de molde integral': [30, 'rebanada', 'rebanadas'], 'Pan pita integral': [60, 'un.', 'un.'], 'Tortilla de trigo (wrap)': [40, 'un.', 'un.'], 'Galletas de arroz': [9, 'un.', 'un.'],
+  'Palta': [160, 'un.', 'un.'], 'Plátano': [120, 'un.', 'un.'], 'Manzana': [180, 'un.', 'un.'], 'Naranja': [150, 'un.', 'un.'], 'Mandarina': [80, 'un.', 'un.'], 'Pera': [170, 'un.', 'un.'], 'Kiwi': [75, 'un.', 'un.'], 'Durazno': [150, 'un.', 'un.'],
+  'Lechuga': [300, 'un.', 'un.'], 'Tomate': [120, 'un.', 'un.'], 'Pepino': [250, 'un.', 'un.'], 'Zanahoria': [70, 'un.', 'un.'], 'Zapallo italiano': [200, 'un.', 'un.'], 'Cebolla': [150, 'un.', 'un.'], 'Pimentón': [150, 'un.', 'un.'], 'Brócoli': [400, 'un.', 'un.'], 'Coliflor': [600, 'un.', 'un.'], 'Repollo': [1000, 'un.', 'un.'],
+  'Leche entera': [1000, 'litro', 'litros'], 'Leche semidescremada': [1000, 'litro', 'litros'], 'Leche descremada': [1000, 'litro', 'litros'], 'Bebida de almendras sin azúcar': [1000, 'litro', 'litros'], 'Proteína whey (polvo)': [30, 'scoop', 'scoops'] };
+const NU_CMP_CUCH = { 'Aceite de oliva': 13, 'Aceite vegetal': 13, 'Mantequilla': 14, 'Mayonesa': 14, 'Mayonesa light': 14, 'Azúcar': 12, 'Miel': 21, 'Mermelada': 15, 'Manjar': 20, 'Ketchup': 15, 'Semillas de chía': 12, 'Linaza molida': 10, 'Harina de trigo': 10, 'Queso parmesano': 5, 'Crema de leche': 15, 'Mantequilla de maní': 16 };
 function nuCompraOpDef(ci) { // opción que más anotó en 14 días; si no anotó ninguna, rota las 3
   const cnt = {}; (S.nuLog || []).filter(r => r.fecha >= addDays(today(), -14) && String(r.pauta_op || '').startsWith(ci + '.')).forEach(r => { const o = r.pauta_op.split('.')[1]; cnt[o] = (cnt[o] || 0) + 1; });
   const ks = Object.keys(cnt); return ks.length ? Number(ks.sort((a, b) => cnt[b] - cnt[a])[0]) : 'rot'; }
-function nuCmpRol(N, it) { const r = N.rolDe(it); if (r !== 'f') return r; const f = N.food(it.n, it.e); return f && f.kcal && f.prot * 4 >= f.kcal * .25 ? 'p' : N.rol({ n: it.n, e: it.e }); }
 function nuCompraLista() { const N = NUT(), P = S.nu.pauta, D = S.nuCmpD || 7, sel = S.nuCmpOp || {}; const tot = new Map();
+  const suma = (n, g) => { const x = tot.get(n) || { n, g: 0, sec: nuCmpSec(n) }; x.g += g; tot.set(n, x); };
   P.comidas.forEach((c, ci) => { const o = sel[ci] ?? nuCompraOpDef(ci); const k = c.ops.length || 1;
     c.ops.forEach((op, oi) => { const dias = o === 'rot' ? Math.floor(D / k) + (oi < D % k ? 1 : 0) : (oi === o ? D : 0); if (!dias) return;
-      op.items.forEach(it => { let n = it.n, e = it.e || '', g = (Number(it.g) || 0) * dias;
-        if (e === 'cocido') { const fc = N.food(n, 'cocido'), fr = N.food(n, 'crudo'); if (fc && fr && fr.e === 'crudo' && fr.kcal) { g = g * fc.kcal / fr.kcal; e = 'crudo'; } }
-        const key = n + '|' + e; const x = tot.get(key) || { n, e, g: 0, r: nuCmpRol(N, it) }; x.g += g; tot.set(key, x); }); }); });
-  return [...tot.values()].filter(x => x.g > 0).sort((a, b) => b.g - a.g); }
-const nuCmpG = g => g >= 1000 ? nuNf1.format(Math.round(g / 100) / 10) + ' kg' : nuNf.format(Math.ceil(g / 10) * 10) + ' g';
+      op.items.forEach(it => { let g = (Number(it.g) || 0) * dias; if (!g) return;
+        if (it.e === 'cocido') { const fc = N.food(it.n, 'cocido'), fr = N.food(it.n, 'crudo'); if (fc && fr && fr.e === 'crudo' && fr.kcal) g = g * fc.kcal / fr.kcal; }
+        if (/^Ensalada surtida/.test(it.n)) { suma('Lechuga', g * .4); suma('Tomate', g * .35); suma('Pepino', g * .25); return; }
+        suma(it.n, g); }); }); });
+  return [...tot.values()].sort((a, b) => b.g - a.g); }
+// peso redondeado hacia arriba a algo que se pide en la feria o la carnicería
+const nuCmpG = g => { const r = Math.max(50, Math.ceil(g / 50) * 50); return r >= 1000 ? nuNf1.format(Math.ceil(g / 100) / 10) + ' kg' : nuNf.format(r) + ' g'; };
+const nuCmpNom = n => n.replace(' (escurrido)', '').replace(' (polvo)', '');
+// { q: lo que compras (grande), s: detalle (chico) }
+function nuCmpCant(x) { const u = NU_BUY[x.n];
+  if (u) { const q = Math.max(1, Math.ceil(x.g / u[0] - .2)); return { q: q + ' ' + (q === 1 ? u[1] : u[2]), s: '≈ ' + nuCmpG(x.g) }; }
+  const c = NU_CMP_CUCH[x.n]; if (c) { const q = Math.max(1, Math.round(x.g / c)); return { q: q + (q === 1 ? ' cucharada' : ' cucharadas'), s: '≈ ' + nuCmpG(x.g) + '' }; }
+  const m = /filete|bistec|chuleta|presa|porción/.test((NUT().food(x.n, 'crudo') || {}).pn || '') ? NUT().medida(x.n, 'crudo', x.g) : '';
+  return { q: nuCmpG(x.g), s: m ? m.replace(/porciones?/, x.n.startsWith('Carne molida') ? 'porciones de 150 g' : '$&') : '' }; }
 const nuCmpHecho = () => { try { return JSON.parse(localStorage.getItem('nuCmp_' + codigo) || '[]'); } catch (_) { return []; } };
 function nuCompraHTML() { const N = NUT(), P = S.nu.pauta, D = S.nuCmpD || 7, L = nuCompraLista(), ok = new Set(nuCmpHecho());
   const dias = `<div class="chips">${[3, 7, 14].map(d => `<button class="chip" data-nucmpd="${d}" aria-pressed="${d === D}">${d} días</button>`).join('')}</div>`;
   const ops = P.comidas.map((c, ci) => { const o = (S.nuCmpOp || {})[ci] ?? nuCompraOpDef(ci);
     return `<div style="display:grid;gap:4px"><span class="small muted">${esc(c.l)}</span><div class="chips">${[['rot', '🔄 Rotar'], ...c.ops.map((_, oi) => [oi, 'Opción ' + (oi + 1)])].map(([v, l]) => `<button class="chip" data-nucmpop="${ci}|${v}" aria-pressed="${String(o) === String(v)}">${l}</button>`).join('')}</div></div>`; }).join('');
-  const grupos = NU_CMP_CAT.map(([k, l]) => { const xs = L.filter(x => (NU_CMP_CAT.some(c => c[0] === x.r) ? x.r : 'f') === k); if (!xs.length) return '';
-    return `<section class="card" style="gap:2px"><h2 style="font-size:20px">${l}</h2>${xs.map(x => { const id = x.n + '|' + x.e, h = ok.has(id), med = N.medida(x.n, x.e, x.g);
-      return `<button data-nucmpx="${esc(id)}" style="display:flex;justify-content:space-between;gap:10px;align-items:center;border:0;border-top:1px solid var(--line);background:none;color:${h ? 'var(--muted)' : 'var(--fg)'};padding:10px 0;text-align:left;font:500 16px Barlow,sans-serif;cursor:pointer;width:100%;min-height:44px${h ? ';text-decoration:line-through' : ''}"><span>${h ? '✅' : '⬜'} ${esc(N.nombre(x.n, x.e))}${med ? ` <span class="small muted">${esc(med)}</span>` : ''}</span><b style="white-space:nowrap">${nuCmpG(x.g)}</b></button>`; }).join('')}</section>`; }).join('');
+  const grupos = NU_CMP_CAT.map(([k, l]) => { const xs = L.filter(x => x.sec === k); if (!xs.length) return '';
+    return `<section class="card" style="gap:2px"><h2 style="font-size:20px">${l}</h2>${xs.map(x => { const h = ok.has(x.n), c = nuCmpCant(x);
+      return `<button data-nucmpx="${esc(x.n)}" style="display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;border:0;border-top:1px solid var(--line);background:none;color:${h ? 'var(--muted)' : 'var(--fg)'};padding:10px 0;text-align:left;cursor:pointer;width:100%;min-height:48px${h ? ';opacity:.55' : ''}"><span style="font-size:20px">${h ? '✅' : '⬜'}</span><span style="min-width:0;display:grid;gap:1px"><span style="font:600 16px Barlow,sans-serif${h ? ';text-decoration:line-through' : ''}">${esc(nuCmpNom(x.n))}</span>${c.s ? `<span class="small muted">${esc(c.s)}</span>` : ''}</span><b style="font:800 19px 'Barlow Condensed',sans-serif;white-space:nowrap;text-align:right">${esc(c.q)}</b></button>`; }).join('')}</section>`; }).join('');
   return `<section class="card" style="gap:10px"><div class="row" style="align-items:center"><h2>🛒 Lista de compras</h2><button class="btn" data-nucompra="0" style="width:auto;min-height:36px;padding:0 12px">‹ Mi pauta</button></div>
     <div class="small muted">Para cuántos días compras:</div>${dias}
     <details><summary class="small" style="cursor:pointer;min-height:32px">Qué opción comes en cada comida</summary><div style="display:grid;gap:8px;margin-top:8px">${ops}</div></details>
-    <div class="small muted">Lo cocido (arroz, fideos, carnes…) aparece en crudo, que es como se compra. Toca un alimento para marcarlo.</div>
+    <div class="small muted">Todo va en crudo (como se compra) y redondeado hacia arriba. Toca un alimento para marcarlo.</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn pri" data-nucmpsh="1" style="min-height:42px">📲 Compartir</button><button class="btn" data-nucmpclr="1" style="min-height:42px">↺ Desmarcar todo</button></div></section>
     ${grupos || '<div class="small muted" style="padding:4px">Tu pauta no tiene alimentos.</div>'}`; }
 document.addEventListener('click', async ev => { const t = ev.target;
@@ -2143,7 +2169,7 @@ document.addEventListener('click', async ev => { const t = ev.target;
   const cx = t.closest('[data-nucmpx]'); if (cx) { const id = cx.dataset.nucmpx, a = new Set(nuCmpHecho()); a.has(id) ? a.delete(id) : a.add(id); try { localStorage.setItem('nuCmp_' + codigo, JSON.stringify([...a])); } catch (_) {} render(true); return; }
   if (t.closest('[data-nucmpclr]')) { try { localStorage.removeItem('nuCmp_' + codigo); } catch (_) {} render(true); return; }
   if (t.closest('[data-nucmpsh]')) { const N = NUT(), L = nuCompraLista(), D = S.nuCmpD || 7;
-    const txt = `🛒 Lista de compras · ${D} días (pauta Titanium)\n` + NU_CMP_CAT.map(([k, l]) => { const xs = L.filter(x => (NU_CMP_CAT.some(c => c[0] === x.r) ? x.r : 'f') === k); return xs.length ? `\n${l}\n` + xs.map(x => { const med = N.medida(x.n, x.e, x.g); return `• ${N.nombre(x.n, x.e)}: ${nuCmpG(x.g)}${med ? ' (' + med + ')' : ''}`; }).join('\n') : ''; }).join('\n');
+    const txt = `🛒 Lista de compras · ${D} días (pauta Titanium)\n` + NU_CMP_CAT.map(([k, l]) => { const xs = L.filter(x => x.sec === k); return xs.length ? `\n${l}\n` + xs.map(x => { const c = nuCmpCant(x); return `• ${nuCmpNom(x.n)}: ${c.q}${c.s ? ' (' + c.s + ')' : ''}`; }).join('\n') : ''; }).join('\n');
     try { if (navigator.share) { await navigator.share({ text: txt }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
     window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank'); return; }
 });
