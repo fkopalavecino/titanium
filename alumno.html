@@ -500,7 +500,10 @@ const CORPORAL_RE = /dominada|pull-?up|chin-?up|fondos|\bdips\b|flexiones|flexi[
 const SEG2_RE = /(\d+)(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i;
 // saltos / pliometría: solo reps, sin kg
 const SALTO_RE = /salto|jump|pogo|brinco|pliom[eé]tric|skipping|step-?up explosivo|burpee/i;
-function tipoEj(e) { const t = tipoEj0(e); return t !== 'tiempo' && SALTO_RE.test(e.nombre || '') ? 'reps' : t; }
+function tipoEj(e) { const t = tipoEj0(e); if (t !== 'tiempo' && SALTO_RE.test(e.nombre || '')) return 'reps';
+  // peso corporal: solo reps; la casilla de kg aparece solo si lleva lastre/chaleco o ya anotó kilos antes
+  if (t === 'corporal' && !/lastre|lastrad|chaleco|con peso|\+\s*\d+\s*kg/i.test((e.nombre || '') + ' ' + (e.dosis || '')) && !(typeof prevSets === 'function' && prevSets(e.nombre).some(x => x && x.kg > 0))) return 'reps';
+  return t; }
 function tipoEj0(e) { const d = sinDesc(e.dosis), nm = e.nombre || ''; if (SEG_RE.test(d)) return 'tiempo';
   // "mismas series · 10 · luego 75 s": lo primero que viene es lo que se hace (10 reps); lo que sigue es el descanso
   const pri = d.replace(/^\s*mismas series\s*·?\s*/i, '').replace(/^\s*\d+\s*[×x]\s*/i, '').match(/^\s*(m[aá]x|\d+(?:\s*[–-]\s*\d+)?)\s*(s\b|seg|"|min|m\b)?/i);
