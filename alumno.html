@@ -544,11 +544,14 @@ const okKey = i => (i.dataset.ap ? 'A|' : '') + i.dataset.n + '|' + i.dataset.i;
 const putDraft = d => { try { localStorage.setItem(DKEY(), JSON.stringify(d)); } catch (e) {} };
 const clearDraft = () => { try { localStorage.removeItem(DKEY()); Object.keys(localStorage).filter(k => k.startsWith('tl-draft-' + codigo + '-') && k !== DKEY() && k.slice(('tl-draft-' + codigo + '-').length, ('tl-draft-' + codigo + '-').length + 10) < addDays(today(), -30)).forEach(k => localStorage.removeItem(k)); } catch (e) {} };
 // serie marcada con kg y reps: la siguiente (vacía) queda con esos mismos números de sugerencia → basta apretar ✓
-function sugerirSiguiente(row) { const kI = row.querySelector('[data-f="kg"]'), rI = row.querySelector('[data-f="r"]');
-  if (row.classList.contains('ap') || !row.classList.contains('done') || !kI || !rI || !kI.value.trim() || !rI.value.trim()) return;
+function sugerirSiguiente(row) { const ins = [...row.querySelectorAll('input[data-f]')];
+  if (row.classList.contains('ap') || !row.classList.contains('done') || !ins.length || ins.some(x => !x.value.trim())) return;
   let nx = row.nextElementSibling; while (nx && (!nx.classList.contains('set') || nx.classList.contains('ap'))) nx = nx.nextElementSibling;
-  const nk = nx?.querySelector('[data-f="kg"]'), nr = nx?.querySelector('[data-f="r"]');
-  if (nk && nr && !nx.classList.contains('done') && !nk.value.trim() && !nr.value.trim()) { nk.placeholder = kI.value.trim(); nr.placeholder = rI.value.trim(); } }
+  if (!nx || nx.classList.contains('done')) return; const nin = [...nx.querySelectorAll('input[data-f]')]; if (nin.some(x => x.value.trim())) return;
+  // la serie siguiente queda sugerida con los mismos números (kg y reps, solo reps o segundos)
+  ins.forEach(x => { const y = nx.querySelector(`input[data-f="${x.dataset.f}"]`); if (y) y.placeholder = x.value.trim(); }); }
+// valor de la serie anterior hecha (mismo campo), para marcar con un toque
+function valorAnterior(row, f) { let pv = row.previousElementSibling; while (pv) { if (pv.classList.contains('set') && !pv.classList.contains('ap')) { const v = pv.querySelector(`input[data-f="${f}"]`)?.value.trim(); if (v) return v; } pv = pv.previousElementSibling; } return ''; }
 function applyDraft() { if (S.v !== 'rutina') return; const d = getDraft();
   document.querySelectorAll('.set input').forEach(i => { const v = d[i.dataset.ap ? 'ap' : 'sets']?.[i.dataset.n]?.[i.dataset.i]?.[i.dataset.f]; const row = i.closest('.set');
     if (v != null && v !== '' && v !== i.value) { i.value = v; if (!d.ok?.[okKey(i)]) row.classList.remove('done'); }
@@ -2026,7 +2029,7 @@ document.addEventListener('click', async ev => {
     if (row.dataset.ok || row.classList.contains('done')) { delete row.dataset.ok; row.classList.remove('done');
       ins.forEach(i => { if (i.value.trim() !== '') { i.placeholder = i.value.trim(); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); } });
       const d0 = getDraft(); if (d0.ok && ins[0]) { delete d0.ok[okKey(ins[0])]; putDraft(d0); } finDescanso(); autoGuardar(400); toast('Serie desmarcada'); return; }
-    ins.forEach(i => { if (i.value.trim() === '' && !/kg|reps|seg/.test(i.placeholder)) { i.value = i.placeholder; i.dispatchEvent(new Event('input', { bubbles: true })); } });
+    ins.forEach(i => { if (i.value.trim() !== '') return; const v = !/kg|reps|seg/.test(i.placeholder) ? i.placeholder : row.classList.contains('ap') ? '' : valorAnterior(row, i.dataset.f); if (v) { i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); } });
     if (ins.some(i => i.value.trim() !== '')) { row.classList.add('done'); row.dataset.ok = '1'; { const d0 = getDraft(); (d0.ok = d0.ok || {})[okKey(ins[0])] = 1; putDraft(d0); } iniciarDescanso(Number(chk.dataset.rest) || 90, row.querySelector('input')?.dataset.n || '');
       sugerirSiguiente(row);
       autoGuardar(400); } else toast(row.querySelector('[data-f="t"]') ? 'Anota los segundos.' : 'Anota los kilos y las repeticiones.'); return; }
