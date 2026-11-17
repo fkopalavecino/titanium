@@ -15,9 +15,11 @@ const hora = (h: string | null) => (h ? String(h).slice(0, 5) : '');
 const clp = (n: number) => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
 
 let vapid: { pub: string; priv: string } | null = null;
+let SECRETO: string | null = null; // clave interna: solo la base (triggers y tareas programadas) la conoce
 async function claves() {
   if (vapid) return vapid;
-  const { data } = await sb.from('push_cfg').select('pub,priv').eq('id', 1).maybeSingle();
+  const { data } = await sb.from('push_cfg').select('pub,priv,secreto').eq('id', 1).maybeSingle();
+  SECRETO = data?.secreto || null;
   if (data?.pub && data?.priv) vapid = { pub: data.pub, priv: data.priv };
   else {
     const k = webpush.generateVAPIDKeys();
@@ -63,6 +65,9 @@ Deno.serve(async (req) => {
     const k = await claves();
     const b = await req.json().catch(() => ({}));
     if (b.init) return json({ pub: k.pub });
+    // lo que llaman las apps (init, prueba, nutri_objetivo, nutri_pauta) se valida contra la base; todo lo demás lo manda solo la base y exige la clave interna
+    const abiertos = ['nutri_objetivo', 'nutri_pauta'];
+    if (!b.prueba && !abiertos.includes(String(b.modo)) && (!SECRETO || req.headers.get('x-titanium-key') !== SECRETO)) return json({ error: 'no autorizado' }, 401);
     if (b.prueba) {
       const { data } = await sb.from('push_subs').select('endpoint,sub').eq('endpoint', String(b.prueba));
       if (data?.length) return json(await enviar(data, { title: '🔔 Avisos activados', body: 'Así te llegarán los avisos de Titanium Sport.', url: './alumno.html', tag: 'prueba' }));
