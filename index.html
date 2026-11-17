@@ -193,7 +193,7 @@ tr.click{cursor:pointer}
 .sc-l3 .dot{display:inline-block;vertical-align:middle;margin-right:6px;width:7px;height:7px;border-radius:50%;background:var(--red);animation:livepulse 1.6s ease-in-out infinite}
 .sc-al{font-size:12px;color:var(--crit);font-weight:600}
 .rg-dias{display:grid;gap:14px;margin-top:8px}.rg-dia{display:grid;gap:6px}.rg-dh{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;padding-bottom:4px;border-bottom:2px solid var(--red)}.rg-n{margin-left:auto;font-size:12px;font-weight:700;background:var(--red);color:var(--red-fg);border-radius:10px;padding:1px 8px}.rg-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;text-decoration:none;color:inherit}.rg-row .grow{flex:1;min-width:0;display:flex;flex-direction:column}.rg-h{min-width:54px;text-align:center;font-weight:700;font-size:15px;padding:4px 0;border-radius:8px;background:color-mix(in srgb,var(--red) 14%,transparent)}.rg-de{margin-top:1px}
-.sc-ic{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}.sc-ic.crit{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 40%,transparent)}
+.sc-ic{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}.sc-ic.crit{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 40%,transparent)}.sc-ic.warn{color:var(--warn,#b45309);border-color:color-mix(in srgb,var(--warn,#b45309) 40%,transparent)}
 .ok-t{color:var(--ok);font-weight:600}.crit-t{color:var(--crit)}
 .sc .chev{color:var(--muted);font-size:20px;transition:transform .2s}.sc.open .chev{transform:rotate(90deg)}
 .sc-head{display:flex;gap:10px;align-items:center}.sc-head .sc-top{flex:1;min-width:0}
@@ -778,7 +778,7 @@ const rutOrder = (a, b) => (CATS.indexOf(catOf(a)) - CATS.indexOf(catOf(b))) || 
 function roster(fecha, hora) {
   const dk = dayKey(fecha), key = dk+'-'+hora;
   const base = activos().filter(a => (a.bloques||[]).includes(key)).map(a => a.codigo);
-  const extra = Object.entries(S.dias.get(fecha)?.bloques?.[hora] || {}).filter(([c,v]) => v.extra && S.alumnos.has(c)).map(([c]) => c);
+  const extra = Object.entries(S.dias.get(fecha)?.bloques?.[hora] || {}).filter(([c,v]) => v.extra && S.alumnos.has(c) && (S.alumnos.get(c).estado !== 'inactivo' || fecha < today())).map(([c]) => c);
   const quit = new Set(Object.entries(S.dias.get(fecha)?.bloques?.[hora] || {}).filter(([c,v]) => v.quitado).map(([c]) => c));
   return [...new Set([...base, ...extra])].filter(c => !quit.has(c));
 }
@@ -1193,7 +1193,8 @@ function studentCard(f, hora, code, ruts) {
   const les = lesionCorta(a); const cu = cumple(a, f);
   const marcas = [r.reagDe && r.reagDe.flex ? '<span class="sc-ic sc-flex" title="Alumna de agenda libre: agendó esta clase desde su app">📅 Agenda libre</span>' : r.reagDe && r.reagDe.recup ? '<span class="sc-ic sc-rec" title="Viene a recuperar una clase">🔁 Recuperación</span>' : r.extra ? '<span title="Agendado solo para esta fecha">↻</span>' : '',
     les.length ? `<span class="sc-ic" title="Lesiones: ${esc(les.join(', '))}">⚠ ${esc(les[0])}${les.length > 1 ? ' +' + (les.length - 1) : ''}</span>` : '',
-    a.ingreso?.parq?.length ? '<span class="sc-ic crit" title="Respondió sí en el PAR-Q">PAR-Q</span>' : '',
+    ingDe(a).parq.length ? `<span class="sc-ic crit" title="${esc('PAR-Q «sí»: ' + ingDe(a).parq.map(i => PARQ[i] || '').join(' · '))}">PAR-Q</span>` : '',
+    (a.perfil?.ficha?.enfermedades || []).length ? (enf => `<span class="sc-ic warn" title="${esc(enf.join(', '))}">❤️ ${esc(enf[0])}${enf.length > 1 ? ' +' + (enf.length - 1) : ''}</span>`)(a.perfil.ficha.enfermedades.map(k => F_ENF_L[k] || k)) : '',
     debe ? `<span class="sc-ic crit go" role="link" tabindex="0" data-act="ir-pago" data-id="${esc(code)}" data-p="${esc(p?.id || '')}" title="Ir a Pagos de este alumno" style="cursor:pointer">$ debe ›</span>` : '',
     cu && cu.dias === 0 ? '<span title="Cumpleaños">🎂</span>' : ''].filter(Boolean).join('');
   const rutNom = r.rutina ? String(S.rutinas.get(r.rutina)?.tipo || 'Rutina').split(' · ')[0] : sug ? 'Le toca ' + String(S.rutinas.get(sug)?.tipo || '').split(' · ')[0] : 'Sin rutina';
@@ -3028,9 +3029,9 @@ function agendarModal() {
 function reagModal(key) {
   const [f, h, code] = key.split('|');
   const c = cfg(); let d = addDays(f, 1);
-  for (let i = 0; i < 7 && !c.dias.includes(dayKey(d)); i++) d = addDays(d, 1);
-  const fijo = (S.alumnos.get(code)?.bloques || []).find(k => k.startsWith(dayKey(d) + '-'));
-  const hDef = fijo ? fijo.split('-')[1] : h;
+  // fecha sugerida: el próximo día hábil en que el alumno NO tenga ya clase (si cae en su propio bloque fijo, la clase se perdería)
+  for (let i = 0; i < 21 && (!c.dias.includes(dayKey(d)) || rgDiaOcupado(code, d)); i++) d = addDays(d, 1);
+  const hDef = h;
   openModal(`Reagendar · ${nombre(code)}`, `
     <p class="small muted" style="margin:0">Sale del bloque de hoy ${esc(h)} y queda agendada solo en la nueva fecha. Su horario fijo no cambia.</p>
     <div class="frow">
@@ -3044,6 +3045,7 @@ function reagModal(key) {
       const sin = $('#rg-sin').checked, nf = val('rg-f'), nh = val('rg-h');
       if (!sin && (!nf || !nh)) { toast('Elige fecha y hora.', true); return false; }
       if (!sin && nf === f && nh === h) { toast('Elige otra fecha u hora.', true); return false; }
+      if (!sin && rgYaTiene(code, nf, nh)) { toast(`${nombre(code)} ya tiene clase el ${fmtD(nf)} a las ${nh}: elige otro bloque.`, true); rgPintar(code); return false; }
       // bloque lleno: avisa y pide tocar «Reagendar» otra vez para confirmar
       if (!sin) { const o = rgOcupacion(nf, nh, code); if (o.lleno && rgAviso !== nf + '|' + nh) { rgAviso = nf + '|' + nh; rgPintar(code, true); return false; } }
       // si era una recuperación o una clase de agenda libre, la nueva fecha mantiene ese tipo (no devuelve el crédito ni cuenta doble)
@@ -3059,9 +3061,13 @@ function reagModal(key) {
 }
 // ocupación del bloque destino: fijos + agendados, sin contar quitados ni a quienes avisaron que no van
 let rgAviso = null;
+// ¿el alumno ya está en ese bloque (fijo o agendado)? ¿tiene alguna clase ese día?
+function rgYaTiene(code, f, h) { return roster(f, h).includes(code); }
+function rgDiaOcupado(code, f) { return (cfg().horas || []).some(h => rgYaTiene(code, f, h)); }
 function rgOcupacion(f, h, code) { const n = roster(f, h).filter(c => c !== code && S.conf?.get(f + '|' + h + '|' + c) !== 'no_voy').length; const cup = cfg().cupos || 8; return { n, cup, lleno: n >= cup }; }
 function rgPintar(code, pedir) { const el = document.getElementById('rg-cupo'); if (!el) return; const f = val('rg-f'), h = val('rg-h');
   if (!f || !h || document.getElementById('rg-sin')?.checked) { el.innerHTML = ''; return; }
+  if (rgYaTiene(code, f, h)) { el.innerHTML = `<div class="notice" style="border-color:var(--crit);color:var(--crit)">⚠️ ${esc(nombre(code))} ya tiene clase ese día a esa hora. Elige otro bloque.</div>`; return; }
   const o = rgOcupacion(f, h, code);
   el.innerHTML = o.lleno ? `<div class="notice" style="border-color:var(--crit);color:var(--crit)">⚠️ Bloque lleno: ${o.n} de ${o.cup} cupos ocupados.${pedir ? ' <b>Toca «Reagendar» otra vez para agendarla igual.</b>' : ''}</div>`
     : `<span class="muted">Cupos: ${o.n} de ${o.cup} ocupados · quedan ${o.cup - o.n}</span>`; }
@@ -3279,7 +3285,7 @@ document.addEventListener('click', e => {
     case 'quitar-extra': { const {f,h,code} = toggleOne(el.dataset.k); const rx = rec(f, h, code);
       if (rx.reagDe?.recup) { patchDia(f, h, code, {quitado: true, asis: null, rutina: null, aprobada: null}); toast(`${nombre(code)}: recuperación quitada (la pierde).`); }
       else patchDia(f, h, code, {extra: null, quitado: null, asis: null, rutina: null, aprobada: null}); break; }
-    case 'todos-presentes': { const f = S.ui.claseFecha || today(), h = S.ui.claseHora; roster(f,h).filter(cd => !rec(f,h,cd).asis).forEach((cd,i) => { const pg = !rec(f,h,cd).rutina ? progEstado(S.alumnos.get(cd), f) : null; patchDia(f, h, cd, Object.assign({asis:'presente'}, pg ? {rutina: pg.next[0]} : {})); }); break; }
+    case 'todos-presentes': { const f = S.ui.claseFecha || today(), h = S.ui.claseHora; roster(f,h).filter(cd => !rec(f,h,cd).asis && S.conf?.get(f + '|' + h + '|' + cd) !== 'no_voy' && S.alumnos.get(cd)?.estado !== 'inactivo').forEach((cd,i) => { const pg = !rec(f,h,cd).rutina ? progEstado(S.alumnos.get(cd), f) : null; patchDia(f, h, cd, Object.assign({asis:'presente'}, pg ? {rutina: pg.next[0]} : {})); }); break; }
     case 'asis': { const {f,h,code} = toggleOne(el.dataset.k); const cur = rec(f,h,code).asis; const nv = cur === el.dataset.v ? null : el.dataset.v;
       // avisó que no venía: el profe elige en una ventana clara si le da la recuperación o queda Ausente
       if (nv === 'aviso') { const k = el.dataset.k, n = esc(firstName(nombre(code)));
