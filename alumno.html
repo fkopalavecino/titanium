@@ -402,6 +402,7 @@ async function load() {
   S.eventos = (ev.data || []).sort((x, y) => (x.fecha + (x.hora || '')).localeCompare(y.fecha + (y.hora || '')));
   S.a = a.data; S.planes = (p.data || []).sort((x, y) => String(x.inicio || '').localeCompare(String(y.inicio || '')));
   S.clases = c.data || []; S.cfg = cf.data?.data || {};
+  if (S.a?.online) try { const { data: oc } = await sb.from('online_cfg').select('data').eq('id', 1).maybeSingle(); S.onlCfg = oc?.data || {}; } catch (_) { S.onlCfg = {}; }
   const ids = new Set(S.clases.map(r => r.rutina).filter(Boolean));
   const pr = S.a.programa;
   const qs = [];
@@ -436,7 +437,10 @@ const horaTxt = h => h === 'online' ? 'Online' : h;
 const ONL_NOMBRE = 'Titanium Online Coaching'; // nombre del servicio online (se muestra al alumno)
 function bloquesDe(f) {
   // online: solo lo agendado (clases en el centro con hora y sesiones online ya registradas); no se sugieren días
-  if (ONL()) { const ag = [...new Set(S.clases.filter(r => r.fecha === f && r.extra && !r.quitado && /^\d\d:\d\d$/.test(r.hora)).map(r => r.hora))].sort();
+  // agenda mixta: si tiene bloques fijos en Titanium (ej. 06:00, ocupa cupo) también se muestran
+  if (ONL()) { const quitO = new Set(S.clases.filter(r => r.fecha === f && r.quitado).map(r => r.hora));
+    const baseO = (S.a.bloques || []).filter(k => k.startsWith(dayKey(f) + '-')).map(k => k.split('-')[1]).filter(h => !quitO.has(h));
+    const ag = [...new Set([...baseO, ...S.clases.filter(r => r.fecha === f && r.extra && !r.quitado && /^\d\d:\d\d$/.test(r.hora)).map(r => r.hora)])].filter(h => /^\d\d:\d\d$/.test(h)).sort();
     const onl = S.clases.some(r => r.fecha === f && r.hora === 'online' && !r.quitado);
     return onl ? [...ag, 'online'] : ag; }
   const base = (S.a.bloques || []).filter(k => k.startsWith(dayKey(f) + '-')).map(k => k.split('-')[1]);
@@ -816,7 +820,7 @@ function onboardingHTML() {
   if (S.onbAvisos || (S.perfil?.reglas?.v || 0) < REGLAS_V) { const e = pushEstado(), cp = S.cfg?.pago || {}, prof = esc(S.cfg?.coach || 'Franco');
     const gracia = cp.gracia ?? 5, bloq = cp.bloquearRecup !== false, nuevo = S.onbAvisos;
     const btnTxt = e === 'off' ? '🔔 Activar avisos y entrar' : 'Entendido, entrar a mi app';
-    return `<div style="display:grid;gap:6px"><div class="eyebrow red">${nuevo ? 'Paso 2 de 2 · Último paso' : 'Información importante'}</div><h1>${e === 'on' ? 'Cómo funciona tu app 📲' : 'Activa tus avisos 🔔'}</h1>
+    return `<div style="display:grid;gap:6px"><div class="eyebrow red">${nuevo ? (ONL() && !onlTerminosOk() ? 'Paso 2 de 3' : 'Paso 2 de 2 · Último paso') : 'Información importante'}</div><h1>${e === 'on' ? 'Cómo funciona tu app 📲' : 'Activa tus avisos 🔔'}</h1>
       <p class="muted" style="margin:0">Léelo con calma: es <b style="color:var(--fg)">información importante</b> y al continuar confirmas que la leíste.</p></div>
       <section class="card" style="gap:10px;border-color:var(--red)">
         <h2 style="margin:0">🔔 Te avisaremos de</h2>
@@ -857,8 +861,168 @@ function onboardingHTML() {
           : e === 'instalar' ? '<div class="small muted">En iPhone los avisos funcionan abriendo la app desde el ícono de tu pantalla de inicio. Actívalos después en Perfil.</div>'
           : e === 'no' ? '<div class="small muted">Este teléfono no permite avisos: revisa tu app seguido.</div>' : ''}
       </section>`; }
+  // alumnos online: dónde entrena + términos y consentimiento (obligatorio antes de entrar)
+  if (ONL() && !onlTerminosOk()) return onlTerminosHTML();
   return null;
 }
+/* ---------- Asesoría Online · onboarding (Fase 2): dónde entrena, términos y consentimiento, tests de movimiento ---------- */
+const TERM_V = 1; // súbelo si cambian los términos online y todos deben volver a aceptarlos
+const ONL_LUG = [['titanium', '🏠 Titanium · bloque 06:00'], ['gym', '🏋️ Otro gimnasio'], ['casa', '🏡 Casa']];
+const ONL_DIAS = [['lun', 'L'], ['mar', 'M'], ['mie', 'X'], ['jue', 'J'], ['vie', 'V'], ['sab', 'S'], ['dom', 'D']];
+const ONL_EQ = ['Barra olímpica', 'Rack / jaula', 'Banco ajustable', 'Mancuernas', 'Kettlebells', 'Poleas', 'Máquina Smith', 'Prensa de piernas', 'Máquinas de pierna', 'Máquinas de torso', 'Barra de dominadas', 'Paralelas', 'Bandas elásticas', 'TRX', 'Cajón pliométrico', 'Balón medicinal', 'Cinta de correr', 'Bicicleta', 'Remo', 'AirBike', 'SkiErg', 'Trineo'];
+const ONL_MANC = [10, 20, 30, 40, 50];
+const ONL_MIN = [45, 60, 75, 90];
+const ONL_TESTS = [
+  ['sq', 'Sentadilla con brazos arriba', 'Brazos estirados sobre la cabeza, baja lo más profundo que puedas. 5 repeticiones de frente y 5 de perfil.'],
+  ['bisagra', 'Bisagra de cadera con palo', 'Palo en la espalda tocando cabeza, espalda alta y glúteos. Inclínate desde la cadera, 5 repeticiones de perfil.'],
+  ['flex', 'Flexión de brazos', '5 flexiones a tu ritmo, grabadas de perfil. Si no puedes completas, hazlas con rodillas apoyadas.'],
+  ['zancada', 'Zancada', '5 zancadas por pierna hacia adelante, grabadas de frente.'],
+  ['hombro', 'Movilidad de hombro en la pared', 'Espalda, glúteos y cabeza en la pared. Sube los brazos estirados intentando tocar la pared. 5 repeticiones de perfil.'],
+];
+const onlP = () => S.perfil?.onl || {};
+const onlEval = () => S.a?.eval_online || {};
+const onlTerminosOk = () => (onlP().terminos?.v || 0) >= TERM_V;
+function onlDraft() { if (!S.onlD) S.onlD = JSON.parse(JSON.stringify(Object.assign({ lugares: [], diasGym: [], equipo: [], tests: {} }, onlP()))); return S.onlD; }
+const onlChip = (grp, val, lbl, on) => `<button type="button" class="chip" data-onlch="${grp}" data-val="${esc(String(val))}" aria-pressed="${!!on}">${esc(lbl)}</button>`;
+
+function onlDondeHTML() { const d = onlDraft(); const gym = d.lugares.includes('gym');
+  return `<div style="display:grid;gap:10px">
+    <div class="small muted">¿Dónde vas a entrenar? Marca todos los que correspondan.</div>
+    <div class="chips" style="flex-wrap:wrap">${ONL_LUG.map(([k, l]) => onlChip('lugares', k, l, d.lugares.includes(k))).join('')}</div>
+    ${d.lugares.includes('titanium') ? `<div class="note small">Tus días a las 06:00 en Titanium los agenda ${esc(S.cfg?.coach || 'Franco')} en tu horario.</div>` : ''}
+    ${gym ? `<label class="field">Nombre del otro gimnasio (opcional)<input id="onl-gymn" maxlength="60" placeholder="Ej: Gimnasio del condominio" value="${esc(d.gymNombre || '')}"></label>
+    <div class="small muted">¿Qué días vas al otro gimnasio?</div>
+    <div class="chips" style="flex-wrap:wrap">${ONL_DIAS.map(([k, l]) => onlChip('diasGym', k, l, d.diasGym.includes(k))).join('')}</div>
+    <div class="small muted">¿Qué equipo tiene? Toca todo lo que haya.</div>
+    <div class="chips" style="flex-wrap:wrap">${ONL_EQ.map(x => onlChip('equipo', x, x, d.equipo.includes(x))).join('')}</div>
+    ${d.equipo.includes('Mancuernas') ? `<div class="small muted">Mancuernas hasta…</div><div class="chips" style="flex-wrap:wrap">${ONL_MANC.map(n => onlChip('mancMax', n, n === 50 ? '50+ kg' : n + ' kg', d.mancMax === n)).join('')}</div>` : ''}` : ''}
+    <div class="small muted">¿Cuánto tiempo tienes por sesión?</div>
+    <div class="chips" style="flex-wrap:wrap">${ONL_MIN.map(n => onlChip('min', n, n + ' min', d.min === n)).join('')}</div>
+  </div>`; }
+function onlDondeFalta() { const d = onlDraft();
+  if (!d.lugares.length) return 'Marca dónde vas a entrenar.';
+  if (d.lugares.includes('gym') && !d.diasGym.length) return 'Marca qué días vas al otro gimnasio.';
+  if (d.lugares.includes('gym') && !d.equipo.length) return 'Marca el equipo que tiene el otro gimnasio.';
+  if (!d.min) return 'Marca cuánto tiempo tienes por sesión.';
+  return ''; }
+
+function onlTerminosHTML() { const prof = esc(S.cfg?.coach || 'Franco'); const d = onlDraft(); onlDraft();
+  return `<div style="display:grid;gap:6px"><div class="eyebrow red">Último paso · ${ONL_NOMBRE}</div><h1>Tu asesoría online 🌐</h1>
+    <p class="muted" style="margin:0">Cuéntanos dónde entrenas y acepta los términos del servicio. Toma 2 minutos.</p></div>
+  <section class="card" style="gap:10px"><h2 style="margin:0">📍 Dónde entreno</h2>${onlDondeHTML()}</section>
+  <section class="card" style="gap:8px"><h2 style="margin:0">📄 Términos del servicio</h2>
+    <div style="display:grid;gap:6px" class="small">
+      <div>• <b>Incluye:</b> planificación FKO cada 4 semanas adaptada a tu equipo, pauta nutricional, check-in semanal (domingo), corrección de técnica (hasta 2 videos por semana) y reevaluación cada 4 semanas con InBody.</div>
+      <div>• <b>Pago</b> mensual por adelantado, en tu fecha de inicio. Sin reembolsos parciales.</div>
+      <div>• <b>Pausa:</b> 1 pausa de hasta 14 días cada 3 meses (viaje, enfermedad o lesión), avisando antes. Los días pausados corren tu renovación.</div>
+      <div>• <b>Comunicación:</b> por WhatsApp. ${prof} responde en hasta 24 h hábiles (lunes a viernes); el check-in, antes del martes.</div>
+      <div>• <b>Tu parte:</b> anotar tus cargas y RPE, enviar el check-in cada domingo, seguir tu pauta lo mejor posible y avisar cualquier dolor.</div>
+      <div>• <b>Si faltas a tu bloque de las 06:00</b> no hay recuperación: entrenas ese día por tu cuenta con la rutina de la app.</div>
+      <div>• Los <b>resultados</b> dependen de tu constancia, descanso y alimentación; no se garantizan resultados específicos.</div>
+      <div>• Puedes terminar la asesoría avisando antes de tu fecha de renovación.</div>
+    </div></section>
+  <section class="card" style="gap:8px;border-color:var(--red)"><h2 style="margin:0">🩺 Consentimiento de salud</h2>
+    <div style="display:grid;gap:6px" class="small">
+      <div>• Entiendo que el ejercicio implica esfuerzo físico y que entreno por mi cuenta siguiendo las indicaciones.</div>
+      <div>• La información de mi ficha es verdadera y avisaré a ${prof} si cambia algo de mi salud, medicamentos o lesiones.</div>
+      <div>• Si mi ficha lo indica, presentaré un <b>visto bueno médico</b> antes de empezar.</div>
+      <div>• <b>Detengo el entrenamiento y aviso de inmediato</b> si tengo: dolor u opresión en el pecho · mareo, desmayo o visión borrosa · falta de aire desproporcionada · palpitaciones o ritmo irregular · dolor articular agudo o que aumenta sesión a sesión · hormigueo o pérdida de fuerza en brazos o piernas.</div>
+      <div>• Autorizo a Titanium a guardar mis datos de salud, medidas y fotos <b>solo</b> para planificar y hacer seguimiento de mi asesoría. Son confidenciales y solo los ve ${prof}.</div>
+    </div></section>
+  <section class="card" style="gap:10px"><h2 style="margin:0">📸 Fotos en redes</h2>
+    <div class="small muted">¿Autorizas a ${prof} a usar tus fotos de progreso en las redes de Titanium? Es opcional y puedes cambiarlo cuando quieras.</div>
+    <div class="chips">${onlChip('redes', 'si', 'Sí, autorizo', d.redes === true)}${onlChip('redes', 'no', 'No, solo privadas', d.redes === false)}</div></section>
+  <section class="card" style="gap:12px">
+    <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" id="onl-ok" style="width:22px;height:22px;accent-color:var(--red);flex:none;margin-top:2px"><span><b>Acepto</b> los términos del servicio y el consentimiento de salud.</span></label>
+    <button class="btn pri" data-onlacepto="1">Aceptar y entrar a mi app</button>
+  </section>`; }
+
+// pasos del inicio online: los que hace el alumno y los que registra el profe en Titanium
+function onlPasos() { const p = onlP(), e = onlEval(), tests = p.tests || {};
+  const nT = ONL_TESTS.filter(([k]) => tests[k]).length;
+  const fotos = S.fotos.some(x => x.frente && x.perfil && x.espalda);
+  const ib = (S.a?.inbody || []).length > 0, per = (e.perim || []).length > 0, fis = (e.fisico || []).length > 0;
+  return [
+    { k: 'ficha', l: 'Ficha de salud', ok: !!S.perfil?.ficha?.fecha },
+    { k: 'term', l: 'Términos y dónde entreno', ok: onlTerminosOk() },
+    { k: 'fotos', l: 'Fotos frente, perfil y espalda', ok: fotos },
+    { k: 'tests', l: `Tests de movimiento (${nT}/${ONL_TESTS.length})`, ok: nT === ONL_TESTS.length },
+    { k: 'eval', l: 'Evaluación en Titanium: InBody, perímetros y test físico', ok: ib && per && fis, prof: true },
+  ]; }
+function onlInicioCard() { if (!ONL()) return ''; const ps = onlPasos(); const n = ps.filter(x => x.ok).length; if (n === ps.length) return '';
+  return `<section class="card" style="border-color:var(--red);cursor:pointer" data-go="onl" role="button" tabindex="0">
+    <div class="row" style="align-items:center"><div><span class="eyebrow red">Tu inicio online</span><h2 style="margin:2px 0 0">📋 ${n} de ${ps.length} pasos listos</h2></div><span class="btn" style="width:auto;padding:0 14px">Ver</span></div>
+    <div class="bar"><i style="width:${Math.round(n / ps.length * 100)}%"></i></div>
+    <div class="small muted">Próximo: ${esc((ps.find(x => !x.ok) || {}).l || '')}</div></section>`; }
+
+const SEM = { v: ['🟢', 'Bien'], a: ['🟡', 'Por mejorar'], r: ['🔴', 'A corregir'] };
+V.onl = () => { const p = onlP(), e = onlEval(), tests = p.tests || {}, ev = e.tests || {}; const ps = onlPasos(); const prof = esc(S.cfg?.coach || 'Franco');
+  const n = waNum(); const nom = S.perfil?.apodo || String(S.a.nombre || '').split(' ')[0];
+  const demos = S.onlCfg?.demos || {};
+  const check = ok => ok ? '<span class="ok" style="font-weight:700">✓</span>' : '<span class="muted">○</span>';
+  const lastOf = arr => (arr || []).slice().sort((x, y) => String(x.f).localeCompare(String(y.f))).pop();
+  const per = lastOf(e.perim), fis = lastOf(e.fisico), ib = (S.a.inbody || []).length;
+  const dl = (S.a.bloques || []).length ? ' · Titanium: ' + (S.a.bloques || []).map(k => { const [d, h] = k.split('-'); return (DL[d] || d) + ' ' + h; }).join(', ') : '';
+  return `<div class="row" style="align-items:center"><button class="btn" data-go="hoy" style="width:auto;padding:0 14px">‹ Inicio</button><span class="small muted">${ps.filter(x => x.ok).length} de ${ps.length} listos</span></div>
+  <div style="display:grid;gap:6px"><div class="eyebrow red">${ONL_NOMBRE}</div><h1>Tu inicio online 📋</h1>
+    <p class="muted" style="margin:0">Con esto ${prof} arma tu planificación a tu medida. Hazlo con calma: no tiene que ser todo hoy.</p></div>
+  <section class="card" style="gap:8px">${ps.map(x => `<div class="row small" style="align-items:center"><span>${check(x.ok)} ${esc(x.l)}</span>${x.prof && !x.ok ? `<span class="muted">la hace ${prof}</span>` : ''}</div>`).join('')}</section>
+
+  <section class="card" style="gap:10px"><div class="row"><h2 style="margin:0">📍 Dónde entreno</h2>${S.onlEdit ? '' : '<button class="btn" data-onledit="1" style="width:auto;padding:0 14px">Editar</button>'}</div>
+    ${S.onlEdit ? onlDondeHTML() + '<button class="btn pri" data-onlsave="1">Guardar</button>' : `<div class="small">${esc((p.lugares || []).map(k => (ONL_LUG.find(x => x[0] === k) || [, k])[1]).join(' · ') || '—')}${esc(dl)}</div>
+    ${(p.lugares || []).includes('gym') ? `<div class="small muted">${esc(p.gymNombre || 'Otro gimnasio')}: ${esc((p.diasGym || []).map(d => DL[d]).join(' '))} · ${esc((p.equipo || []).join(', '))}${p.mancMax ? ' · mancuernas hasta ' + p.mancMax + ' kg' : ''}</div>` : ''}
+    ${p.min ? `<div class="small muted">${p.min} min por sesión</div>` : ''}`}</section>
+
+  <section class="card" style="gap:10px"><div class="row"><h2 style="margin:0">📸 Fotos</h2>${check(ps[2].ok)}</div>
+    <div class="small muted">Frente, perfil y espalda. Con buena luz, a 2–3 metros, cámara a la altura del ombligo, ropa ajustada (short y top o sin polera) y siempre en el mismo lugar.</div>
+    <button class="btn ${ps[2].ok ? '' : 'pri'}" data-onlfotos="1">${ps[2].ok ? 'Ver mis fotos' : '📸 Subir mis 3 fotos'}</button></section>
+
+  <section class="card" style="gap:10px"><div class="row"><h2 style="margin:0">🎥 Tests de movimiento</h2><span class="small muted">${ONL_TESTS.filter(([k]) => tests[k]).length}/${ONL_TESTS.length}</span></div>
+    <div class="small muted">Graba cada test con tu celular (15–20 segundos) y envíalo a ${prof} por WhatsApp. Después toca «Ya lo envié».</div>
+    ${ONL_TESTS.map(([k, tit, txt], i) => { const t = tests[k], c = ev[k];
+      const msg = `Hola ${String(S.cfg?.coach || 'Franco').split(' ')[0]}, soy ${nom}. Te envío mi test de movimiento ${i + 1}: ${tit}.`;
+      return `<div style="display:grid;gap:8px;padding:12px;border:1px solid ${t ? 'var(--line)' : 'var(--red)'};border-radius:12px">
+        <div class="row" style="align-items:center"><b>${i + 1}. ${esc(tit)}</b>${c?.s ? `<span class="small" title="${esc(SEM[c.s]?.[1] || '')}">${SEM[c.s]?.[0] || ''} ${esc(SEM[c.s]?.[1] || '')}</span>` : t ? '<span class="small ok">Enviado ✓</span>' : ''}</div>
+        <div class="small muted">${esc(txt)}</div>
+        ${c?.n ? `<div class="note small">💬 ${prof}: ${esc(c.n)}</div>` : ''}
+        <div class="grid2">${demos[k] ? `<a class="btn" href="${esc(demos[k])}" target="_blank" rel="noopener">▶ Ver cómo</a>` : ''}${n ? `<a class="btn" href="https://wa.me/${n}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">📲 Enviar</a>` : ''}</div>
+        ${t ? `<div class="row small"><span class="muted">Enviado el ${esc(fmtD(t.f))}</span><button class="btn" data-onltest="${k}" data-val="0" style="width:auto;min-height:34px;padding:0 12px">Deshacer</button></div>`
+          : `<button class="btn pri" data-onltest="${k}" data-val="1">✓ Ya lo envié</button>`}
+      </div>`; }).join('')}</section>
+
+  <section class="card" style="gap:8px"><div class="row"><h2 style="margin:0">🏋️ Evaluación en Titanium</h2>${check(ps[4].ok)}</div>
+    <div class="small muted">La hace ${prof} cuando vienes a Titanium. Se repite cada 4 semanas.</div>
+    <div class="row small"><span>${check(ib)} InBody</span><span class="muted">${ib ? 'listo' : 'pendiente'}</span></div>
+    <div class="row small"><span>${check(!!per)} Perímetros</span><span class="muted">${per ? esc(fmtD(per.f)) : 'pendiente'}</span></div>
+    ${per ? `<div class="small muted">${[['brazo', 'Brazo'], ['pecho', 'Pecho'], ['cintura', 'Cintura'], ['cadera', 'Cadera'], ['muslo', 'Muslo'], ['pant', 'Pantorrilla']].filter(([k2]) => per[k2]).map(([k2, l]) => l + ' ' + String(per[k2]).replace('.', ',') + ' cm').join(' · ')}</div>` : ''}
+    <div class="row small"><span>${check(!!fis)} Test de condición física</span><span class="muted">${fis ? esc(fmtD(fis.f)) : 'pendiente'}</span></div>
+    ${fis ? `<div class="small muted">${[['flex', 'Flexiones', ''], ['plancha', 'Plancha', ' s'], ['sent', 'Sentadillas 60 s', ''], ['airbike', 'AirBike 2 min', ' cal']].filter(([k2]) => fis[k2] != null).map(([k2, l, u]) => l + ' ' + fis[k2] + u).join(' · ')}</div>` : ''}
+  </section>`; };
+
+async function onlGuardar(cambios) { const nuevo = Object.assign({}, JSON.parse(JSON.stringify(onlP())), cambios);
+  nuevo.tests = nuevo.tests || {}; return guardarPerfil({ onl: nuevo }); }
+document.addEventListener('input', ev => { if (ev.target.id === 'onl-gymn') onlDraft().gymNombre = ev.target.value.trim(); });
+document.addEventListener('click', async ev => {
+  const ch = ev.target.closest('[data-onlch]'); if (ch) { const d = onlDraft(), g = ch.dataset.onlch, v = ch.dataset.val;
+    if (g === 'min' || g === 'mancMax') d[g] = d[g] === Number(v) ? null : Number(v);
+    else if (g === 'redes') d.redes = v === 'si';
+    else { const arr = d[g] || (d[g] = []); const i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1); else arr.push(v);
+      if (g === 'diasGym') d.diasGym = ONL_DIAS.map(x => x[0]).filter(x => d.diasGym.includes(x)); }
+    render(true); return; }
+  if (ev.target.closest('[data-onlacepto]')) { const b = ev.target.closest('[data-onlacepto]'); const falta = onlDondeFalta(); const d = onlDraft();
+    if (falta) { toast(falta); return; } if (d.redes == null) { toast('Responde si autorizas tus fotos en redes (Sí o No).'); return; }
+    if (!$('#onl-ok')?.checked) { toast('Marca «Acepto» para continuar.'); $('#onl-ok')?.focus(); return; }
+    b.disabled = true; const ok = await onlGuardar(Object.assign({}, d, { terminos: { v: TERM_V } })); if (!ok) { b.disabled = false; return; }
+    S.onlD = null; S.v = 'hoy'; render(); window.scrollTo(0, 0); toast('¡Listo! Bienvenido a tu asesoría online 💪'); return; }
+  if (ev.target.closest('[data-onledit]')) { S.onlD = null; onlDraft(); S.onlEdit = true; render(true); return; }
+  if (ev.target.closest('[data-onlsave]')) { const falta = onlDondeFalta(); if (falta) { toast(falta); return; } const d = onlDraft();
+    const b = ev.target.closest('[data-onlsave]'); b.disabled = true;
+    if (await onlGuardar({ lugares: d.lugares, diasGym: d.diasGym, equipo: d.equipo, mancMax: d.mancMax ?? null, min: d.min, gymNombre: d.gymNombre || null })) { S.onlEdit = false; S.onlD = null; S.v = 'onl'; render(true); toast('Guardado ✓'); } else b.disabled = false; return; }
+  const ot = ev.target.closest('[data-onltest]'); if (ot) { const k = ot.dataset.onltest, on = ot.dataset.val === '1'; const tests = Object.assign({}, onlP().tests || {});
+    if (on) tests[k] = { f: today() }; else delete tests[k];
+    ot.disabled = true; if (await onlGuardar({ tests })) { S.v = 'onl'; render(true); if (on) toast('Test marcado como enviado ✓'); } else ot.disabled = false; return; }
+  if (ev.target.closest('[data-onlfotos]')) { S.v = 'progreso'; S.evalFirst = false; S.ptab = 'fotos'; S.fotoUp = !onlPasos()[2].ok; render(); return; }
+});
 function fichaCard() { const f = S.perfil?.ficha || {}; const e = f.emerg || {}; const pq = f.parqResp || {};
   const estado = f.fecha ? `<span class="small ok">Actualizada el ${esc(fmtD(f.fecha))}</span>` : `<span class="small warn" style="font-weight:700">Pendiente · complétala antes de entrenar</span>`;
   return `<details class="card blk" data-sec="ficha" ${secAbiertos.has('ficha') ? 'open' : ''}><summary><div><h2>🩺 Mi ficha de salud</h2>${estado}</div><span class="chev" aria-hidden="true">›</span></summary>
@@ -968,6 +1132,7 @@ V.hoy = () => {
   ${flexHTML()}
   ${recupHTML()}
   ${evDia(t).map(evHTML).join('')}
+  ${onlInicioCard()}
   ${!S.perfil?.ficha?.fecha ? `<section class="card" style="border-color:var(--red)"><div><h2 style="margin:0">🩺 Completa tu ficha de salud</h2><div class="small muted">Lesiones, enfermedades y contacto de emergencia. Toma 3 minutos.</div></div><button class="btn pri" data-go="plan" data-ficha="1">Completar mi ficha</button></section>` : ''}
   <div class="grid2">
     ${ONL() ? (() => { const lun = addDays(t, -((parseISO(t).getDay() + 6) % 7)); const n = S.clases.filter(r => r.fecha >= lun && r.fecha <= t && !r.quitado && r.rpe != null).length; const meta = (S.a.dias_online || []).length;

@@ -1116,7 +1116,7 @@ VIEWS.inicio = () => {
         const rt = ult?.r.rutina && S.rutinas.get(ult.r.rutina);
         const det = ult ? `Última: ${diffDays(ult.f, t) === 0 ? 'hoy' : diffDays(ult.f, t) === 1 ? 'ayer' : esc(DSHORT[dayKey(ult.f)] + ' ' + fmtD(ult.f))}${rt ? ' · ' + esc(rt.tipo || '') : ''}${ult.r.rpe != null ? ' · RPE ' + esc(ult.r.rpe) : ' · sin terminar'}` : 'Aún no registra sesiones';
         const tono = !ult || diffDays(ult.f, t) >= 7 ? 'crit' : sem.length < Math.min(meta, ((parseISO(t).getDay() + 6) % 7) + 1) - 1 ? 'warn' : 'ok';
-        return `<div class="seg-row"><span class="ic">🌐</span><div class="grow" style="flex:1;min-width:0"><button class="st-name" data-act="ficha" data-id="${esc(a.codigo)}" style="border:0;background:none;padding:0;cursor:pointer;font-size:15px;text-align:left">${esc(a.nombre)}</button><div class="small muted">${det}${pe ? ' · sem ' + Math.min(pe.semana, pe.total) + '/' + pe.total : ''}</div></div><span class="count ${tono === 'crit' ? 'crit' : tono === 'warn' ? '' : 'zero'}" title="Sesiones terminadas esta semana">${sem.length}${meta ? '/' + meta : ''}</span>${ult ? `<button type="button" class="btn sm pri" data-act="on-ses" data-id="${esc(a.codigo)}" style="flex:none">Ver sesión</button>` : ''}</div>`; };
+        return `<div class="seg-row"><span class="ic">🌐</span><div class="grow" style="flex:1;min-width:0"><button class="st-name" data-act="ficha" data-id="${esc(a.codigo)}" style="border:0;background:none;padding:0;cursor:pointer;font-size:15px;text-align:left">${esc(a.nombre)}</button><div class="small muted">${det}${pe ? ' · sem ' + Math.min(pe.semana, pe.total) + '/' + pe.total : ''}${(() => { const ps = window.tlOnbPasos ? window.tlOnbPasos(a) : []; const n = ps.filter(x => x[1]).length; return ps.length && n < ps.length ? ` · <span class="warn" style="font-weight:700">📋 Inicio ${n}/${ps.length}</span>` : ''; })()}</div></div><span class="count ${tono === 'crit' ? 'crit' : tono === 'warn' ? '' : 'zero'}" title="Sesiones terminadas esta semana">${sem.length}${meta ? '/' + meta : ''}</span>${ult ? `<button type="button" class="btn sm pri" data-act="on-ses" data-id="${esc(a.codigo)}" style="flex:none">Ver sesión</button>` : ''}</div>`; };
       return `<section class="card pad">
       <h2 style="font-size:22px;margin-bottom:2px">Alumnos online</h2>
       <p class="muted small" style="margin:0 0 6px">Sesiones terminadas esta semana (de lunes a hoy). Toca «Ver sesión» para ver lo que hizo y anotó.</p>
@@ -2129,7 +2129,10 @@ function fichaAlumno(code, tabIni) {
     </div>
     </details>
     ${isNew ? '' : `<details class="sec" id="fa-hab-sec"><summary>⭐ Skills <span class="small muted" id="fa-hab-n" style="font-weight:500">· cargando…</span></summary><div class="small muted" style="margin:8px 0 6px">Toca para asignar o quitar. La pestaña Skills solo aparece en la app de quien tenga alguna asignada.</div><div class="chips" id="fa-hab" data-alumno="${esc(a.codigo)}"></div></details>`}
+    ${!isNew && a.online ? (() => { const ps = window.tlOnbPasos ? window.tlOnbPasos(a) : []; const n = ps.filter(x => x[1]).length;
+      return `<details class="sec" ${n < ps.length ? 'open' : ''}><summary>🌐 Asesoría online · inicio <span class="small ${n < ps.length ? 'warn' : 'muted'}" style="font-weight:500">· ${n}/${ps.length} pasos</span></summary><div data-tl-onb="${esc(code)}" style="margin-top:8px"></div></details>`; })() : ''}
     <details class="sec" ${isNew ? 'open' : ''}><summary>🗓 Horario fijo <span class="small muted" style="font-weight:500">· ${esc(bloquesTexto(a))}</span></summary>
+      ${a.online ? '<div class="small muted" style="margin:8px 0">🌐 Alumno online: marca solo los bloques en que viene a Titanium (ej. 06:00). Ocupan cupo y aparece en «Clase de hoy», sin recuperaciones. El resto de la semana entrena por su cuenta.</div>' : ''}
       ${grid}
     </details>
     <details class="sec"><summary>📱 App y acceso <span class="small muted" style="font-weight:500">· ${a.vinculado ? esc(appEstado(a).l) : 'aún no usa la app'}</span></summary>
@@ -3276,6 +3279,7 @@ document.addEventListener('click', e => {
       if (S.ui.stOpen) delete S.ui.stOpen[el.dataset.k];
       if (r.extra && r.reagDe?.recup) patchDia(f, h, code, {quitado: true, asis: null, rutina: null, aprobada: null, ej: null, rpe: null, carga: null, sesion: null});
       else if (r.extra) patchDia(f, h, code, {extra: null, quitado: null, asis: null, rutina: null, aprobada: null, ej: null, rpe: null, carga: null, sesion: null, reagDe: null});
+      else if (S.alumnos.get(code)?.online) { patchDia(f, h, code, {quitado: true, asis: null, aprobada: null, rutina: null, ej: null, rpe: null, carga: null, sesion: null}); toast(`${nombre(code)} quitado de las ${h} · online: sin recuperación`); break; }
       else { const dar = confirm(`¿Le das una recuperación a ${nombre(code)}?\n\nAceptar: le aparece "1 clase por recuperar" en su app para agendarla en otro bloque.\nCancelar: solo se quita de esta clase, sin recuperación.`);
         patchDia(f, h, code, {quitado: true, asis: null, aprobada: null, rutina: null, ej: null, rpe: null, carga: null, sesion: null});
         if (dar && window.__sb) window.__sb.rpc('otorgar_recuperacion', {p_codigo: code, p_fecha: f, p_hora: h})
@@ -3288,6 +3292,7 @@ document.addEventListener('click', e => {
     case 'todos-presentes': { const f = S.ui.claseFecha || today(), h = S.ui.claseHora; roster(f,h).filter(cd => !rec(f,h,cd).asis && S.conf?.get(f + '|' + h + '|' + cd) !== 'no_voy' && S.alumnos.get(cd)?.estado !== 'inactivo').forEach((cd,i) => { const pg = !rec(f,h,cd).rutina ? progEstado(S.alumnos.get(cd), f) : null; patchDia(f, h, cd, Object.assign({asis:'presente'}, pg ? {rutina: pg.next[0]} : {})); }); break; }
     case 'asis': { const {f,h,code} = toggleOne(el.dataset.k); const cur = rec(f,h,code).asis; const nv = cur === el.dataset.v ? null : el.dataset.v;
       // avisó que no venía: el profe elige en una ventana clara si le da la recuperación o queda Ausente
+      if (nv === 'aviso' && S.alumnos.get(code)?.online) { patchDia(f, h, code, {asis: 'aviso'}); toast(`${firstName(nombre(code))} avisó · online: sin recuperación, entrena ese día por su cuenta`); break; }
       if (nv === 'aviso') { const k = el.dataset.k, n = esc(firstName(nombre(code)));
         openModal(`${firstName(nombre(code))} avisó que no venía`, `<p style="margin:0 0 12px">¿Le das una clase para recuperar antes de que termine su plan?</p>
           <div style="display:grid;gap:10px">

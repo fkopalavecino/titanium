@@ -115,7 +115,7 @@
     notas: r.notas || '', planes: planes || [] };
     if (r.email) a.email = r.email; if (r.nacimiento) a.nacimiento = r.nacimiento; if (r.ingreso) a.ingreso = r.ingreso;
     if (r.programa !== undefined) a.programa = r.programa; if (r.programas_hechos && r.programas_hechos.length) a.programasHechos = r.programas_hechos;
-    if (r.fotos && r.fotos.length) a.fotos = r.fotos; if (r.medidas && r.medidas.length) a.medidas = r.medidas; if (r.inbody && r.inbody.length) a.inbody = r.inbody; if (r.perfil && Object.keys(r.perfil).length) a.perfil = r.perfil; if (r.user_id) a.vinculado = true; if (r.flex) a.flex = true; if (r.online) { a.online = true; a.diasOnline = r.dias_online || []; } return a; };
+    if (r.fotos && r.fotos.length) a.fotos = r.fotos; if (r.medidas && r.medidas.length) a.medidas = r.medidas; if (r.inbody && r.inbody.length) a.inbody = r.inbody; if (r.perfil && Object.keys(r.perfil).length) a.perfil = r.perfil; if (r.user_id) a.vinculado = true; if (r.flex) a.flex = true; if (r.online) { a.online = true; a.diasOnline = r.dias_online || []; if (r.eval_online && Object.keys(r.eval_online).length) a.evalOnline = r.eval_online; } return a; };
   const P2R = (code, p) => ({ id: p.id, alumno: code, mes: p.mes || null, inicio: p.inicio || null, fin: p.fin || null,
     clases: p.clases == null || p.clases === '' ? null : Number(p.clases), monto: Number(p.monto) || 0, pagos: p.pagos || [], updated_at: new Date().toISOString() });
   const R2P = r => ({ id: r.id, mes: r.mes, inicio: r.inicio, fin: r.fin, clases: r.clases, monto: r.monto, pagos: r.pagos || [] });
@@ -629,10 +629,10 @@
     const chip = (k, l) => `<button type="button" data-tl-od="${k}" aria-pressed="${dias.includes(k)}" aria-label="${k}" style="min-width:38px;min-height:36px;border-radius:999px;border:1px solid ${dias.includes(k) ? '#4da3ff' : 'var(--line,#2f2a2e)'};background:${dias.includes(k) ? '#4da3ff' : 'transparent'};color:${dias.includes(k) ? '#0e0c0f' : 'inherit'};font:700 14px Barlow,sans-serif;cursor:pointer">${l}</button>`;
     el.innerHTML = `<div style="display:grid;gap:8px;padding:8px 12px;border:1px solid ${on ? '#4da3ff' : 'var(--line,#2f2a2e)'};border-radius:10px;font-size:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>${on ? '🌐 <b>Alumno online</b> · entrena por su cuenta con la rutina de la app' : '🏋️ Presencial'}</span><button type="button" data-tl-on="${on ? 'off' : 'on'}" style="min-height:36px;padding:0 12px;border-radius:8px;border:1px solid ${on ? 'var(--line,#2f2a2e)' : '#4da3ff'};background:transparent;color:${on ? 'inherit' : '#4da3ff'};font:600 14px Barlow,sans-serif;cursor:pointer">${on ? 'Volver a presencial' : 'Activar modo online'}</button></div>
-      ${on ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span style="color:var(--muted,#a69ea3);font-size:13px;margin-right:4px">Días sugeridos</span>${DOL.map(([k, l]) => chip(k, l)).join('')}</div><div style="color:var(--muted,#a69ea3);font-size:12px">Sin hora ni cupo. En su app ve la sesión sugerida de cada día y puede hacerla otro día si se le corre la semana.</div>` : ''}</div>`;
+      ${on ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span style="color:var(--muted,#a69ea3);font-size:13px;margin-right:4px">Días sugeridos</span>${DOL.map(([k, l]) => chip(k, l)).join('')}</div><div style="color:var(--muted,#a69ea3);font-size:12px">Los días online no tienen hora ni cupo. Si además viene a Titanium, márcale esos bloques en «Horario fijo» (ocupan cupo, sin recuperaciones).</div>` : ''}</div>`;
     el.querySelector('[data-tl-on]').onclick = async ev => { const btn = ev.currentTarget, v = btn.dataset.tlOn === 'on';
       const prev = a.modo_prev || {}, tenia = (a.bloques || []).length || a.flex;
-      if (v && !confirm('¿Activar modo online?\n\nNo ocupa cupos ni aparece en «Clase de hoy». Entrena por su cuenta con la rutina de la app y paga su plan mensual sin número de clases.' + (tenia ? '\n\nSu horario presencial queda guardado y vuelve tal cual si lo pasas de nuevo a presencial.' : ''))) return;
+      if (v && !confirm('¿Activar modo online?\n\nEntrena por su cuenta con la rutina de la app y paga su plan mensual sin número de clases. Si viene a Titanium (ej. 06:00), después márcale esos bloques en «Horario fijo»: ahí sí ocupa cupo y aparece en «Clase de hoy», sin recuperaciones.' + (tenia ? '\n\nSu horario presencial queda guardado y vuelve tal cual si lo pasas de nuevo a presencial.' : ''))) return;
       if (!v && !confirm('¿Volver a presencial?' + ((prev.bloques || []).length || prev.flex ? '\n\nRecupera su horario de antes.' : '\n\nAsígnale sus bloques en la ficha.') + ' Sus días online y sus sesiones quedan guardados por si vuelve a online.')) return;
       // al pasar a online se respalda el horario presencial; al volver se restaura tal cual (los días online también se guardan)
       btn.disabled = true; const { error } = await sb.from('alumnos').update(v
@@ -645,6 +645,78 @@
       if (error) { alert('No se pudo guardar: ' + error.message); b.disabled = false; return; } pintarOnline(el); });
   }
   new MutationObserver(() => document.querySelectorAll('[data-tl-online]:not([data-done])').forEach(pintarOnline)).observe(document.documentElement, { childList: true, subtree: true });
+
+  /* ---------- asesoría online · inicio (Fase 2): ve lo que completó el alumno y registra su evaluación ---------- */
+  const ONB_TESTS = [['sq', 'Sentadilla brazos arriba'], ['bisagra', 'Bisagra de cadera'], ['flex', 'Flexión de brazos'], ['zancada', 'Zancada'], ['hombro', 'Movilidad de hombro']];
+  const ONB_PER = [['brazo', 'Brazo'], ['pecho', 'Pecho'], ['cintura', 'Cintura'], ['cadera', 'Cadera'], ['muslo', 'Muslo'], ['pant', 'Pantorrilla']];
+  const ONB_FIS = [['flex', 'Flexiones máx', 'reps'], ['plancha', 'Plancha', 'seg'], ['sent', 'Sentadillas 60 s', 'reps'], ['airbike', 'AirBike 2 min', 'cal']];
+  const ONB_LUG = { titanium: 'Titanium 06:00', gym: 'Otro gimnasio', casa: 'Casa' };
+  const ONB_DL = { lun: 'L', mar: 'M', mie: 'X', jue: 'J', vie: 'V', sab: 'S', dom: 'D' };
+  const onbEsc = x => String(x == null ? '' : x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const onbHoy = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
+  const onbF = s => { if (!s) return '—'; const [y, m, d] = String(s).slice(0, 10).split('-'); return `${Number(d)}-${m}-${y}`; };
+  const onbBtn = 'min-height:34px;padding:0 10px;border-radius:8px;border:1px solid var(--line,#2f2a2e);background:transparent;color:inherit;font:600 13px Barlow,sans-serif;cursor:pointer';
+  const onbIn = 'height:36px;border-radius:8px;border:1px solid var(--line,#2f2a2e);background:var(--sunk,#1b181c);color:inherit;padding:0 8px;font:500 14px Barlow,sans-serif;width:100%';
+  window.tlOnbPasos = (a, ev) => { const p = a?.perfil?.onl || {}, e = ev || a?.evalOnline || {}; const t = p.tests || {};
+    const nT = ONB_TESTS.filter(([k]) => t[k]).length;
+    return [['Ficha', !!a?.perfil?.ficha?.fecha], ['Términos', (p.terminos?.v || 0) >= 1], ['Fotos', (a?.fotos || []).some(x => x.frente && x.perfil && x.espalda)],
+      [`Tests ${nT}/5`, nT === 5], ['InBody', (a?.inbody || []).length > 0], ['Perímetros', (e.perim || []).length > 0], ['Test físico', (e.fisico || []).length > 0]]; };
+  async function pintarOnb(el) {
+    const code = el.dataset.tlOnb; el.dataset.done = '1';
+    const [{ data: a }, { data: oc }] = await Promise.all([sb.from('alumnos').select('online,perfil,eval_online,fotos,inbody,bloques').eq('codigo', code).maybeSingle(), sb.from('online_cfg').select('data').eq('id', 1).maybeSingle()]);
+    if (!a || !a.online) { el.innerHTML = ''; return; }
+    const p = a.perfil?.onl || {}, e = a.eval_online || {}, demos = oc?.data?.demos || {}, tests = p.tests || {}, evt = e.tests || {};
+    const pasos = window.tlOnbPasos(a, e); const n = pasos.filter(x => x[1]).length;
+    const ult = arr => (arr || []).slice().sort((x, y) => String(x.f).localeCompare(String(y.f))).pop();
+    const sem = (k, s) => [['v', '🟢'], ['a', '🟡'], ['r', '🔴']].map(([v, ic]) => `<button type="button" data-onb-sem="${k}" data-v="${v}" aria-pressed="${s === v}" style="${onbBtn};min-width:40px;${s === v ? 'border-color:#d71f30;background:rgba(215,31,48,.15)' : ''}">${ic}</button>`).join('');
+    const hist = (arr, cols) => (arr || []).slice().sort((x, y) => String(y.f).localeCompare(String(x.f))).slice(0, 4).map(r => `<div style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted,#a69ea3)"><b style="color:inherit;min-width:78px">${onbF(r.f)}</b><span style="flex:1">${cols.filter(([k]) => r[k] != null).map(([k, l, u]) => l + ' ' + String(r[k]).replace('.', ',') + ' ' + (u || 'cm')).join(' · ')}</span></div>`).join('');
+    const per0 = ult(e.perim) || {};
+    el.innerHTML = `<div style="display:grid;gap:12px;font-size:14px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${pasos.map(([l, ok]) => `<span style="padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid ${ok ? '#1f7a4d' : 'var(--line,#2f2a2e)'};color:${ok ? '#5fd39a' : 'var(--muted,#a69ea3)'}">${ok ? '✓' : '○'} ${onbEsc(l)}</span>`).join('')}<span style="font-size:12px;color:var(--muted,#a69ea3);align-self:center">${n}/${pasos.length}</span></div>
+      <div style="display:grid;gap:4px"><b>📍 Dónde entrena</b>
+        <div>${onbEsc((p.lugares || []).map(k => ONB_LUG[k] || k).join(' · ') || 'Aún no lo completa')}${p.min ? ' · ' + p.min + ' min por sesión' : ''}</div>
+        ${(p.lugares || []).includes('gym') ? `<div style="color:var(--muted,#a69ea3);font-size:13px">${onbEsc(p.gymNombre || 'Otro gimnasio')}: ${onbEsc((p.diasGym || []).map(d => ONB_DL[d] || d).join(' '))} · ${onbEsc((p.equipo || []).join(', ') || 'sin equipo marcado')}${p.mancMax ? ' · mancuernas hasta ' + p.mancMax + ' kg' : ''}</div>` : ''}
+        <div style="color:var(--muted,#a69ea3);font-size:13px">📄 Términos: ${p.terminos ? 'aceptados el ' + onbEsc(p.terminos.f) + ' (v' + p.terminos.v + ')' : 'pendientes'} · 📸 Fotos en redes: ${p.redes === true ? '<b style="color:#5fd39a">sí autoriza</b>' : p.redes === false ? 'no autoriza' : '—'}</div></div>
+      <div style="display:grid;gap:8px"><b>🎥 Tests de movimiento</b><div style="color:var(--muted,#a69ea3);font-size:12px">Te llegan por WhatsApp. Califica con el semáforo y deja una nota corta: el alumno la ve en su app.</div>
+        ${ONB_TESTS.map(([k, l]) => { const t = tests[k], c = evt[k] || {};
+          return `<div style="display:grid;gap:6px;padding:8px 10px;border:1px solid var(--line,#2f2a2e);border-radius:10px">
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><span><b>${onbEsc(l)}</b> <span style="color:${t ? '#5fd39a' : 'var(--muted,#a69ea3)'};font-size:12px">${t ? 'enviado ' + onbF(t.f) : 'no enviado'}</span>${t?.link ? ` · <a href="${onbEsc(t.link)}" target="_blank" rel="noopener" style="color:#7cc0ff">ver video</a>` : ''}</span><span style="display:flex;gap:4px">${sem(k, c.s)}</span></div>
+            <input data-onb-nota="${k}" maxlength="200" placeholder="Nota para el alumno (opcional)" value="${onbEsc(c.n || '')}" style="${onbIn}"></div>`; }).join('')}</div>
+      <div style="display:grid;gap:8px"><b>📏 Perímetros (cm)</b>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">${ONB_PER.map(([k, l]) => `<label style="display:grid;gap:3px;font-size:12px;color:var(--muted,#a69ea3)">${l}<input type="number" inputmode="decimal" step="0.1" min="10" max="200" data-onb-per="${k}" placeholder="${per0[k] != null ? String(per0[k]).replace('.', ',') : ''}" style="${onbIn}"></label>`).join('')}</div>
+        <div style="display:flex;gap:6px;align-items:center"><input type="date" data-onb-perf value="${onbHoy()}" style="${onbIn};max-width:170px"><button type="button" data-onb-save="perim" style="${onbBtn};border-color:#d71f30;color:#fff;background:#d71f30">Guardar perímetros</button></div>
+        ${hist(e.perim, ONB_PER)}</div>
+      <div style="display:grid;gap:8px"><b>💪 Test de condición física</b>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">${ONB_FIS.map(([k, l, u]) => `<label style="display:grid;gap:3px;font-size:12px;color:var(--muted,#a69ea3)">${l} (${u})<input type="number" inputmode="numeric" min="0" max="999" data-onb-fis="${k}" style="${onbIn}"></label>`).join('')}</div>
+        <div style="display:flex;gap:6px;align-items:center"><input type="date" data-onb-fisf value="${onbHoy()}" style="${onbIn};max-width:170px"><button type="button" data-onb-save="fisico" style="${onbBtn};border-color:#d71f30;color:#fff;background:#d71f30">Guardar test</button></div>
+        ${hist(e.fisico, ONB_FIS)}</div>
+      <details><summary style="cursor:pointer;font-weight:700">▶ Videos demo de los tests (YouTube) · ${ONB_TESTS.filter(([k]) => demos[k]).length}/5</summary>
+        <div style="display:grid;gap:6px;margin-top:8px"><div style="color:var(--muted,#a69ea3);font-size:12px">Pega el link de YouTube (puede ser «no listado»). Es el mismo para todos tus alumnos online y no ocupa espacio en la app.</div>
+        ${ONB_TESTS.map(([k, l]) => `<label style="display:grid;gap:3px;font-size:12px;color:var(--muted,#a69ea3)">${l}<input type="url" data-onb-demo="${k}" placeholder="https://youtu.be/…" value="${onbEsc(demos[k] || '')}" style="${onbIn}"></label>`).join('')}
+        <button type="button" data-onb-save="demos" style="${onbBtn}">Guardar links</button></div></details>
+    </div>`;
+    const guardarEval = async cambios => { const { data: cur } = await sb.from('alumnos').select('eval_online').eq('codigo', code).maybeSingle();
+      const nuevo = Object.assign({}, cur?.eval_online || {}, cambios(cur?.eval_online || {}));
+      const { error } = await sb.from('alumnos').update({ eval_online: nuevo }).eq('codigo', code); if (error) { alert('No se pudo guardar: ' + error.message); return false; } return true; };
+    el.querySelectorAll('[data-onb-sem]').forEach(b => b.onclick = async () => { const k = b.dataset.onbSem, v = b.dataset.v; b.disabled = true;
+      if (await guardarEval(cur => { const t = Object.assign({}, cur.tests || {}); const x = Object.assign({}, t[k] || {}); x.s = x.s === v ? null : v; x.f = onbHoy(); t[k] = x; return { tests: t }; })) pintarOnb(el); else b.disabled = false; });
+    el.querySelectorAll('[data-onb-nota]').forEach(i => i.onchange = async () => { const k = i.dataset.onbNota, v = i.value.trim();
+      if (await guardarEval(cur => { const t = Object.assign({}, cur.tests || {}); t[k] = Object.assign({}, t[k] || {}, { n: v || null }); return { tests: t }; })) { i.style.borderColor = '#1f7a4d'; } });
+    el.querySelectorAll('[data-onb-save]').forEach(b => b.onclick = async () => { const tipo = b.dataset.onbSave;
+      if (tipo === 'demos') { const d = {}; let malo = '';
+        el.querySelectorAll('[data-onb-demo]').forEach(i => { const v = i.value.trim(); if (!v) return; if (!/^https:\/\//.test(v)) malo = v; d[i.dataset.onbDemo] = v; });
+        if (malo) { alert('El link debe empezar con https:// (cópialo desde YouTube › Compartir).'); return; }
+        b.disabled = true; const { data: cur } = await sb.from('online_cfg').select('data').eq('id', 1).maybeSingle();
+        const { error } = await sb.from('online_cfg').upsert({ id: 1, data: Object.assign({}, cur?.data || {}, { demos: d }), updated_at: new Date().toISOString() });
+        if (error) { alert('No se pudo guardar: ' + error.message); b.disabled = false; return; } pintarOnb(el); return; }
+      const sel = tipo === 'perim' ? '[data-onb-per]' : '[data-onb-fis]'; const f = el.querySelector(tipo === 'perim' ? '[data-onb-perf]' : '[data-onb-fisf]').value || onbHoy();
+      const fila = { f }; let alguno = false;
+      el.querySelectorAll(sel).forEach(i => { const v = Number(String(i.value).replace(',', '.')); if (i.value !== '' && !isNaN(v)) { fila[i.dataset.onbPer || i.dataset.onbFis] = v; alguno = true; } });
+      if (!alguno) { alert('Ingresa al menos un valor.'); return; }
+      b.disabled = true;
+      if (await guardarEval(cur => ({ [tipo]: (cur[tipo] || []).filter(r => r.f !== f).concat(fila) }))) pintarOnb(el); else b.disabled = false; });
+  }
+  new MutationObserver(() => document.querySelectorAll('[data-tl-onb]:not([data-done])').forEach(pintarOnb)).observe(document.documentElement, { childList: true, subtree: true });
 
   /* ---------- respaldo: descarga todos los datos en un archivo ---------- */
   const BK = 'tl-respaldo';
