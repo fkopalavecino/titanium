@@ -1110,7 +1110,7 @@ VIEWS.inicio = () => {
     ${(() => { // alumnos online: qué sesiones hicieron esta semana (entrenan por su cuenta con la rutina de la app)
       const ons = al.filter(a => a.online && a.estado !== 'inactivo'); if (!ons.length) return '';
       const lun = addDays(t, -((parseISO(t).getDay() + 6) % 7));
-      const fila = a => { const ses = []; for (const [f, d] of S.dias) { const r = d.bloques?.online?.[a.codigo]; if (r && f <= t && f >= addDays(t, -60) && (r.rpe != null || (r.ej || []).length)) ses.push({ f, r }); }
+      const fila = a => { const ses = []; for (const [f, d] of S.dias) { const r = sesOnlDia(d, a.codigo); if (r && f <= t && f >= addDays(t, -60) && (r.rpe != null || (r.ej || []).length)) ses.push({ f, r }); }
         ses.sort((x, y) => y.f.localeCompare(x.f)); const sem = ses.filter(x => x.f >= lun && x.r.rpe != null);
         const meta = (a.diasOnline || []).length || 0; const ult = ses[0]; const pe = progEstado(a);
         const rt = ult?.r.rutina && S.rutinas.get(ult.r.rutina);
@@ -1533,7 +1533,7 @@ VIEWS.alumnos = () => {
         <td><div style="display:flex;gap:10px;align-items:center">${a.perfil?.avatar && fotoURL(a.perfil.avatar) ? `<img class="al-av" src="${fotoURL(a.perfil.avatar)}" alt="" loading="lazy">` : `<span class="al-av" aria-hidden="true">${esc(iniciales(a.nombre))}</span>`}<div style="min-width:0"><b>${esc(a.nombre)}</b>${nuPill(a.codigo)}${a.online ? ' <span class="pill" style="background:rgba(77,163,255,.15);color:#7cc0ff;border:1px solid rgba(77,163,255,.45);font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;white-space:nowrap">🌐 Online</span>' : ''}${a.estado !== 'inactivo' ? appChips(a) : ''}<span class="sub">${esc(a.codigo)}${a.estado === 'inactivo' ? ' · inactivo' : ''}${(() => { const pg = progEstado(a); return pg ? ' · ' + esc(progTexto(pg)) + ' · sem ' + Math.min(pg.semana, pg.total) + '/' + pg.total + (pg.terminado ? ' ✓' : '') : ''; })()}</span></div></div></td>
         <td class="small">${a.online ? '<span style="color:#7cc0ff;font-weight:600">🌐 Online</span>' + ((a.diasOnline || []).length ? ' · ' + esc(a.diasOnline.map(d => DSHORT[d]).join(' ')) : '') : esc(bloquesTexto(a))}</td>
         <td class="r num">${a.online ? 'Mensual' : tot || '—'}${p?.inicio ? `<span class="sub">${fmtD(p.inicio)}–${fmtD(p.fin)}</span>` : ''}</td>
-        ${a.online ? (() => { let n = 0; for (const [f, d] of S.dias) { const r = d.bloques?.online?.[a.codigo]; if (r && r.rpe != null && p?.inicio && f >= p.inicio && (!p.fin || f < p.fin)) n++; } return `<td class="r num">${n}<span class="sub">sesiones</span></td><td class="r num">—</td><td class="r num">—</td>`; })() : `<td class="r num">${as.pres + as.aus}${as.aus ? `<span class="sub">${as.aus} falta${as.aus === 1 ? '' : 's'}</span>` : ''}</td>
+        ${a.online ? (() => { let n = 0; for (const [f, d] of S.dias) { const r = sesOnlDia(d, a.codigo); if (r && r.rpe != null && p?.inicio && f >= p.inicio && (!p.fin || f < p.fin)) n++; } return `<td class="r num">${n}<span class="sub">sesiones</span></td><td class="r num">—</td><td class="r num">—</td>`; })() : `<td class="r num">${as.pres + as.aus}${as.aus ? `<span class="sub">${as.aus} falta${as.aus === 1 ? '' : 's'}</span>` : ''}</td>
         <td class="r num">${tot ? Math.max(0, tot - as.pres - as.aus) : '—'}</td>
         <td class="r num">${pct}</td>`}
         <td>${pill(vigencia(a,p))}</td>
@@ -1733,8 +1733,11 @@ VIEWS.registro = () => {
 
 /* ---------- modal ---------- */
 let modalSubmit = null;
+// sesión de un alumno online ese día: la online o la que hizo en su bloque fijo en Titanium (agenda mixta)
+function sesOnlDia(d, code) { const b = d?.bloques || {}; if (b.online?.[code]) return b.online[code];
+  for (const h in b) { if (h === 'libre') continue; const r = b[h][code]; if (r && !r.quitado && (r.rpe != null || (r.ej || []).length)) return r; } return null; }
 /* alumnos online: ver con un toque la sesión que hizo (series, cargas, RPE, nota) y compararla con la anterior */
-function onlineSesiones(code) { const out = []; for (const [f, d] of S.dias) { const r = d.bloques?.online?.[code]; if (r && (r.rpe != null || r.notas || r.nota || (r.ej || []).some(x => setsOf(x).length))) out.push({ f, r }); } return out.sort((a, b) => b.f.localeCompare(a.f)); }
+function onlineSesiones(code) { const out = []; for (const [f, d] of S.dias) { const r = sesOnlDia(d, code); if (r && (r.rpe != null || r.notas || r.nota || (r.ej || []).some(x => setsOf(x).length))) out.push({ f, r }); } return out.sort((a, b) => b.f.localeCompare(a.f)); }
 function verSesionOnline(code, f) {
   const ses = onlineSesiones(code); if (!ses.length) { toast('Aún no registra sesiones'); return; }
   const i = Math.max(0, ses.findIndex(x => x.f === f)), s = ses[i], prev = ses.slice(i + 1), t = today();
@@ -2260,15 +2263,21 @@ async function tecnicaModal() {
   const usos = {}; [...S.rutinas.values()].forEach(r => (r.bloques || []).forEach(b => (b.ejercicios || []).forEach(e => { const t = tecMatch(e.nombre); if (t) usos[t.id] = (usos[t.id] || 0) + 1; })));
   TEC.forEach(t => t.usos = usos[t.id] || 0);
   TEC.sort((a, b) => (!!a.video - !!b.video) || (b.usos - a.usos) || (a.orden - b.orden));
+  // ejercicios que usan hoy los alumnos online (para grabar primero esos)
+  const famOnl = new Set(activos().filter(a => a.online && a.programa?.familia).map(a => a.programa.familia));
+  const onlIds = new Set(); [...S.rutinas.values()].filter(r => famOnl.has(r.familia)).forEach(r => (r.bloques || []).forEach(b => (b.ejercicios || []).forEach(e => { const t = tecMatch(e.nombre); if (t) onlIds.add(t.id); })));
+  const onlSin = TEC.filter(t => onlIds.has(t.id) && !t.video).length;
   const conVideo = TEC.filter(t => t.video).length, pct = TEC.length ? Math.round(conVideo / TEC.length * 100) : 0;
   openModal('Técnica y videos', `
     <div style="display:grid;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>🎬 Grabados ${conVideo} de ${TEC.length}</b><span class="small muted num">${pct}%</span></div>
       <div style="height:6px;border-radius:4px;background:var(--line)"><i style="display:block;height:6px;width:${pct}%;border-radius:4px;background:var(--red)"></i></div>
       <p class="small muted" style="margin:0">Ordenados por prioridad: arriba los que más se repiten en tus workouts y aún no tienen video. Pega el link y queda marcado solo. Tus alumnos lo ven al tocar <b>?</b> o «¿Cómo se hace?».</p></div>
     <input type="search" class="search" id="tec-q" placeholder="Buscar movimiento" aria-label="Buscar movimiento">
+    ${onlIds.size ? `<label class="small" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="tec-onl" style="width:20px;height:20px;accent-color:var(--red)"> 🌐 Solo los de mis alumnos online · <b>${onlSin} sin video</b></label>` : ''}
     ${sin.length ? `<details class="tec-sin"><summary class="small"><b>${sin.length} ejercicio${sin.length === 1 ? '' : 's'} sin técnica</b></summary><div class="list small">${sin.map(n => `<div class="li"><span class="grow">${esc(n)}</span><button type="button" class="btn sm" data-act="tec-add" data-n="${esc(n)}">+ Agregar</button></div>`).join('')}</div></details>` : ''}
-    <div class="list" id="tec-list" style="max-height:52vh;overflow:auto">${TEC.map(tecFila).join('')}</div>`, { wide: true, submit: 'Listo', cancel: 'Cerrar', onSubmit: () => { const o = document.querySelector('#tec-list details.tec-it[open] [data-act="tec-save"]'); if (o) { o.click(); return false; } return true; } });
-  $('#tec-q')?.addEventListener('input', ev => { const q = norm(ev.target.value); document.querySelectorAll('#tec-list .tec-it').forEach(d => { d.hidden = q && !d.dataset.q.includes(q); }); });
+    <div class="list" id="tec-list" style="max-height:52vh;overflow:auto">${TEC.map(t => tecFila(t).replace('<details class="tec-it"', `<details data-onl="${onlIds.has(t.id) ? 1 : 0}" class="tec-it"`)).join('')}</div>`, { wide: true, submit: 'Listo', cancel: 'Cerrar', onSubmit: () => { const o = document.querySelector('#tec-list details.tec-it[open] [data-act="tec-save"]'); if (o) { o.click(); return false; } return true; } });
+  const tecFiltrar = () => { const q = norm($('#tec-q')?.value || ''), so = !!$('#tec-onl')?.checked; document.querySelectorAll('#tec-list .tec-it').forEach(d => { d.hidden = (q && !d.dataset.q.includes(q)) || (so && d.dataset.onl !== '1'); }); };
+  $('#tec-q')?.addEventListener('input', tecFiltrar); $('#tec-onl')?.addEventListener('change', tecFiltrar);
 }
 const ytBuscar = q => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q + ' técnica ejercicio');
 async function verTec(nombre) {
@@ -3120,7 +3129,7 @@ function sesionModal(key, rid) {
     wide: true, submit: 'Guardar sesión',
     extra: r.sesion ? `<button type="button" class="btn ghost" data-act="ses-reset" data-k="${esc(key)}">Volver a la original</button>` : '',
     onSubmit: () => {
-      const nb = bloques.map((b, i) => Object.assign({}, b, {ejercicios: [...document.querySelectorAll(`.ses-blq[data-b="${i}"] .ses-row`)].map(row => ({nombre: row.querySelector('.ses-n').value.trim(), dosis: row.querySelector('.ses-d').value.trim()})).filter(e => e.nombre)}));
+      const nb = bloques.map((b, i) => Object.assign({}, b, {ejercicios: [...document.querySelectorAll(`.ses-blq[data-b="${i}"] .ses-row`)].map(row => { const nm = row.querySelector('.ses-n').value.trim(); const pr = (b.ejercicios || []).find(x => x.nombre === nm); return Object.assign({nombre: nm, dosis: row.querySelector('.ses-d').value.trim()}, pr?.alt ? {alt: pr.alt} : {}); }).filter(e => e.nombre)}));
       if ($('#ses-plantilla').checked) {
         saveRutina(rid, Object.assign(clone(base), {bloques: nb}));
         patchDia(f, h, code, {rutina: rid, sesion: null});
@@ -3136,7 +3145,7 @@ function sesionModal(key, rid) {
 }
 function wkModal(id, dup) {
   const r = id ? clone(S.rutinas.get(id)) : {familia:'', tipo:'Sesión FKO', nivel:'Básico', minutos:45, guia:'', favorito:false, bloques:[{titulo:'Bloque A · Activación, movilidad y core', nota:'', ejercicios:[]},{titulo:'Bloque B · Fuerza', nota:'', ejercicios:[]},{titulo:'Bloque C · Híbrido EMOM', nota:'', ejercicios:[]}]};
-  const text = (r.bloques||[]).map(b => `# ${b.titulo}\n${b.nota ? '> ' + b.nota + '\n' : ''}${(b.ejercicios||[]).map(e => `- ${e.nombre} | ${e.dosis}`).join('\n')}`).join('\n\n');
+  const text = (r.bloques||[]).map(b => `# ${b.titulo}\n${b.nota ? '> ' + b.nota + '\n' : ''}${(b.ejercicios||[]).map(e => `- ${e.nombre} | ${e.dosis}${(e.alt||[]).length ? ' | alt: ' + e.alt.join(' / ') : ''}`).join('\n')}`).join('\n\n');
   const editing = id && !dup;
   openModal(editing ? 'Editar workout' : dup ? 'Duplicar workout' : 'Crear workout', `
     <div class="frow">
@@ -3149,7 +3158,7 @@ function wkModal(id, dup) {
       <label class="f">Minutos<input type="number" id="wk-min" min="1" value="${esc(r.minutos || '')}"></label>
     </div>
     <label class="f">Bloques y ejercicios<textarea id="wk-txt" rows="14" style="font-family:ui-monospace,Menlo,monospace;font-size:13px">${esc(text)}</textarea></label>
-    <p class="small muted" style="margin:0"><b>#</b> inicia un bloque · <b>&gt;</b> nota del bloque · <b>-</b> ejercicio, y después de <b>|</b> la dosis (series × reps · RIR · descanso).</p>
+    <p class="small muted" style="margin:0"><b>#</b> inicia un bloque · <b>&gt;</b> nota del bloque · <b>-</b> ejercicio, y después de <b>|</b> la dosis (series × reps · RIR · descanso). Opcional: <b>| alt: A / B</b> = alternativas si no tiene la máquina.</p>
     <label class="f">Guía para el coach<textarea id="wk-guia" rows="3">${esc(r.guia || '')}</textarea></label>
     <label class="f">Progresión semanal (una línea por semana)<textarea id="wk-prog" rows="5" placeholder="Semana 1 · Técnica, RIR 3&#10;Semana 2 · +2,5 kg…">${esc((r.progresion || []).join('\n'))}</textarea></label>`, {
     submit: editing ? 'Guardar' : 'Crear',
@@ -3161,7 +3170,7 @@ function wkModal(id, dup) {
         if (l.startsWith('#')) { cur = {titulo: l.replace(/^#+\s*/,''), nota:'', ejercicios:[]}; bloques.push(cur); return; }
         if (!cur) { cur = {titulo:'Bloque', nota:'', ejercicios:[]}; bloques.push(cur); }
         if (l.startsWith('>')) { cur.nota = (cur.nota ? cur.nota + ' ' : '') + l.replace(/^>\s*/,''); return; }
-        const [n, ...rest] = l.replace(/^[-*•]\s*/,'').split('|'); cur.ejercicios.push({nombre: n.trim(), dosis: rest.join('|').trim()}); });
+        const [n, ...rest] = l.replace(/^[-*•]\s*/,'').split('|'); const ai = rest.findIndex(x => /^\s*alt\s*:/i.test(x)); const alt = ai >= 0 ? rest.splice(ai, 1)[0].replace(/^\s*alt\s*:/i, '').split('/').map(x => x.trim()).filter(Boolean) : []; cur.ejercicios.push(Object.assign({nombre: n.trim(), dosis: rest.join('|').trim()}, alt.length ? {alt} : {})); });
       const nr = Object.assign({}, r, {familia: fam, categoria: val('wk-cat') || 'Mis workouts', nivel: val('wk-nivel'), tipo: val('wk-tipo'), minutos: Number(val('wk-min')) || null, guia: val('wk-guia'), progresion: $('#wk-prog').value.split('\n').map(x => x.trim()).filter(Boolean), bloques});
       const nid = editing ? id : (norm(fam).replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40) || 'workout') + '-' + norm(nr.nivel) + '-' + Date.now().toString(36).slice(-4);
       saveRutina(nid, nr); toast(editing ? 'Workout guardado.' : 'Workout creado.');

@@ -1,0 +1,2 @@
+-- Fase 3: _limpiar_onl acepta perfil.onl.corr = [{f, ej}] (correcciones de técnica pedidas por WhatsApp, últimas 40).
+-- Aplicada en Supabase el 17-11-2026 (ver función actual en la base).

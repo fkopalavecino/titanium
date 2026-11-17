@@ -1334,6 +1334,17 @@ const ytBuscar = q => 'https://www.youtube.com/results?search_query=' + encodeUR
 // modo clase: botón de video siempre a mano; tu video si está grabado, si no ejemplos en YouTube
 const vidBtn = (e, tc) => tc && tc.video ? `<a class="vid-b own" href="${esc(tc.video)}" target="_blank" rel="noopener" aria-label="Ver video: ${esc(e.nombre)}">▶ Video</a>` : `<a class="vid-b" href="${esc(ytBuscar(tc ? tc.nombre : normEj(e.nombre)))}" target="_blank" rel="noopener" aria-label="Ver video: ${esc(e.nombre)}">▶ Video</a>`;
 const fmtKg = v => String(Math.round(v * 10) / 10).replace('.', ',');
+// alumno online: pedir corrección de técnica por WhatsApp (máx. 2 por semana, queda registrado para el profe)
+const lunesDeHoy = () => addDays(today(), -((parseISO(today()).getDay() + 6) % 7));
+const corrSemana = () => ((S.perfil?.onl || {}).corr || []).filter(x => x.f >= lunesDeHoy());
+function corrBtn(e) { const n = waNum(); if (!n) return ''; const nom = S.perfil?.apodo || String(S.a.nombre || '').split(' ')[0]; const prof = String(S.cfg?.coach || 'Franco').split(' ')[0];
+  const msg = `Hola ${prof}, soy ${nom}. ¿Me corriges la técnica? Ejercicio: ${normEj(e.nombre)} (${fmtD(today())}). Te mando el video 🎥`;
+  return `<a class="small" data-corr="${esc(normEj(e.nombre))}" href="https://wa.me/${n}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" style="color:#5fd39a;text-decoration:none;font-weight:600">📲 Pedir corrección · ${corrSemana().length}/2 esta semana</a>`; }
+document.addEventListener('click', ev => { const a = ev.target.closest('[data-corr]'); if (!a) return; const usadas = corrSemana().length;
+  if (usadas >= 2 && !confirm('Ya pediste tus 2 correcciones de esta semana. ¿Enviar igual? Puede que Franco la responda la próxima semana.')) { ev.preventDefault(); return; }
+  const onl = Object.assign({}, S.perfil?.onl || {}); onl.corr = (onl.corr || []).concat({ f: today(), ej: a.dataset.corr }).slice(-40);
+  S.perfil = Object.assign({}, S.perfil, { onl }); a.textContent = '📲 Pedir corrección · ' + corrSemana().length + '/2 esta semana';
+  sb.rpc('actualizar_mi_perfil', { p_perfil: S.perfil }).then(({ error }) => { if (error) toast('No se pudo registrar la corrección: ' + error.message); }, () => {}); });
 // carga sugerida: si en la sesión anterior llegó al tope de reps en todas sus series pesadas, sube; si no, mantiene
 function sugerencia(e) { if (tipoEj(e) === 'tiempo') { const pv = prevSets(e.nombre).filter(x => x && x.t > 0); if (!pv.length) return null; const t = Math.max(...pv.map(x => x.t)); const obj = segObj(e);
     if (!obj || pv.every(x => x.t >= obj)) return { t: t + 5, sube: true, txt: `Hoy prueba ${t + 5} s · la vez anterior aguantaste ${t} s` }; return { t, txt: `Mantén ${t} s y apunta a ${obj} s` }; }
@@ -1350,6 +1361,8 @@ function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nS
   return `<div class="ej${foco ? ' ej-f' : ''}"><div class="ej-h"><b class="ej-n">${esc(e.nombre)}</b><span class="ej-acc">${foco ? vidBtn(e, tc) : ''}${tc && !foco ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</span></div>
     <div class="small muted">${esc(e.dosis)}${isB && !/desc|\d\s*(min|s)\b/i.test(String(e.dosis || '').replace(/^\d+\s*[×x]\s*[\d–-]+/, '')) ? ` · ⏱ ${mmss(descansoDe(e))}` : ''}</div>
     ${sg ? `<div class="sug${sg.sube ? ' up' : ''}">${sg.sube ? '↗' : '→'} ${esc(sg.txt)}</div>` : ''}
+    ${(e.alt || []).length ? `<details class="tec-d"><summary>🔄 No tengo esta máquina</summary><div class="small" style="margin-top:6px">Haz en su lugar ${e.alt.map(x => `<b>${esc(x)}</b>`).join(' o ')}, con la misma dosis. Anota cuál hiciste en el comentario.</div></details>` : ''}
+    ${ONL() && isB ? corrBtn(e) : ''}
     ${tc && foco ? `<details class="tec-d"><summary>¿Cómo se hace?</summary><ol>${(tc.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol></details>` : ''}
     ${isB ? (() => { const tp = tipoEj(e); const ap = tp === 'kg' ? Math.max(nAprox(e), (c?.ap || []).length, (S.apX || {})[DKEY() + e.nombre] || 0, ...Object.keys(getDraft().ap?.[e.nombre] || {}).map(k => Number(k) + 1)) : 0; const aps = c?.ap || [];
       const base = sg?.kg ?? (pv.length ? Math.max(0, ...pv.map(x => x.kg || 0)) : 0); const inc = /mancuerna|kb|kettlebell|pesa rusa/i.test(e.nombre) ? 1 : 2.5;
@@ -1544,7 +1557,7 @@ V.rutina = () => {
       ${cIdx === bi ? `<label class="field">Resultado · ${esc(cNom)}<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>` : ''}` : ''}
     </section>${nav}`; }
   return `${otro}${tambien}${okCard}
-  <div style="display:grid;gap:6px"><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total : ''}</div><h1 style="font-size:30px;line-height:1.05">${esc(r.tipo || 'Rutina')}</h1>${(() => { const l = rd.pe ? progLinea(r, rd.pe.semana) : ''; return l ? `<div class="small muted">💡 ${esc(l.replace(/^Semana \d+ · /, ''))}</div>` : ''; })()}
+  <div style="display:grid;gap:6px"><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total : ''}</div><h1 style="font-size:30px;line-height:1.05">${esc(r.tipo || 'Rutina')}</h1>${r.lugar ? `<div><span class="tg" style="margin:0">${r.lugar === 'titanium' ? '🏠 En Titanium' : r.lugar === 'casa' ? '🏡 En casa' : '🏋️ En tu otro gimnasio'}</span></div>` : ''}${(() => { const l = rd.pe ? progLinea(r, rd.pe.semana) : ''; return l ? `<div class="small muted">💡 ${esc(l.replace(/^Semana \d+ · /, ''))}</div>` : ''; })()}
     <div class="chips" style="margin-top:2px">${r.minutos ? `<span class="chip">⏱ ~${esc(r.minutos)} min</span>` : ''}<span class="chip">${items.length} ejercicios</span>${rd.hora && rd.hora !== 'libre' ? `<span class="chip">${rd.hora === 'online' ? '🌐' : '🕒'} ${esc(horaTxt(rd.hora))}</span>` : ''}</div>
     ${(!rd.futuro || S.tourSes) && items.length ? `<div class="row" style="align-items:center"><button class="btn pri foco-go" data-foco="1">${(() => { const g = getFoco(); return g && g.k > 0 ? '▶ Seguir modo clase · paso ' + (g.k + 1) : '▶ Modo clase'; })()}</button></div>${asHTML()}` : ''}</div>
   ${bloques.map((b, bi) => { const { letra, nomB, isB, isC } = info(b);
