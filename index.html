@@ -470,6 +470,23 @@ i.mov,.pf-k.mov,.it.mov,i.quit,.pf-k.quit,.it.quit,i.pend,.pf-k.pend,.it.pend,i.
 .pf-modo button[aria-selected="true"]{border-color:var(--red);background:var(--red-soft);box-shadow:inset 0 -3px 0 var(--red)}
 .pf-rut summary{color:var(--red);font-weight:700}.pf-rut div{white-space:normal;display:grid;gap:3px;margin-top:6px}.pf-rut div>b{margin-top:6px;color:var(--fg)}.pf-ej{display:block;padding-left:10px}.pf-ej .ok{color:var(--ok)}
 .pf-det{margin-top:2px;font-size:13px;color:var(--muted)}.pf-det summary{cursor:pointer;list-style:none}.pf-det summary::-webkit-details-marker{display:none}.pf-det .v2,.pf-det[open] .v1{display:none}.pf-det[open] .v2{display:inline}.pf-det summary b{color:var(--red)}.pf-det[open] summary{margin-bottom:4px;color:var(--red);font-weight:700}.pf-det div{white-space:pre-line;line-height:1.45}
+.os{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--sunk)}
+.os-h{display:flex;flex-wrap:wrap;gap:6px}
+.os-t{font-family:var(--display);font-size:19px;line-height:1.2;letter-spacing:.02em}
+.os-pl{font-size:13px;background:var(--info-soft);color:var(--fg);border-radius:8px;padding:7px 10px}
+.os-nota{background:var(--red-soft);border-radius:8px;padding:8px 10px;font-size:14px}.os-nota b{font-size:12px}
+.os-bl{display:grid;gap:6px;margin-top:4px}
+.os-bt{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--red);border-bottom:1px solid var(--line);padding-bottom:4px}
+.os-bn{font-size:12px;color:var(--muted);line-height:1.4}
+.os-ej{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:8px;padding:8px 10px;display:grid;gap:4px}
+.os-ej.hecho{border-left-color:var(--ok)}
+.os-n{font-weight:700;font-size:15px;line-height:1.25}
+.os-dos{font-size:13px;color:var(--muted);line-height:1.35}
+.os-sets{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.os-sets span{border:1px solid var(--line);background:var(--sunk);border-radius:7px;padding:3px 8px;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums}
+.os-sets i{font-style:normal;color:var(--muted);font-weight:500;margin-right:4px}
+.os-sets .up{color:var(--ok)}.os-sets .dn{color:var(--crit)}.os-sets .eq{color:var(--muted)}
+.os-ant{font-size:12px;color:var(--muted)}.os-no{font-size:12px;color:var(--warn);font-weight:600}
 .pf-k{flex:none;width:10px;height:10px;border-radius:3px;background:var(--c,var(--line))}
 .pf-add{display:grid;gap:10px;padding:12px;border-radius:10px;background:var(--sunk)}
 input[type=time]{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:15px;min-width:0}
@@ -2658,14 +2675,15 @@ function pfItemsDia(a, f, evs) {
     const r = d[h]?.[code] || {}, fijo = (a.bloques || []).includes(dk + '-' + h);
     if (cfg().noDisponible.includes(dk + '-' + h) && !d[h]?.[code]) return;
     // nombre corto de la rutina (Fuerza A, Fuerza B…) para que se vea qué entrenamiento es
-    const rut = r.rutina ? S.rutinas.get(r.rutina) : null, corto = rut ? String(rut.tipo || rut.familia || '').split('·')[0].trim() : '';
+    const rut = r.rutina ? S.rutinas.get(r.rutina) : null, pz = rut ? String(rut.tipo || rut.familia || '').split('·').map(x => x.trim()).filter(Boolean) : [], corto = pz.length > 1 && /^d[ií]a\s*\d+$/i.test(pz[0]) ? pz[1] : (pz[0] || '');
     const hh = corto || (h === 'libre' ? 'Libre' : h === 'online' ? 'Online' : h); let k, l, tt;
     if (r.quitado && r.reagA) { k = 'mov'; l = '↻ ' + hh; tt = `Movida al ${fmtD(r.reagA.f)} ${r.reagA.h}`; }
     else if (r.quitado) { k = 'quit'; l = '– ' + hh; tt = 'Quitada de esta clase'; }
     else if (r.asis === 'presente') { k = 'ok'; l = (r.extra && r.reagDe?.recup ? '🔁 ' : '✓ ') + hh; tt = 'Vino' + (r.rpe ? ' · RPE ' + r.rpe : '') + (r.extra && r.reagDe?.recup ? ' · recuperación' : ''); }
     else if (r.asis === 'ausente') { k = 'crit'; l = '✗ ' + hh; tt = 'Faltó sin aviso'; }
     else if (r.asis === 'aviso') { k = 'warn'; l = '📩 ' + hh; tt = 'Avisó que no venía'; }
-    else if (h === 'online') { const fin = r.rpe != null; k = fin ? 'ok' : 'pend'; l = (fin ? '🌐 ' : '… ') + hh; tt = fin ? 'Sesión online terminada · RPE ' + r.rpe : 'Sesión online sin terminar'; }
+    else if (h === 'online') { const fin = r.rpe != null, anot = (r.ej || []).some(x => setsOf(x).length);
+      if (fin) { k = 'ok'; l = '✓ ' + hh; tt = 'Hecha · RPE ' + r.rpe; } else if (f > t) { k = 'plan'; l = hh; tt = 'Planificada'; } else if (f === t) { k = 'plan'; l = hh; tt = 'Para hoy'; } else { k = anot ? 'warn' : 'pend'; l = (anot ? '½ ' : '? ') + hh; tt = anot ? 'A medias · no la cerró' : 'No la hizo'; } }
     else if (f < t || (f === t && h !== 'libre' && hmToMin(h) + 60 < hmToMin(nowHM()))) { if (!r.extra && !fijo) return; k = 'pend'; l = '? ' + hh; tt = 'Sin marcar asistencia'; }
     else if (r.extra && r.reagDe?.recup) { k = 'rec'; l = '🔁 ' + hh; tt = 'Viene a recuperar'; }
     else if (r.extra) { k = 'ext'; l = '＋ ' + hh; tt = r.reagDe ? `Reagendada desde el ${fmtD(r.reagDe.f)}` : 'Clase agendada para esta fecha'; }
@@ -2713,6 +2731,39 @@ function pfAgenda(a) {
     <div id="pf-dia">${sel ? pfDia(a, sel) : '<div class="pf-day pf-day-vacio"><p class="small muted" style="margin:0">Toca un día del calendario para ver lo que tiene o agendar algo.</p></div>'}</div></div>
     <div id="pf-msj">${pfMensajes(a)}</div>`;
 }
+/* sesión online en el día del calendario: qué le tocaba, qué hizo y cómo le fue, de un vistazo */
+function onlSesCard(a, f, x) {
+  const code = a.codigo, r = x.r || {}, rut = x.rut, t = today();
+  const fin = r.rpe != null, regs = (r.ej || []).filter(e => e && e.n), anot = regs.filter(e => setsOf(e).length);
+  const est = fin ? ['ok', '✓ Hecha'] : f > t ? ['plan', '📅 Planificada'] : f === t ? ['plan', '📅 Para hoy'] : anot.length ? ['warn', '½ A medias · no la cerró'] : ['crit', '✗ No la hizo'];
+  const pe = progEstado(a, f), sem = pe ? Math.min(pe.semana, pe.total) : 0, pl = rut ? progLinea(rut, sem) : '';
+  const bl = Array.isArray(r.sesion) && r.sesion.length ? r.sesion : (rut?.bloques || []);
+  const key = n => norm(limpiarEj(n)).replace(/\s+/g, ' ').trim();
+  const prev = onlineSesiones(code).filter(p => p.f < f);
+  const antDe = n => { const k = key(n); for (const p of prev) { const e = (p.r.ej || []).find(z => key(z.n) === k); if (e && setsOf(e).length) return { f: p.f, e }; } return null; };
+  const mejor = e => setsOf(e).reduce((m, z) => Math.max(m, (Number(z.kg) || 0) * 1000 + (Number(z.r) || 0) + (Number(z.t) || 0)), 0);
+  const vol = e => setsOf(e).reduce((v, z) => v + (Number(z.kg) || 0) * (Number(z.r) || 0), 0);
+  const usados = new Set();
+  const fila = (nom, dosis, reg) => { const ss = reg ? setsOf(reg).filter(z => z.kg != null || z.r != null || z.t != null) : []; const an = ss.length ? antDe(nom) : null;
+    let tr = ''; if (an) { const d = mejor(reg) - mejor(an.e), dv = vol(reg) - vol(an.e); tr = d > 0 || (d === 0 && dv > 0) ? '<b class="up">▲</b>' : d < 0 ? '<b class="dn">▼</b>' : '<b class="eq">=</b>'; }
+    return `<div class="os-ej${ss.length ? ' hecho' : ''}"><div class="os-n">${esc(limpiarEj(nom))}</div>${dosis ? `<div class="os-dos">${esc(dosis)}</div>` : ''}
+      ${ss.length ? `<div class="os-sets">${ss.map((z, i) => `<span><i>${i + 1}</i>${esc(fmtSetC(z))}</span>`).join('')}${tr}</div>${an ? `<div class="os-ant">Antes (${esc(fmtD(an.f))}): ${esc(setsOf(an.e).filter(z => z.kg != null || z.r != null || z.t != null).map(fmtSetC).join(' · '))}</div>` : ''}` : (fin || f < t) ? '<div class="os-no">Sin anotar</div>' : ''}
+      ${reg?.c ? `<div class="os-ant">📝 ${esc(reg.c)}</div>` : ''}</div>`; };
+  const bloques = bl.map(b => `<div class="os-bl"><div class="os-bt">${esc(b.titulo || '')}</div>${b.nota ? `<div class="os-bn">${esc(b.nota)}</div>` : ''}${(b.ejercicios || []).map(e0 => { const reg = regs.find(z => key(z.n) === key(e0.nombre)); if (reg) usados.add(reg); return fila(e0.nombre, e0.dosis, reg); }).join('')}</div>`).join('');
+  const otros = regs.filter(z => !usados.has(z));
+  const nEj = bl.reduce((n, b) => n + (b.ejercicios || []).length, 0);
+  return `<div class="os">
+    <div class="os-h"><span class="pill ${est[0] === 'plan' ? '' : est[0]}">${est[1]}</span>${fin ? `<span class="pill ${Number(r.rpe) >= 9 ? 'crit' : Number(r.rpe) >= 7 ? 'warn' : 'ok'}">RPE ${esc(r.rpe)}</span>` : ''}${r.carga ? `<span class="pill">⏱ ${esc(r.carga)}</span>` : ''}${sem ? `<span class="pill">Semana ${sem}/${pe.total}</span>` : ''}</div>
+    <div class="os-t">🌐 ${esc(rut?.tipo || r.rutina || 'Sesión online')}</div>
+    <div class="small muted">${nEj} ejercicio${nEj === 1 ? '' : 's'}${anot.length ? ` · ${anot.length} anotado${anot.length === 1 ? '' : 's'}` : ''}${rut?.minutos ? ' · ~' + esc(rut.minutos) + ' min' : ''} · entrena por su cuenta en la app</div>
+    ${pl ? `<div class="os-pl">📈 ${esc(String(pl).replace(/^Semana \d+ · /, ''))}</div>` : ''}
+    ${r.notas || r.nota ? `<div class="os-nota"><b>💬 Nota del alumno</b><div>${esc(r.notas || r.nota)}</div></div>` : ''}
+    ${bloques || (rut ? '' : '<div class="small muted">Sin rutina asignada.</div>')}
+    ${otros.length ? `<div class="os-bl"><div class="os-bt">Otros que anotó</div>${otros.map(z => fila(z.n, '', z)).join('')}</div>` : ''}
+    ${rut?.guia ? `<details class="pf-det"><summary><span class="v1"><b>Ver guía de la rutina</b></span><span class="v2">▲ Ocultar guía</span></summary><div>${esc(rut.guia)}</div></details>` : ''}
+    <div class="tools">${anot.length || fin ? `<button type="button" class="btn sm" data-act="on-ses" data-id="${esc(code)}" data-f="${esc(f)}">📊 Comparar sesiones</button>` : ''}<button type="button" class="btn sm ghost" data-act="msg" data-id="${esc(code)}">💬 Mensaje</button></div>
+  </div>`;
+}
 function pfDia(a, f) {
   const code = a.codigo, mes = f.slice(0, 7), evs = (S.ui.pfEv || {})[code + '|' + mes] || [], its = pfItemsDia(a, f, evs), t = today();
   const tipo = S.ui.pfAddT || 'Clase', c = cfg(), modo = f >= t && S.ui.pfModo === 'agendar' ? 'agendar' : 'ver';
@@ -2725,7 +2776,7 @@ function pfDia(a, f) {
       <button type="button" role="tab" data-act="pf-modo" data-v="ver" aria-selected="${modo === 'ver'}"><b>📋 Lo del día</b><span>${its.length ? its.length + (its.length === 1 ? ' cosa' : ' cosas') : 'Nada agendado'}</span></button>
       ${f >= t ? `<button type="button" role="tab" data-act="pf-modo" data-v="agendar" aria-selected="${modo === 'agendar'}"><b>＋ Agendar algo</b><span>Clase extra, evaluación, InBody…</span></button>` : ''}
     </div>
-    ${modo === 'ver' ? (its.length ? `<div class="list">${its.map(x => `<div class="li"><span class="pf-k ${x.k}"></span><span class="grow"><b>${esc(x.l)}</b>${x.tt ? `<span class="small muted"> · ${esc(x.tt)}</span>` : ''}${x.rut ? (() => { const bl = Array.isArray(x.r.sesion) && x.r.sesion.length ? x.r.sesion : (x.rut.bloques || []); const n = bl.reduce((s0, b) => s0 + (b.ejercicios || []).length, 0);
+    ${modo === 'ver' ? (its.length ? `<div class="list">${its.map(x => x.c === 'cl' && x.h === 'online' ? onlSesCard(a, f, x) : `<div class="li"><span class="pf-k ${x.k}"></span><span class="grow"><b>${esc(x.l)}</b>${x.tt ? `<span class="small muted"> · ${esc(x.tt)}</span>` : ''}${x.rut ? (() => { const bl = Array.isArray(x.r.sesion) && x.r.sesion.length ? x.r.sesion : (x.rut.bloques || []); const n = bl.reduce((s0, b) => s0 + (b.ejercicios || []).length, 0);
         return `<details class="pf-det pf-rut"><summary><span class="v1">🏋️ Ver entrenamiento · ${n} ejercicio${n === 1 ? '' : 's'}${(x.r.ej || []).length ? ' · ' + x.r.ej.length + ' con cargas anotadas' : ''}</span><span class="v2">▲ Ocultar entrenamiento</span></summary><div>${bl.map(b => `<b>${esc(b.titulo || '')}</b>${(b.ejercicios || []).map(e0 => { const reg = (x.r.ej || []).find(z => z.n === e0.nombre); return `<span class="pf-ej">${esc(e0.nombre)}${e0.dosis ? ` <span class="muted">· ${esc(e0.dosis)}</span>` : ''}${reg ? ` <b class="ok">· ${esc(fmtSet(reg))}</b>` : ''}</span>`; }).join('')}`).join('')}</div></details>`; })() : ''}${x.det ? `${x.det.length > 120 ? `<details class="pf-det"><summary><span class="v1">${esc(x.det.slice(0, 120).trim())}… <b>ver más</b></span><span class="v2">▲ Ver menos</span></summary><div>${esc(x.det)}</div></details>` : `<div class="pf-det">${esc(x.det)}</div>`}` : ''}${x.e?.link ? ` <a class="small" href="${esc(x.e.link)}" target="_blank" rel="noopener">abrir link ↗</a>` : ''}</span>
       ${x.c === 'cl' && x.h === 'online' ? `<span class="small muted" style="white-space:nowrap">🌐 Entrena por su cuenta en la app</span>` : ''}${x.c === 'cl' && x.h !== 'libre' && x.h !== 'online' && !x.r.quitado ? `<span class="acts"><button type="button" class="btn sm" data-act="pf-ir-clase" data-f="${f}" data-h="${esc(x.h)}">Abrir clase</button>${f >= t ? `<button type="button" class="btn sm ghost" data-act="reag" data-k="${esc(f + '|' + x.h + '|' + code)}">Reagendar</button>` : ''}</span>` : ''}
       ${x.c === 'ev' && x.e.alumno ? `<button type="button" class="btn sm ghost" data-act="pf-ev-del" data-id="${esc(code)}" data-ev="${esc(x.e.id)}" aria-label="Borrar evento" title="Borrar">✕</button>` : ''}</div>`).join('')}</div>` : (f >= t ? `<p class="small muted" style="margin:0">Nada agendado este día. <button type="button" class="btn sm" data-act="pf-modo" data-v="agendar">＋ Agendar algo</button></p>` : '<p class="small muted" style="margin:0">Nada registrado este día.</p>')) : ''}
