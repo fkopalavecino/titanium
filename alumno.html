@@ -499,7 +499,7 @@ const conDato = z => !!z && (z.kg != null || z.r != null || z.t != null);
 const sinDesc = d => String(d || '').replace(/(desc(?:anso)?\.?|luego|pausa)\s*\d+(?:[:.]\d+)?\s*(?:s|seg|min|m|')(?![a-z])/gi, '').replace(/\d+(?:[:.]\d+)?\s*(?:s|seg|min)\s*de\s*(pausa|descanso)/gi, '');
 const SEG_RE = /×\s*(\d+)(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i;
 const TIEMPO_RE = /plancha(?!.*copenhag)|plank|hollow|isom[eé]tric|wall ?sit|sentadilla en (la )?pared|colgad|dead ?hang|l-?sit/i;
-const CORPORAL_RE = /dominada|pull-?up|chin-?up|fondos|\bdips\b|flexiones|flexi[oó]n de brazos|push-?up|remo invertido|muscle-?up|copenhag|n[oó]rdico|superman|toque de hombro|elevaci[oó]n de piernas/i;
+const CORPORAL_RE = /dominada|pull-?up|chin-?up|fondos|\bdips\b|flexiones|flexi[oó]n de brazos|push-?up|remo invertido|muscle-?up|copenhag|n[oó]rdico|superman|toque de hombro|elevaci[oó]n de piernas|\btrx\b|anillas?\b|anillos?\b|\brings?\b/i;
 // orden: tiempo explícito en la dosis > reps explícitas en la dosis > nombre del ejercicio
 const SEG2_RE = /(\d+)(?:\s*[–-]\s*\d+)?\s*(s|seg(?:undos?)?|"|min(?:utos?)?)(?![a-z])/i;
 // saltos / pliometría: solo reps, sin kg
