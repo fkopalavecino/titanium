@@ -262,32 +262,93 @@
       b.onclick = () => abrirSol(); document.body.appendChild(b); }
     b.hidden = !list.length; b.textContent = 'Solicitudes de alumnos (' + list.length + ')'; window.__tlSol = list;
   }
+  const SOLCSS = `
+#tl-solp{position:fixed;right:16px;bottom:72px;z-index:901;width:min(440px,calc(100vw - 32px));max-height:70vh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:#1b181c;color:#f2eef0;border:1px solid #2f2a2e;border-radius:18px;padding:14px;font:15px Barlow,system-ui,sans-serif;display:grid;gap:10px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#tl-solp *{box-sizing:border-box}
+#tl-solp .hd{display:flex;justify-content:space-between;align-items:center}
+#tl-solp .hd b{font:800 19px Barlow,system-ui,sans-serif}
+#tl-solp .hd button{width:40px;height:40px;border-radius:12px;border:1px solid #2f2a2e;background:#161317;color:#f2eef0;font-size:16px;cursor:pointer}
+#tl-solp .it{background:#161317;border:1px solid #2f2a2e;border-left:4px solid var(--c);border-radius:14px;padding:12px;display:grid;gap:8px}
+#tl-solp .top{display:flex;gap:10px;align-items:center}
+#tl-solp .ic{width:40px;height:40px;border-radius:12px;background:var(--bg);display:grid;place-items:center;font-size:20px;flex:none}
+#tl-solp .nm{flex:1;min-width:0}
+#tl-solp .nm b{display:block;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#tl-solp .tp{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--c)}
+#tl-solp .ago{color:#a69ea3;font-size:12px;flex:none;align-self:flex-start}
+#tl-solp .dt{font:700 17px Barlow,sans-serif;color:#fff}
+#tl-solp .tx{margin:0;color:#d9d3d6;white-space:pre-wrap;word-break:break-word;background:#1f1b20;border-radius:10px;padding:8px 10px}
+#tl-solp .nt{color:#a69ea3;font-size:13px}
+#tl-solp .ok{color:#6fdc9c}#tl-solp .wr{color:#ffc861}
+#tl-solp .bt{display:flex;gap:8px}
+#tl-solp .bt button{flex:1;height:46px;border-radius:12px;font:700 15px Barlow,sans-serif;cursor:pointer;border:1px solid #2f2a2e;background:transparent;color:#f2eef0}
+#tl-solp .bt .si{border:0;background:#17804a;color:#fff}
+#tl-solp .bt button:disabled{opacity:.5}
+#tl-solp .cp{justify-self:start;height:40px;border:1px solid #2f2a2e;border-radius:10px;background:transparent;color:#f2eef0;padding:0 14px;font:600 14px Barlow,sans-serif;cursor:pointer}
+#tl-solp label{display:grid;gap:4px;color:#a69ea3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+#tl-solp input{height:44px;border-radius:10px;border:1px solid #2f2a2e;background:#121013;color:#f2eef0;padding:0 12px;font:700 17px Barlow,sans-serif}
+#tl-solp .ft{margin:0;color:#a69ea3;font-size:12px}
+#tl-soltoast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:960;background:#17804a;color:#fff;font:700 15px Barlow,system-ui,sans-serif;padding:12px 18px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-width:calc(100vw - 32px);text-align:center}
+#tl-soltoast.err{background:#d71f30}`;
+  const SOLT = {
+    no_voy: { i: '❌', t: 'No puede ir', c: '#ff8a94', bg: '#3a1519' },
+    recuperar: { i: '🔁', t: 'Quiere recuperar', c: '#8cc4ff', bg: '#13263a' },
+    pago: { i: '💵', t: 'Avisa un pago', c: '#6fdc9c', bg: '#12301f' },
+    mensaje: { i: '💬', t: 'Mensaje', c: '#ffc861', bg: '#33280f' },
+    vincular: { i: '📲', t: 'Quiere entrar a la app', c: '#c9a7ff', bg: '#281a3a' },
+  };
+  function solToast(msg, err) { let t = document.getElementById('tl-soltoast'); if (!t) { t = document.createElement('div'); t.id = 'tl-soltoast'; document.body.appendChild(t); }
+    t.textContent = msg; t.className = err ? 'err' : ''; t.hidden = false; clearTimeout(solToast.t); solToast.t = setTimeout(() => { t.hidden = true; }, 3200); }
+  const SOLDIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  const SMES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  function solFecha(f, h) { if (!f) return h || '';
+    const [y, m, d] = String(f).split('-').map(Number); if (!y || !m || !d) return [f, h].filter(Boolean).join(' · ');
+    const dt = new Date(y, m - 1, d), hoy = new Date(); hoy.setHours(0, 0, 0, 0); const dif = Math.round((dt - hoy) / 864e5);
+    let s = dif === 0 ? 'Hoy' : dif === 1 ? 'Mañana' : dif === -1 ? 'Ayer' : SOLDIAS[dt.getDay()][0].toUpperCase() + SOLDIAS[dt.getDay()].slice(1) + ' ' + d + ' ' + SMES[m - 1];
+    return s + (h ? ' · ' + h : ''); }
+  function solHace(ts) { const m = Math.max(0, Math.round((Date.now() - new Date(ts)) / 6e4)); if (!ts || isNaN(m)) return '';
+    if (m < 1) return 'recién'; if (m < 60) return 'hace ' + m + ' min'; const h = Math.round(m / 60); if (h < 24) return 'hace ' + h + ' h'; const d = Math.round(h / 24); return 'hace ' + d + (d === 1 ? ' día' : ' días'); }
+  function solAviso(r) { const d = r.data || {}; if (r.tipo !== 'no_voy' || !d.fecha || !d.hora) return '';
+    const cl = new Date(d.fecha + 'T' + d.hora + ':00'), h = (cl - new Date(r.created_at)) / 36e5; if (isNaN(h)) return '';
+    return h >= 2 ? '<div class="nt ok">✓ Avisó con ' + (h >= 24 ? Math.round(h / 24) + (Math.round(h / 24) === 1 ? ' día' : ' días') : Math.floor(h) + ' h') + ' de anticipación: gana recuperación</div>'
+      : '<div class="nt wr">⏰ Avisó con menos de 2 h: no recupera</div>'; }
   function abrirSol() {
     const list = window.__tlSol || []; let p = document.getElementById('tl-solp'); if (p) p.remove();
+    if (!document.getElementById('tl-solcss')) { const s = document.createElement('style'); s.id = 'tl-solcss'; s.textContent = SOLCSS; document.head.appendChild(s); }
     p = document.createElement('div'); p.id = 'tl-solp';
-    p.style.cssText = 'position:fixed;right:16px;bottom:72px;z-index:901;width:min(380px,calc(100vw - 32px));max-height:60vh;overflow:auto;background:#1b181c;color:#f2eef0;border:1px solid #2f2a2e;border-radius:14px;padding:14px;font:14px Barlow,system-ui,sans-serif;display:grid;gap:10px';
     const esc = x => String(x == null ? '' : x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-    p.innerHTML = '<b style="font-size:16px">Solicitudes</b>' + list.map(r => { const d = r.data || {};
-      return '<div style="border-top:1px solid #2f2a2e;padding-top:8px;display:grid;gap:6px"><div><b>' + esc(d.nombre || r.alumno) + '</b> · ' + esc(TIPO[r.tipo] || r.tipo) + '</div>'
-        + '<div style="color:#a69ea3">' + esc([d.fecha, d.hora, d.prefiere, d.monto, d.texto].filter(Boolean).join(' · ')) + '</div>'
-        + (r.tipo === 'pago' ? (d.comprobante ? '<button data-comp="' + esc(d.comprobante) + '" style="justify-self:start;height:34px;border:1px solid #2f2a2e;border-radius:8px;background:transparent;color:#f2eef0;padding:0 12px;cursor:pointer">📎 Ver comprobante</button>' : '<div style="color:#a69ea3;font-size:12px">Sin comprobante adjunto: revisa tu cuenta antes de confirmar.</div>')
-          + '<label style="display:grid;gap:4px;color:#a69ea3;font-size:12px">Monto recibido<input data-pmon="' + r.id + '" inputmode="numeric" value="' + esc(d.montoNum || String(d.monto || '').replace(/\D/g, '')) + '" style="height:38px;border-radius:8px;border:1px solid #2f2a2e;background:#121013;color:#f2eef0;padding:0 10px;font:600 15px Barlow,sans-serif"></label>'
-          + '<div style="display:flex;gap:8px"><button data-id="' + r.id + '" data-pago="1" style="flex:1;height:36px;border:0;border-radius:8px;background:#17804a;color:#fff;font-weight:700">✓ Confirmar pago</button><button data-id="' + r.id + '" data-e="rechazada" style="flex:1;height:36px;border:1px solid #2f2a2e;border-radius:8px;background:transparent;color:#f2eef0">Rechazar</button></div>'
-          + '<div style="color:#a69ea3;font-size:12px">Si el plan tiene saldo, se abona. Si ya estaba pagado, se crea la renovación con este pago.</div></div>' : '')
-        + (r.tipo === 'pago' ? '' : r.tipo === 'vincular' ? '<div style="color:#a69ea3;font-size:12px">Verifica que sea esta persona antes de aprobar: tendrá acceso a la ficha de ' + esc(d.nombre || r.alumno) + '.</div><div style="display:flex;gap:8px"><button data-id="' + r.id + '" data-vin="1" style="flex:1;height:36px;border:0;border-radius:8px;background:#17804a;color:#fff;font-weight:700">✓ Sí, es él/ella</button><button data-id="' + r.id + '" data-e="rechazada" style="flex:1;height:36px;border:1px solid #2f2a2e;border-radius:8px;background:transparent;color:#f2eef0;font-weight:700">No es</button></div></div>' :
-          '<div style="display:flex;gap:8px"><button data-id="' + r.id + '" data-e="aprobada" style="flex:1;height:36px;border:0;border-radius:8px;background:#17804a;color:#fff;font-weight:700">Listo</button><button data-id="' + r.id + '" data-e="rechazada" style="flex:1;height:36px;border:1px solid #2f2a2e;border-radius:8px;background:transparent;color:#f2eef0">Rechazar</button></div></div>'); }).join('')
-      + '<p style="margin:0;color:#a69ea3;font-size:12px">Para mover la clase usa ↻ Reagendar en Clase de hoy y luego marca «Listo».</p>';
-    p.onclick = async ev => { const cb = ev.target.closest('[data-comp]');
-      if (cb) { const { data } = await sb.storage.from('fotos').createSignedUrl(cb.dataset.comp, 600); if (data?.signedUrl) window.open(data.signedUrl, '_blank'); else alert('No se pudo abrir el comprobante.'); return; }
+    const btns = (id, si, no, extra) => '<div class="bt"><button class="si" data-id="' + id + '" ' + extra + '>' + si + '</button><button data-id="' + id + '" data-e="rechazada">' + no + '</button></div>';
+    p.innerHTML = '<div class="hd"><b>Solicitudes (' + list.length + ')</b><button data-x="1" aria-label="Cerrar">✕</button></div>' + list.map(r => { const d = r.data || {}, T = SOLT[r.tipo] || { i: '📌', t: r.tipo, c: '#a69ea3', bg: '#262126' };
+      let body = '';
+      if (d.fecha || d.hora) body += '<div class="dt">' + esc(solFecha(d.fecha, d.hora)) + '</div>';
+      body += solAviso(r);
+      if (d.prefiere) body += '<div class="nt">Le acomoda:</div><p class="tx">' + esc(d.prefiere) + '</p>';
+      if (d.texto) body += '<p class="tx">' + esc(d.texto) + '</p>';
+      if (r.tipo === 'pago') {
+        if (d.monto) body += '<div class="dt">' + esc(d.monto) + '</div>';
+        body += d.comprobante ? '<button class="cp" data-comp="' + esc(d.comprobante) + '">📎 Ver comprobante</button>' : '<div class="nt wr">Sin comprobante: revisa tu cuenta antes de confirmar.</div>';
+        body += '<label>Monto recibido<input data-pmon="' + r.id + '" inputmode="numeric" value="' + esc(d.montoNum || String(d.monto || '').replace(/\D/g, '')) + '"></label>'
+          + btns(r.id, '✓ Confirmar pago', 'Rechazar', 'data-pago="1"')
+          + '<div class="nt">Si el plan tiene saldo, se abona. Si ya estaba pagado, se crea la renovación.</div>';
+      } else if (r.tipo === 'vincular') {
+        body += '<div class="nt">Verifica que sea esta persona: tendrá acceso a la ficha de ' + esc(d.nombre || r.alumno) + '.</div>' + btns(r.id, '✓ Sí, es él/ella', 'No es', 'data-vin="1"');
+      } else body += btns(r.id, '✓ Listo', 'Rechazar', 'data-e="aprobada"');
+      return '<div class="it" style="--c:' + T.c + ';--bg:' + T.bg + '"><div class="top"><div class="ic">' + T.i + '</div><div class="nm"><b>' + esc(d.nombre || r.alumno) + '</b><span class="tp">' + esc(T.t) + '</span></div><span class="ago">' + esc(solHace(r.created_at)) + '</span></div>' + body + '</div>'; }).join('')
+      + '<p class="ft">Para mover la clase usa ↻ Reagendar en Clase de hoy y luego marca «Listo».</p>';
+    p.onclick = async ev => { if (ev.target.closest('[data-x]')) { p.remove(); return; }
+      const cb = ev.target.closest('[data-comp]');
+      if (cb) { const { data } = await sb.storage.from('fotos').createSignedUrl(cb.dataset.comp, 600); if (data?.signedUrl) window.open(data.signedUrl, '_blank'); else solToast('No se pudo abrir el comprobante.', 1); return; }
       const t = ev.target.closest('button[data-id]'); if (!t) return;
       if (t.dataset.pago) { const m = Number(String(p.querySelector('[data-pmon="' + t.dataset.id + '"]')?.value || '').replace(/\D/g, ''));
-        if (!m) { alert('Escribe el monto recibido.'); return; } t.disabled = true;
+        if (!m) { solToast('Escribe el monto recibido.', 1); return; } t.disabled = true;
         const { data, error } = await sb.rpc('confirmar_pago', { p_sol: t.dataset.id, p_monto: m });
-        if (error) { alert('No se pudo confirmar: ' + error.message); t.disabled = false; return; }
-        alert(data?.accion === 'renovacion' ? 'Pago confirmado ✓ Se creó la renovación del plan.' : 'Pago confirmado ✓ Se abonó al plan.'); p.remove(); solicitudes(); return; }
-      if (t.dataset.vin) { t.disabled = true; const { error } = await sb.rpc('aprobar_vinculo', { p_sol: t.dataset.id }); if (error) { alert('No se pudo aprobar: ' + error.message); t.disabled = false; return; } }
-      else await sb.from('solicitudes').update({ estado: t.dataset.e }).eq('id', t.dataset.id);
-      p.remove(); solicitudes(); };
+        if (error) { solToast('No se pudo confirmar: ' + error.message, 1); t.disabled = false; return; }
+        solToast(data?.accion === 'renovacion' ? 'Pago confirmado ✓ Se creó la renovación' : 'Pago confirmado ✓ Se abonó al plan'); p.remove(); solicitudes(); return; }
+      t.disabled = true;
+      if (t.dataset.vin) { const { error } = await sb.rpc('aprobar_vinculo', { p_sol: t.dataset.id }); if (error) { solToast('No se pudo aprobar: ' + error.message, 1); t.disabled = false; return; } solToast('Acceso aprobado ✓'); }
+      else { const { error } = await sb.from('solicitudes').update({ estado: t.dataset.e }).eq('id', t.dataset.id); if (error) { solToast('No se pudo guardar: ' + error.message, 1); t.disabled = false; return; } }
+      const card = t.closest('.it'); window.__tlSol = (window.__tlSol || []).filter(x => String(x.id) !== t.dataset.id);
+      if (card) card.remove(); if (!window.__tlSol.length) p.remove(); else p.querySelector('.hd b').textContent = 'Solicitudes (' + window.__tlSol.length + ')';
+      solicitudes(); };
     document.body.appendChild(p);
   }
 
