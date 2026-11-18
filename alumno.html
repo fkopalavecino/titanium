@@ -463,7 +463,7 @@ function progEstado() {
   const ids = new Set(ses.map(([id]) => id)); const pos = new Map(ses.map(([id], i) => [id, i])); const t = today();
   let last = -1, hechas = 0;
   for (const r of S.clases) { if (r.fecha > t || (pr.inicio && r.fecha < pr.inicio)) continue;
-    if (r.hora === 'libre' || r.asis === 'ausente' || !(r.asis === 'presente' || r.aprobada || r.rpe != null)) continue; if (r.rutina && !ids.has(r.rutina)) continue;
+    if (r.hora === 'libre' || r.asis === 'ausente' || !(r.asis === 'presente' || r.aprobada || r.rpe != null || (r.ej || []).length)) continue; if (r.rutina && !ids.has(r.rutina)) continue;
     hechas++; last = r.rutina ? pos.get(r.rutina) : (last + 1) % ses.length; }
   const semana = pr.inicio ? Math.max(1, Math.floor(diffDays(pr.inicio, t) / 7) + 1) : 1; const total = Number(pr.semanas) || 6;
   const idx = (last + 1) % ses.length;
@@ -1752,7 +1752,7 @@ const lunesDe = f => addDays(f, -((parseISO(f).getDay() + 6) % 7));
 function prediccion() { const m = new Map(); const pe = progEstado(); const t = today(); let i = 0;
   for (let d = 0; d < 70; d++) { const f = addDays(t, d);
     for (const h of bloquesDe(f)) { if (f === t && hm(h) + 60 < nowM()) continue; const rec = recOf(f, h);
-      const hecha = rec && rec.asis !== 'ausente' && (rec.asis === 'presente' || rec.aprobada || rec.rpe != null);
+      const hecha = rec && rec.asis !== 'ausente' && (rec.asis === 'presente' || rec.aprobada || rec.rpe != null || (rec.ej || []).length);
       if (rec?.rutina) m.set(f + '|' + h, rec.rutina); else if (pe) m.set(f + '|' + h, pe.ses[(pe.idx + i) % pe.ses.length][0]); if (!hecha) i++; } }
   return m; }
 // días pasados: lo registrado + sus bloques fijos de ese día (desde que empezó su primer plan), aunque nadie haya marcado nada

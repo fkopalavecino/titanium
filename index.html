@@ -760,8 +760,8 @@ function progEstado(a, fecha) {
   const ids = new Set(ses.map(([id]) => id)); const f = fecha || today();
   let hechas = 0, lastIdx = -1;
   const pos = new Map(ses.map(([id], i) => [id, i]));
-  // cuenta como hecha si asistió, si la aprobaste o si el alumno la terminó en su app (marcó RPE); las sesiones libres no mueven el programa
-  const hecha = r => r && r.asis !== 'ausente' && (r.asis === 'presente' || r.aprobada || (r.rpe != null && r.rpe !== ''));
+  // cuenta como hecha si asistió, si la aprobaste, si el alumno la terminó en su app (marcó RPE) o si anotó ejercicios aunque no la cerrara; las sesiones libres no mueven el programa
+  const hecha = r => r && r.asis !== 'ausente' && (r.asis === 'presente' || r.aprobada || (r.rpe != null && r.rpe !== '') || (r.ej || []).length > 0);
   for (const df of [...S.dias.keys()].sort()) { if (df >= f || (pr.inicio && df < pr.inicio)) continue; const d = S.dias.get(df);
     for (const h of Object.keys(d.bloques||{}).sort()) { if (h === 'libre') continue; const r = d.bloques[h][a.codigo];
       if (!hecha(r) || (r.rutina && !ids.has(r.rutina))) continue;
