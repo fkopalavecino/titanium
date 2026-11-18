@@ -2761,7 +2761,7 @@ function onlSesCard(a, f, x) {
     ${bloques || (rut ? '' : '<div class="small muted">Sin rutina asignada.</div>')}
     ${otros.length ? `<div class="os-bl"><div class="os-bt">Otros que anotó</div>${otros.map(z => fila(z.n, '', z)).join('')}</div>` : ''}
     ${rut?.guia ? `<details class="pf-det"><summary><span class="v1"><b>Ver guía de la rutina</b></span><span class="v2">▲ Ocultar guía</span></summary><div>${esc(rut.guia)}</div></details>` : ''}
-    <div class="tools">${anot.length || fin ? `<button type="button" class="btn sm" data-act="on-ses" data-id="${esc(code)}" data-f="${esc(f)}">📊 Comparar sesiones</button>` : ''}<button type="button" class="btn sm ghost" data-act="msg" data-id="${esc(code)}">💬 Mensaje</button></div>
+    <div class="tools">${r.rutina && rut ? `<button type="button" class="btn sm" data-act="editar-ses" data-k="${esc(f + '|online|' + code)}" data-r="${esc(r.rutina)}">${r.sesion ? '✎ Ajustada · editar' : '✎ Editar sesión'}</button>` : ''}${anot.length || fin ? `<button type="button" class="btn sm" data-act="on-ses" data-id="${esc(code)}" data-f="${esc(f)}">📊 Comparar sesiones</button>` : ''}<button type="button" class="btn sm ghost" data-act="msg" data-id="${esc(code)}">💬 Mensaje</button></div>
   </div>`;
 }
 function pfDia(a, f) {
