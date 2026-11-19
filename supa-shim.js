@@ -95,7 +95,13 @@
         if (error) { console.warn('ingreso sin correo no disponible:', error.message); step1(); return; }
         g.remove(); onDone(); };
     };
-    if (esAlumno) stepInv(); else step1();
+    // alumno que ya usaba la app en este teléfono (se le cerró la sesión): entra con el correo de su ficha, sin código nuevo
+    let cuenta = '', modo = ''; try { cuenta = localStorage.getItem('tl-cuenta') || ''; modo = localStorage.getItem('tl-modo') || ''; localStorage.removeItem('tl-modo'); } catch (e) {}
+    if (esAlumno && (modo === 'email' || (cuenta && !tieneInv()))) { if (cuenta.includes('@') && !email) email = cuenta; step1();
+      const p = g.querySelector('p'); if (p && cuenta && modo !== 'email') p.innerHTML = 'Tu sesión se cerró 🔒 Entra con tu correo y te mandamos un código. <b style="color:#f2eef0">No necesitas código nuevo del profe.</b>';
+      const f = document.getElementById('tl-f1'); if (f) { const b = document.createElement('button'); b.type = 'button'; b.className = 'sec'; b.textContent = 'Tengo un código del profe';
+        b.onclick = () => { try { localStorage.removeItem('tl-cuenta'); } catch (e) {} stepInv(); }; f.appendChild(b); } }
+    else if (esAlumno) stepInv(); else step1();
     const { data: sub } = sb.auth.onAuthStateChange((ev, ses) => { if (ses && document.getElementById('tl-gate')) { sub.subscription.unsubscribe(); g.remove(); onDone(); } });
   }
   async function ensureSession() {

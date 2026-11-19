@@ -322,6 +322,7 @@ while (!codigo) {
     <input id="inv-in" autocapitalize="characters" autocomplete="off" maxlength="12" placeholder="Ej: K7M2QX" style="width:100%;max-width:340px;min-height:56px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);text-align:center;letter-spacing:.25em;font:700 22px Barlow,sans-serif;text-transform:uppercase">
     <button class="btn pri" id="inv-ok" style="width:100%;max-width:340px">Entrar</button>
     ${ayuda ? `<a class="btn" href="${ayuda}" target="_blank" rel="noopener" style="width:100%;max-width:340px;background:#1f7a4d;border-color:#1f7a4d;color:#fff">💬 Pedir ayuda a ${esc(profe)}</a>` : ''}
+    ${mail ? '' : `<button class="btn" style="width:100%;max-width:340px" onclick="try{localStorage.setItem('tl-modo','email')}catch(e){};tlLogout()">👋 Ya usaba la app: entrar con mi correo</button>`}
     <button class="btn" style="background:transparent;border:0;color:var(--muted)" onclick="tlLogout()">${mail ? `Usar otro correo (${esc(mail)})` : 'Volver al inicio'}</button></div>`;
   const v = await new Promise(res => { const go = () => { const x = $('#inv-in').value.trim().toUpperCase(); if (x) res(x); };
     $('#inv-ok').onclick = go; $('#inv-in').onkeydown = e => { if (e.key === 'Enter') go(); }; });
@@ -330,6 +331,8 @@ while (!codigo) {
   ({ data: codigo } = await sb.rpc('vincular_alumno', { p_inv: v }));
 }
 try { localStorage.removeItem('tl-inv'); } catch (_) {}
+// recuerda que este teléfono ya tiene cuenta: si se cierra la sesión, la app pide el correo (no un código nuevo)
+sb.from('alumnos').select('email').eq('codigo', codigo).maybeSingle().then(({ data }) => { try { localStorage.setItem('tl-cuenta', data?.email || '1'); } catch (_) {} });
 
 /* ---------- avisos push ---------- */
 const PUSH_FN = 'https://lnovgbpxdnqgsojkfzwy.supabase.co/functions/v1/notificar';
