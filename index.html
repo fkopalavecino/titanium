@@ -602,7 +602,7 @@ td.crit{color:var(--crit);font-weight:700}
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supa-shim.js?v=20261118a"></script><script src="inbody-ocr.js?v=20261113a"></script><script src="alimentos.js?v=20261113b"></script><script src="nutri-calc.js?v=20261113g"></script><script src="sonidos.js?v=2"></script>
+<script src="supa-shim.js?v=20261119a"></script><script src="inbody-ocr.js?v=20261113a"></script><script src="alimentos.js?v=20261113b"></script><script src="nutri-calc.js?v=20261113g"></script><script src="sonidos.js?v=2"></script>
 <script>
 (() => {
 'use strict';
@@ -633,6 +633,7 @@ const FRASES = [
 ];
 const $ = (s, r=document) => r.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const stvA = u => u ? `<a class="pill" href="${esc(u)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="background:#fc4c02;border-color:#fc4c02;color:#fff;text-decoration:none">🟠 Strava ›</a>` : '';
 const clone = o => JSON.parse(JSON.stringify(o ?? null));
 const pad2 = n => String(n).padStart(2,'0');
 const toISO = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
@@ -1301,7 +1302,7 @@ function vivoInfo(f, hora, code, rut, r) {
   if (r.rpe != null && Number(r.rpe) >= 9) al.push('RPE ' + r.rpe);
   cur.forEach(x => { const pv = prev.find(c => c.n === x.n); if (pv && pv.kg > 0 && x.kg > pv.kg * 1.15) al.push(`${ejCorto(x.n)} +${Math.round((x.kg / pv.kg - 1) * 100)}%`); });
   const terminado = r.rpe != null; const vivo = f === today() && !terminado;
-  const txt = (terminado ? `<span class="ok-t">✓ Terminó</span> · ${hechas}${plan ? '/' + plan : ''} series · RPE ${esc(r.rpe)}`
+  const txt = (terminado ? `<span class="ok-t">✓ Terminó</span> · ${hechas}${plan ? '/' + plan : ''} series · RPE ${esc(r.rpe)}${r.strava ? ' ' + stvA(r.strava) : ''}`
     : (() => { const ty = (S.typ || {})[f + '|' + hora + '|' + code]; const tyOk = ty && Date.now() - ty.at < 60000;
         const actN = pa ? pa.ej : tyOk ? ty.n : ciOk && !hechas && blqNom(rut, ci0.bi) ? blqNom(rut, ci0.bi) : ult ? ult.n : ''; const act = actN ? cur.find(x => x.n === actN) : null; const usaTy = tyOk && ty.n === actN;
         const lleno = z => z && (z.kg != null || z.r != null || z.t != null);
@@ -1777,7 +1778,7 @@ function verSesionOnline(code, f) {
     <div class="chips" style="overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px">${chips}</div>
     <div style="display:grid;gap:4px"><div style="font:700 19px/1.2 inherit">${esc(rt?.tipo || s.r.rutina || 'Sesión')}</div>
       <div class="small muted">${esc(longDate(s.f))} · ${anot}/${ejs.length} ejercicios anotados${rt?.minutos ? ' · ~' + esc(rt.minutos) + ' min' : ''}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${s.r.rpe != null ? `<span class="pill ${Number(s.r.rpe) >= 9 ? 'crit' : Number(s.r.rpe) >= 7 ? 'warn' : 'ok'}">RPE ${esc(s.r.rpe)}</span>` : '<span class="pill">Sin terminar</span>'}${s.r.carga ? `<span class="pill">⏱ ${esc(s.r.carga)}</span>` : ''}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${s.r.rpe != null ? `<span class="pill ${Number(s.r.rpe) >= 9 ? 'crit' : Number(s.r.rpe) >= 7 ? 'warn' : 'ok'}">RPE ${esc(s.r.rpe)}</span>` : '<span class="pill">Sin terminar</span>'}${s.r.carga ? `<span class="pill">⏱ ${esc(s.r.carga)}</span>` : ''}${stvA(s.r.strava)}</div>
       ${s.r.notas || s.r.nota ? `<div style="background:var(--red-soft);border-radius:8px;padding:8px 10px;margin-top:4px"><b class="small">💬 Nota del alumno</b><div>${esc(s.r.notas || s.r.nota)}</div></div>` : ''}</div>
     <div>${filas || '<div class="small muted">No anotó ejercicios en esta sesión.</div>'}</div></div>`;
   openModal('🌐 ' + nombre(code), body, { wide: true, cancel: 'Cerrar', extra: `<button type="button" class="btn" data-act="ficha" data-id="${esc(code)}" data-tab="progreso">Ver su progreso</button><button type="button" class="btn" data-act="msg" data-id="${esc(code)}">💬 Mensaje</button>` });
@@ -2180,9 +2181,9 @@ function fichaAlumno(code, tabIni) {
   `;
   if (!isNew) setTimeout(() => habPanel(a.codigo), 0);
   if (!isNew && window.__sb) setTimeout(async () => { try {
-    const { data } = await window.__sb.from('actividades_hechas').select('fecha,minutos,rpe,nota,eventos(titulo,tipo)').eq('alumno', a.codigo).order('fecha', { ascending: false }).limit(20);
+    const { data } = await window.__sb.from('actividades_hechas').select('fecha,minutos,rpe,nota,strava,eventos(titulo,tipo)').eq('alumno', a.codigo).order('fecha', { ascending: false }).limit(20);
     const box = document.getElementById('fa-acts'); if (!box || !data || !data.length) return;
-    box.innerHTML = data.map(x => `<div class="li"><span class="grow"><b>${esc(x.eventos?.titulo || 'Actividad')}</b> <span class="muted num">· ${fmtDY(x.fecha)}${x.minutos ? ' · ' + x.minutos + ' min' : ''}${x.rpe != null ? ' · RPE ' + esc(x.rpe) : ''}</span>${x.nota ? `<br><span class="muted">${esc(x.nota)}</span>` : ''}</span><span class="pill ok">Hecha</span></div>`).join('');
+    box.innerHTML = data.map(x => `<div class="li"><span class="grow"><b>${esc(x.eventos?.titulo || 'Actividad')}</b> <span class="muted num">· ${fmtDY(x.fecha)}${x.minutos ? ' · ' + x.minutos + ' min' : ''}${x.rpe != null ? ' · RPE ' + esc(x.rpe) : ''}</span>${x.nota ? `<br><span class="muted">${esc(x.nota)}</span>` : ''}</span>${stvA(x.strava)}<span class="pill ok">Hecha</span></div>`).join('');
     document.getElementById('fa-acts-n').textContent = '· ' + data.length + ' registrada' + (data.length === 1 ? '' : 's'); document.getElementById('fa-acts-sec').hidden = false; } catch (_) {} }, 0);
   // al abrir un perfil parte en Agenda (o en la pestaña que pide el botón); solo al volver de abonar/reagendar mantiene la pestaña en que estabas
   const tab0 = S.ui.pfKeep && PF_TABS.some(([k]) => k === S.ui.pfTab) ? S.ui.pfTab : PF_TABS.some(([k]) => k === tabIni) ? tabIni : 'agenda';
@@ -2753,7 +2754,7 @@ function onlSesCard(a, f, x) {
   const otros = regs.filter(z => !usados.has(z));
   const nEj = bl.reduce((n, b) => n + (b.ejercicios || []).length, 0);
   return `<div class="os">
-    <div class="os-h"><span class="pill ${est[0] === 'plan' ? '' : est[0]}">${est[1]}</span>${fin ? `<span class="pill ${Number(r.rpe) >= 9 ? 'crit' : Number(r.rpe) >= 7 ? 'warn' : 'ok'}">RPE ${esc(r.rpe)}</span>` : ''}${r.carga ? `<span class="pill">⏱ ${esc(r.carga)}</span>` : ''}${sem ? `<span class="pill">Semana ${sem}/${pe.total}</span>` : ''}</div>
+    <div class="os-h"><span class="pill ${est[0] === 'plan' ? '' : est[0]}">${est[1]}</span>${fin ? `<span class="pill ${Number(r.rpe) >= 9 ? 'crit' : Number(r.rpe) >= 7 ? 'warn' : 'ok'}">RPE ${esc(r.rpe)}</span>` : ''}${r.carga ? `<span class="pill">⏱ ${esc(r.carga)}</span>` : ''}${sem ? `<span class="pill">Semana ${sem}/${pe.total}</span>` : ''}${stvA(r.strava)}</div>
     <div class="os-t">🌐 ${esc(rut?.tipo || r.rutina || 'Sesión online')}</div>
     <div class="small muted">${nEj} ejercicio${nEj === 1 ? '' : 's'}${anot.length ? ` · ${anot.length} anotado${anot.length === 1 ? '' : 's'}` : ''}${rut?.minutos ? ' · ~' + esc(rut.minutos) + ' min' : ''} · entrena por su cuenta en la app</div>
     ${pl ? `<div class="os-pl">📈 ${esc(String(pl).replace(/^Semana \d+ · /, ''))}</div>` : ''}

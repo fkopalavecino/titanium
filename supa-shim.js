@@ -126,7 +126,7 @@
     CFIELDS.forEach(f => row[f] = null);
     for (const k in r) { const f = CMAP[k] || k; if (CFIELDS.includes(f)) row[f] = r[k] === '' ? null : r[k]; }
     if (row.rpe != null && isNaN(Number(row.rpe))) row.rpe = null; return row; };
-  const row2rec = row => { const r = {}; CFIELDS.forEach(f => { if (row[f] != null) r[CBACK[f] || f] = f === 'rpe' ? String(row[f]) : row[f]; }); return r; };
+  const row2rec = row => { const r = {}; CFIELDS.forEach(f => { if (row[f] != null) r[CBACK[f] || f] = f === 'rpe' ? String(row[f]) : row[f]; }); if (row.strava) r.strava = row.strava; return r; }; // strava: solo lectura (lo escribe el alumno)
 
   async function all(table, q) { let out = [], from = 0; for (;;) { let qq = sb.from(table).select(q || '*').range(from, from + 999); const { data, error } = await qq; if (error) throw error; out = out.concat(data); if (data.length < 1000) return out; from += 1000; } }
 

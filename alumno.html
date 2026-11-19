@@ -385,7 +385,7 @@ async function load() {
     sb.from('config').select('data').eq('id', 1).maybeSingle(),
     sb.from('eventos').select('*').gte('fecha', desde).order('fecha'),
     sb.from('confirmaciones').select('fecha,hora,estado,cambios').eq('alumno', codigo).gte('fecha', today()),
-    sb.from('actividades_hechas').select('evento,fecha,minutos,rpe,nota').eq('alumno', codigo).gte('fecha', desde),
+    sb.from('actividades_hechas').select('evento,fecha,minutos,rpe,nota,strava').eq('alumno', codigo).gte('fecha', desde),
     sb.from('tecnica').select('id,nombre,patron,claves,video,orden').order('orden'),
     sb.from('mensajes').select('id,titulo,cuerpo,enviado_at').not('enviado_at', 'is', null).gte('enviado_at', new Date(Date.now() - 7 * 864e5).toISOString()).order('enviado_at', { ascending: false }).limit(5),
   ]);
@@ -1517,7 +1517,7 @@ V.rutina = () => {
   const cIdx = (() => { let k = -1; bloques.forEach((b, bi) => { if (!/bloque b/i.test(b.titulo || '') && (/bloque c/i.test(b.titulo || '') || bi >= 2)) k = bi; }); return k; })();
   const cNom = cIdx >= 0 ? (String(bloques[cIdx].titulo || '').replace(/^bloque\s+[a-z]\s*[·:-]?\s*/i, '').split('·')[0].trim() || 'bloque final') : '';
   const guardada = rd.rec && rd.rec.rpe != null; // terminada: el RPE se marca al final
-  const okCard = guardada ? `<section class="card" style="border-color:var(--ok);background:rgba(111,211,154,.08)"><b class="ok" style="font-size:18px">✅ Sesión guardada</b><div class="small muted">${[(rd.rec.ej || []).length ? rd.rec.ej.length + ' ejercicio' + (rd.rec.ej.length === 1 ? '' : 's') + ' anotados' : '', rd.rec.carga ? 'Resultado: ' + rd.rec.carga : '', rd.rec.rpe != null ? 'RPE ' + rd.rec.rpe : ''].filter(Boolean).map(esc).join(' · ')}</div><div class="small muted">Si cambias algo, toca «Actualizar mi entrenamiento».</div></section>` : '';
+  const okCard = guardada ? `<section class="card" style="border-color:var(--ok);background:rgba(111,211,154,.08)"><b class="ok" style="font-size:18px">✅ Sesión guardada</b><div class="small muted">${[(rd.rec.ej || []).length ? rd.rec.ej.length + ' ejercicio' + (rd.rec.ej.length === 1 ? '' : 's') + ' anotados' : '', rd.rec.carga ? 'Resultado: ' + rd.rec.carga : '', rd.rec.rpe != null ? 'RPE ' + rd.rec.rpe : ''].filter(Boolean).map(esc).join(' · ')}</div><div class="small muted">Si cambias algo, toca «Actualizar mi entrenamiento».</div></section>${stravaBox('s', rd.rec.fecha, rd.rec.hora, rd.rec.strava)}` : '';
   const tambien = (!S.ses || S.ses.auto) && claseHoy && evsHoy.length ? `<div class="chips">${evsHoy.map(x => `<button class="chip" data-evid="${esc(x.id)}">También hoy: ${EVI[x.tipo] || '📌'} ${esc(x.titulo)} ›</button>`).join('')}</div>` : '';
   const info = b => { const m = String(b.titulo || '').match(/^bloque\s+([a-z])\s*[·:-]?\s*(.*)$/i); const bi = bloques.indexOf(b); const letra = m ? m[1].toUpperCase() : String.fromCharCode(65 + bi);
     const isB = /bloque b/i.test(b.titulo || ''); return { letra, nomB: (m ? m[2] : b.titulo) || 'Bloque ' + letra, isB, isC: !isB && (/bloque c/i.test(b.titulo || '') || bi >= 2) }; };
@@ -1804,13 +1804,27 @@ function evActs(e) { const n = waNum(); const nom = String(S.perfil?.apodo || S.
   if (e.fecha >= today()) acts.push(`<a class="btn" href="${icsDe(e)}" download="titanium-${esc(e.fecha)}.ics">📅 Agregar a mi calendario</a>`);
   if (n) acts.push(`<a class="btn" href="https://wa.me/${n}?text=${encodeURIComponent(`Hola Franco, soy ${nom}. Te escribo por: ${e.titulo} (${longD(e.fecha).toLowerCase()}${e.hora ? ' a las ' + e.hora : ''}).`)}" target="_blank" rel="noopener" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">💬 Escribir a Franco</a>`);
   return { acts, doc, esPdf }; }
+/* ---------- link de Strava: el alumno pega el link de su actividad al terminar ---------- */
+const stravaDe = t => { const m = String(t || '').match(/https:\/\/[^\s<>"']*strava\.(?:com|app\.link)[^\s<>"']*/i); return m ? m[0].replace(/[).,;]+$/, '') : ''; };
+function stravaBox(k, a, b, url) { const key = k + '|' + a + '|' + (b || ''); const ed = S.stEdit === key;
+  const d = `data-stk="${esc(k)}" data-sta="${esc(a)}" data-stb="${esc(b || '')}"`;
+  if (url && !ed) return `<section class="card" style="border-color:#fc4c02"><div class="row" style="align-items:center"><b style="font-size:17px">🟠 Strava conectado</b><button class="chip" ${d} data-stedit="1">Cambiar</button></div><a class="btn" href="${esc(url)}" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">Ver mi actividad en Strava ›</a><div class="small muted">Franco ve este link junto a tu entrenamiento.</div></section>`;
+  return `<section class="card" style="border-color:#fc4c02"><b style="font-size:17px">🟠 ¿Lo grabaste en Strava?</b>
+    <div class="small muted">En Strava abre la actividad › <b>Compartir</b> › <b>Copiar link</b>. Después vuelve acá y toca «Pegar».</div>
+    <input id="st-url" inputmode="url" autocomplete="off" placeholder="https://strava.app.link/…" value="${esc(url || '')}">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn" ${d} data-stpaste="1">📋 Pegar</button><button class="btn pri" ${d} data-stsave="1">Guardar link</button></div>
+    ${url ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn" data-stcancel="1">Cancelar</button><button class="btn" ${d} data-stdel="1">Quitar link</button></div>` : ''}</section>`; }
+async function stravaGuardar(el, url) { const k = el.dataset.stk; el.disabled = true;
+  const { error } = k === 's' ? await sb.rpc('mi_strava_sesion', { p_fecha: el.dataset.sta, p_hora: el.dataset.stb, p_url: url || null }) : await sb.rpc('mi_strava_actividad', { p_evento: el.dataset.sta, p_url: url || null });
+  el.disabled = false; if (error) { toast(error.message); return; }
+  S.stEdit = null; await load(); toast(url ? 'Link de Strava guardado 🟠' : 'Link quitado'); render(true); }
 const esEntreno = e => e && (e.tipo === 'Actividad' || e.tipo === 'Evento' || e.tipo === 'Otro');
 const hechaDe = e => S.hechas?.get(String(e.id));
 const actsMes = mes => [...(S.hechas?.values() || [])].filter(r => String(r.fecha).startsWith(mes)).length;
 function hechaCard(e) { if (!esEntreno(e)) return ''; const h = hechaDe(e); const t = today();
   if (e.fecha > t) return `<section class="card"><div class="small muted">Cuando llegue el día podrás marcarla como hecha ✅</div></section>`;
   if (e.fecha < addDays(t, -30)) return h ? `<section class="card"><b class="ok">✅ La hiciste</b></section>` : '';
-  if (h && !S.actEdit) return `<section class="card" style="border-color:var(--ok)"><div class="row" style="align-items:center"><b class="ok" style="font-size:18px">✅ La hiciste</b><span style="display:flex;gap:6px"><button class="chip" data-actedit="1">Editar</button><button class="chip" data-actdel="${esc(e.id)}">Desmarcar</button></span></div><div class="small muted">${[h.minutos ? h.minutos + ' min' : '', h.rpe != null ? 'RPE ' + h.rpe : '', h.nota || ''].filter(Boolean).map(esc).join(' · ') || 'Sin detalles'}</div></section>`;
+  if (h && !S.actEdit) return `<section class="card" style="border-color:var(--ok)"><div class="row" style="align-items:center"><b class="ok" style="font-size:18px">✅ La hiciste</b><span style="display:flex;gap:6px"><button class="chip" data-actedit="1">Editar</button><button class="chip" data-actdel="${esc(e.id)}">Desmarcar</button></span></div><div class="small muted">${[h.minutos ? h.minutos + ' min' : '', h.rpe != null ? 'RPE ' + h.rpe : '', h.nota || ''].filter(Boolean).map(esc).join(' · ') || 'Sin detalles'}</div></section>${stravaBox('a', e.id, '', h.strava)}`;
   const sug = h?.minutos || (String(e.detalle || e.titulo || '').match(/(\d{1,3})\s*(?:[–-]\s*\d{1,3}\s*)?min/i) || [])[1] || '';
   const rpeSel = S.actRpe ?? h?.rpe;
   return `<section class="card"><h2 style="margin:0">¿La hiciste?</h2>
@@ -2235,6 +2249,11 @@ document.addEventListener('click', async ev => {
   if (ev.target.id === 'fup-open') { S.fotoUp = !S.fotoUp; render(); document.getElementById('fup-card')?.scrollIntoView({ block: 'start' }); return; }
   if (ev.target.id === 'ib-cancel') { if (S.ibNew?.prev) URL.revokeObjectURL(S.ibNew.prev); S.ibNew = null; render(); return; }
   if (ev.target.closest('[data-entrenar]')) { const pe = progEstado(); if (!pe) return; const id = pe.next[0]; S.evSel = null; S.foco = null; S.ses = { f: today(), h: 'libre', id }; S.rutSel = id; S.rpe = null; S.v = 'rutina'; blkAbiertos.clear(); render(); window.scrollTo(0, 0); return; }
+  const stp = ev.target.closest('[data-stpaste]'); if (stp) { const inp = $('#st-url'); try { const t = await navigator.clipboard.readText(); const u = stravaDe(t); if (u) { inp.value = u; stravaGuardar(stp, u); return; } toast('No encontré un link de Strava copiado. En Strava: Compartir › Copiar link.'); } catch (_) { inp?.focus(); toast('Mantén presionado el cuadro y elige «Pegar».'); } return; }
+  const sts = ev.target.closest('[data-stsave]'); if (sts) { const raw = ($('#st-url')?.value || '').trim(); const u = stravaDe(raw); if (!u) { toast(raw ? 'Ese link no es de Strava.' : 'Pega primero el link de tu actividad.'); return; } stravaGuardar(sts, u); return; }
+  const std = ev.target.closest('[data-stdel]'); if (std) { stravaGuardar(std, null); return; }
+  const ste = ev.target.closest('[data-stedit]'); if (ste) { S.stEdit = ste.dataset.stk + '|' + ste.dataset.sta + '|' + (ste.dataset.stb || ''); render(true); return; }
+  if (ev.target.closest('[data-stcancel]')) { S.stEdit = null; render(true); return; }
   if (ev.target.closest('[data-actedit]')) { S.actEdit = true; S.actRpe = null; render(true); return; }
   const arp = ev.target.closest('[data-actrpe]'); if (arp) { S.actRpe = Number(arp.dataset.actrpe); document.querySelectorAll('[data-actrpe]').forEach(b => b.setAttribute('aria-pressed', b === arp)); return; }
   const ahe = ev.target.closest('[data-acthecha]'); if (ahe) { const mn = parseInt(($('#act-min')?.value || '').replace(/\D/g, ''), 10); const nota = ($('#act-nota')?.value || '').trim();
