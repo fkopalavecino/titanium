@@ -1,4 +1,4 @@
-// Titanium Sport · avisos push a alumnos (evento nuevo, recordatorios, clases, mensajes grupales y personales, pagos, recuperaciones) y al profe (confirmaciones, recuperaciones, agenda libre, comprobantes, ingresos nuevos, resumen de pagos)
+// Titanium Sport · avisos push a alumnos (evento nuevo, recordatorios, clases, mensajes grupales y personales, pagos, recuperaciones) y al profe (confirmaciones, recuperaciones, agenda libre, comprobantes, ingresos nuevos, resumen de pagos) · al profe con silencio nocturno 22:00–05:50
 import webpush from 'npm:web-push@3.6.7';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -46,6 +46,22 @@ async function enviar(subs: { endpoint: string; sub: unknown }[], msg: Record<st
   return { ok, fallos };
 }
 const subsProfe = async () => (await sb.from('coach_push').select('endpoint,sub')).data || [];
+// silencio nocturno del profe: de 22:00 a 05:50 (hora Chile) los avisos se guardan y salen juntos a las 05:50
+const silencioProfe = () => { const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).split(':').map(Number); const t = (h % 24) * 60 + m; return t >= 22 * 60 || t < 5 * 60 + 50; };
+async function avisarProfe(msg: Record<string, string>) {
+  if (silencioProfe()) { await sb.from('profe_avisos_pend').insert({ msg }); return { silenciado: true }; }
+  return enviar(await subsProfe(), msg);
+}
+// a partir de las 05:50 se mandan los avisos guardados de la noche (uno solo tal cual; varios en un resumen)
+async function soltarPendientesProfe() {
+  if (silencioProfe()) return null;
+  const { data: ps } = await sb.from('profe_avisos_pend').delete().lte('created_at', new Date().toISOString()).select('msg,created_at');
+  if (!ps?.length) return null;
+  ps.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  if (ps.length === 1) return enviar(await subsProfe(), ps[0].msg);
+  const tit = ps.map((p) => String(p.msg?.title || '')).filter(Boolean);
+  return enviar(await subsProfe(), { title: `🌙 ${ps.length} avisos de la noche`, body: tit.slice(0, 5).join(' · ') + (tit.length > 5 ? ` y ${tit.length - 5} más` : ''), url: './index.html', tag: 'noche-' + diaCL() });
+}
 const nombreProfe = async () => { const { data: cf } = await sb.from('config').select('data').eq('id', 1).maybeSingle(); return String(cf?.data?.coach || 'Tu profe').split(' ')[0]; };
 // link del profe directo al bloque de esa clase
 const urlClase = (f: string, h: string) => `./index.html#clase/${f}/${h}`;
@@ -124,7 +140,7 @@ Deno.serve(async (req) => {
       // si avisó a tiempo gana una clase para recuperar: se le avisa a él y se suma al aviso del profe
       let rq: { gana?: boolean; disponibles?: number; vence?: string; opciones?: number } | null = null;
       if (!voy) { const r = await sb.rpc('recuperable', { c: c.alumno, f: c.fecha, h: c.hora }); rq = r.data; if (rq?.gana) await avisarRecupAlumno(c.alumno, rq, false); }
-      return json(await enviar(await subsProfe(), {
+      return json(await avisarProfe({
         title: voy ? `✅ ${nom} viene` : `❌ ${nom} no viene`,
         body: `Clase de ${cuando} a las ${h}${voy ? '' : rq?.gana ? ' · 🔁 ganó 1 clase para recuperar' : ' · toca para ver la clase'}`,
         url: urlClase(c.fecha, h), tag: `cf-${c.alumno}-${c.fecha}-${h}` }));
@@ -139,7 +155,7 @@ Deno.serve(async (req) => {
       const { data: s } = await sb.from('solicitudes').select('alumno,data').eq('id', String(b.sol)).maybeSingle();
       if (!s) return json({ skip: true });
       const nom = String(s.data?.nombre || s.alumno).trim();
-      return json(await enviar(await subsProfe(), { title: `💳 ${nom} envió un comprobante`, body: `${s.data?.monto || ''}${s.data?.comprobante ? ' · con foto' : ''} · toca para revisarlo y confirmarlo`, url: './index.html#solicitudes', tag: 'sol-' + b.sol }));
+      return json(await avisarProfe({ title: `💳 ${nom} envió un comprobante`, body: `${s.data?.monto || ''}${s.data?.comprobante ? ' · con foto' : ''} · toca para revisarlo y confirmarlo`, url: './index.html#solicitudes', tag: 'sol-' + b.sol }));
     }
     if (b.modo === 'pago_estado') {
       // el profe confirmó o rechazó el comprobante: aviso al alumno
@@ -155,6 +171,7 @@ Deno.serve(async (req) => {
     }
     if (b.modo === 'mensajes') {
       // mensajes del profe (grupales o para un alumno): se marcan como enviados antes de mandar, así nunca salen dos veces
+      const noche = await soltarPendientesProfe();
       const ahora = new Date().toISOString();
       const { data: ms } = await sb.from('mensajes').update({ enviado_at: ahora }).lte('enviar_at', ahora).is('enviado_at', null).select();
       const out = []; let todos: { endpoint: string; sub: unknown }[] | null = null;
@@ -165,7 +182,7 @@ Deno.serve(async (req) => {
           title: `${personal ? '💬' : '📣'} ${m.titulo || 'Mensaje de tu profe'}`, body: String(m.cuerpo || '').slice(0, 180),
           url: `./alumno.html?msg=${m.id}`, tag: 'msg-' + m.id }));
       }
-      return json({ mensajes: (ms || []).length, out });
+      return json({ mensajes: (ms || []).length, out, noche });
     }
     if (b.modo === 'recuperacion') {
       // un alumno agendó o canceló una recuperación desde su app: aviso informativo al profe
@@ -174,7 +191,7 @@ Deno.serve(async (req) => {
       const cuando = f === diaCL() ? 'hoy' : f === diaCL(1) ? 'mañana' : fechaTxt(f);
       // accion: 'agenda' | 'cancela' (recuperación) · 'agenda_flex' | 'cancela_flex' (alumno de agenda libre)
       const ag = String(b.accion).startsWith('agenda'), flex = String(b.accion).endsWith('_flex');
-      return json(await enviar(await subsProfe(), {
+      return json(await avisarProfe({
         title: flex ? (ag ? `📅 ${nom} agendó una clase` : `↩️ ${nom} canceló su clase`) : ag ? `🔁 ${nom} recupera una clase` : `↩️ ${nom} canceló su recuperación`,
         body: `${ag ? 'Viene' : 'Ya no viene'} ${cuando} a las ${h}`, url: urlClase(f, h), tag: `rc-${b.alumno}-${f}-${h}` }));
     }
@@ -188,7 +205,7 @@ Deno.serve(async (req) => {
       const parq = f.parqResp ? Object.values(f.parqResp).filter((v) => v === 'si').length : (Array.isArray(f.parq) ? f.parq.length : 0);
       const alertas = [les ? `${les} lesión${les === 1 ? '' : 'es'}` : '', enf ? `${enf} condición${enf === 1 ? '' : 'es'} de salud` : '', parq ? `${parq} « sí » en PAR-Q` : ''].filter(Boolean);
       const partes = [f.fecha ? 'Ficha completa' : 'Sin ficha', count ? '🔔 avisos activos' : '🔕 sin avisos', 'leyó la información'];
-      return json(await enviar(await subsProfe(), {
+      return json(await avisarProfe({
         title: `🎉 ${String(a.nombre || b.alumno).trim()} ya está en la app`,
         body: partes.join(' · ') + (alertas.length ? ` · ⚠️ Revisa su ficha: ${alertas.join(', ')}` : ''),
         url: './index.html#alumnos', tag: 'ing-' + b.alumno }));
@@ -201,7 +218,7 @@ Deno.serve(async (req) => {
       if (!up) return json({ skip: true });
       const { data: a } = await sb.from('alumnos').select('nombre').eq('codigo', n.alumno).maybeSingle();
       const OBJ: Record<string, string> = { bajar: 'Bajar grasa', recomp: 'Recomposición corporal', mantener: 'Mantener', subir: 'Ganar músculo' };
-      return json(await enviar(await subsProfe(), {
+      return json(await avisarProfe({
         title: `🥗 ${String(a?.nombre || n.alumno).trim()} eligió «${OBJ[n.meta.obj] || 'objetivo'}»`,
         body: `Meta ${Math.round(n.meta.kcal || 0).toLocaleString('es-CL')} kcal · P ${n.meta.prot} · C ${n.meta.carb} · G ${n.meta.gras}. Revisa y envía su pauta.`,
         url: './index.html#nutri/' + n.alumno, tag: 'nutri-obj-' + n.alumno }));
@@ -235,7 +252,7 @@ Deno.serve(async (req) => {
       if (!v.length && !x.length && !r?.saldo && !r?.pendientes) return json({ nada: true });
       const lista = (a: string[]) => a.slice(0, 4).join(', ') + (a.length > 4 ? ` y ${a.length - 4} más` : '');
       const partes = [v.length ? `Vencen ${v.length}: ${lista(v)}` : '', x.length ? `Vencidos ${x.length}: ${lista(x)}` : '', r?.saldo ? `${r.saldo} con saldo` : '', r?.pendientes ? `${r.pendientes} comprobante${r.pendientes === 1 ? '' : 's'} por revisar` : ''].filter(Boolean);
-      return json(await enviar(await subsProfe(), { title: '💰 Pagos de la semana', body: partes.join(' · '), url: './index.html#pagos', tag: 'resumen-pagos' }));
+      return json(await avisarProfe({ title: '💰 Pagos de la semana', body: partes.join(' · '), url: './index.html#pagos', tag: 'resumen-pagos' }));
     }
     return json({ error: 'sin acción' }, 400);
   } catch (err) { console.error(err); return json({ error: String((err as Error)?.message || err) }, 500); }
