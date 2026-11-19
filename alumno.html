@@ -1355,8 +1355,8 @@ function sugerencia(e) { if (tipoEj(e) === 'tiempo') { const pv = prevSets(e.nom
   const m = String(e.dosis || '').match(/×\s*(\d+)(?:\s*[–-]\s*(\d+))?/); if (!m) return null;
   const lo = Number(m[1]), hi = Number(m[2] || m[1]); const pv = prevSets(e.nombre).filter(x => x && x.kg != null && x.r != null && x.kg > 0); if (!pv.length) return null;
   const kg = Math.max(...pv.map(x => x.kg)); const top = pv.filter(x => x.kg === kg);
-  const inc = /mancuerna|kb|kettlebell|pesa rusa/i.test(e.nombre) ? 2 : 2.5;
-  if (top.every(x => x.r >= hi)) { const nk = Math.round((kg + inc) * 2) / 2; return { kg: nk, sube: true, txt: `Hoy prueba ${fmtKg(nk)} kg · llegaste a ${hi} reps` }; }
+  const mc = /mancuerna|kb|kettlebell|pesa rusa/i.test(e.nombre); const inc = mc ? 2 : 5; // discos: mínimo 2,5 por lado → saltos de 5 kg
+  if (top.every(x => x.r >= hi)) { const nk = mc ? Math.round((kg + inc) * 2) / 2 : Math.round((kg + inc) / 5) * 5; return { kg: nk, sube: true, txt: `Hoy prueba ${fmtKg(nk)} kg · llegaste a ${hi} reps` }; }
   if (top.some(x => x.r < lo)) return { kg, txt: `Mantén ${fmtKg(kg)} kg y apunta a ${lo}${hi !== lo ? '–' + hi : ''} reps` };
   return { kg, txt: `Mantén ${fmtKg(kg)} kg y suma 1 rep` }; }
 function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nSer(e.dosis) : 0; const sets = c?.sets || [];
@@ -1369,7 +1369,7 @@ function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nS
     ${ONL() && isB ? corrBtn(e) : ''}
     ${tc && foco ? `<details class="tec-d"><summary>¿Cómo se hace?</summary><ol>${(tc.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol></details>` : ''}
     ${isB ? (() => { const tp = tipoEj(e); const ap = tp === 'kg' ? Math.max(nAprox(e), (c?.ap || []).length, (S.apX || {})[DKEY() + e.nombre] || 0, ...Object.keys(getDraft().ap?.[e.nombre] || {}).map(k => Number(k) + 1)) : 0; const aps = c?.ap || [];
-      const base = sg?.kg ?? (pv.length ? Math.max(0, ...pv.map(x => x.kg || 0)) : 0); const inc = /mancuerna|kb|kettlebell|pesa rusa/i.test(e.nombre) ? 1 : 2.5;
+      const base = sg?.kg ?? (pv.length ? Math.max(0, ...pv.map(x => x.kg || 0)) : 0); const inc = /mancuerna|kb|kettlebell|pesa rusa/i.test(e.nombre) ? 1 : 5;
       const PCT = [[0.5, 8], [0.75, 3], [0.85, 2], [0.9, 1]];
       const apRow = i => { const s0 = aps[i] || {}; const [pc, rp] = PCT[Math.min(i, PCT.length - 1)]; const kgS = base ? Math.round(base * pc / inc) * inc : null;
         return `<div class="set ap ${conDato(s0) ? 'done' : ''}"><span class="n">A</span><span class="prev"><button type="button" class="ap-del" data-apdel="${esc(e.nombre)}" data-api="${i}" aria-label="Borrar aproximación ${i + 1} ${esc(e.nombre)}">✕</button>${kgS ? '~' + Math.round(pc * 100) + '%' : 'aprox.'}</span><input inputmode="decimal" placeholder="${kgS ? esc(fmtKg(kgS)) : 'kg'}" aria-label="kg aproximación ${i + 1} ${esc(e.nombre)}" data-ap="1" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s0.kg != null ? esc(String(s0.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${rp}" aria-label="reps aproximación ${i + 1} ${esc(e.nombre)}" data-ap="1" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s0.r != null ? esc(s0.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="60" aria-label="Marcar aproximación ${i + 1} hecha">✓</button></div>`; };
