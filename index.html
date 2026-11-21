@@ -1098,7 +1098,7 @@ VIEWS.inicio = () => {
       <div class="list">
         ${seguimiento.length ? seguimiento.slice(0,12).map(a => { const p = planActual(a); const v = vigencia(a,p); return `
           <div class="li"><div class="grow"><div class="t">${esc(a.nombre)}</div><div class="small muted num">${p.fin ? 'Renueva ' + fmtDY(p.fin) : ''} · ${clp(p.monto)}</div></div>
-          ${pill(v)}<button class="btn sm" data-act="msg" data-id="${esc(a.codigo)}">Mensaje</button><button class="btn sm pri" data-act="renovar" data-id="${esc(a.codigo)}">Renovar</button></div>`; }).join('')
+          ${pill(v)}<button class="btn sm" data-act="msg" data-id="${esc(a.codigo)}">Mensaje</button><button class="btn sm pri" data-act="pago" data-id="${esc(a.codigo)}">💳 Pagó</button><button class="btn sm" data-act="renovar" data-id="${esc(a.codigo)}">Renovar</button></div>`; }).join('')
         : `<p class="muted">Nada por renovar esta semana.</p>`}
         ${seguimiento.length > 12 ? `<a class="li" href="#pagos" style="color:var(--red);font-weight:600;text-decoration:none">Ver los ${seguimiento.length} en Pagos ›</a>` : ''}
       </div>
@@ -1617,7 +1617,8 @@ VIEWS.pagos = () => {
       <td class="num">${fmtDY(p.inicio)}</td><td class="num">${fmtDY(p.fin)}</td>
       <td><div class="chips">${pill(pagoEstado(p))}${actual ? pill(vigencia(a,p)) : ''}</div></td>
       <td><div class="acts">
-        ${saldo(p) ? `<button class="btn sm pri" data-act="abonar" data-id="${esc(a.codigo)}" data-p="${esc(p.id)}">Abonar</button>` : ''}
+        ${actual ? `<button class="btn sm pri" data-act="pago" data-id="${esc(a.codigo)}">💳 Pagó</button>` : ''}
+        ${saldo(p) ? `<button class="btn sm${actual ? '' : ' pri'}" data-act="abonar" data-id="${esc(a.codigo)}" data-p="${esc(p.id)}">Abonar</button>` : ''}
         ${actual ? `<button class="btn sm" data-act="renovar" data-id="${esc(a.codigo)}">Renovar</button>` : ''}
         <button class="btn sm" data-act="editar-plan" data-id="${esc(a.codigo)}" data-p="${esc(p.id)}">Editar</button>
         <button class="btn sm ghost" data-act="msg" data-id="${esc(a.codigo)}" data-p="${esc(p.id)}">Mensaje</button>
@@ -2374,6 +2375,55 @@ function planModal(code, pid, mode) {
 }
 let editingPlan = null;
 
+/* ---------- «Pagó»: un solo botón. Si el plan tiene saldo, abona; si ya está pagado, crea el plan siguiente desde el día que vencía ---------- */
+function avisoPagoAlumno(code, monto, plan) { // mensaje + aviso en la app del alumno
+  if (!window.__sb || !plan) return;
+  const n = firstName(S.alumnos.get(code)?.nombre || '');
+  const cuerpo = `Hola ${n}! Recibimos tu pago de ${clp(monto)}. Tu plan va del ${fmtD(plan.inicio)} al ${fmtD(plan.fin)}${plan.clases ? ' (' + plan.clases + ' clases)' : ''}. ¡Gracias! 💪`;
+  window.__sb.from('mensajes').insert({ alumno: code, titulo: '✅ Pago recibido', cuerpo, enviar_at: new Date().toISOString() }).then(({ error }) => { if (error) console.warn('aviso pago', error.message); });
+}
+function pagoModal(code) {
+  const a = clone(S.alumnos.get(code)); if (!a) return;
+  const ps = planesOrden(a), last = ps[ps.length - 1];
+  if (last && saldo(last) > 0) { abonarModal(code, last.id); return; }
+  const c = cfg(), t = today(), gracia = c.pago?.gracia ?? 5;
+  const ini0 = last?.fin || t, ncl = last?.clases || a.clases || '', monto0 = last?.monto || '';
+  const tarde = last?.fin ? diffDays(last.fin, t) : 0;
+  openModal(`💳 Pagó · ${a.nombre}`, `
+    <div class="card" style="padding:12px;display:grid;gap:4px;border-color:var(--red)">
+      <div class="small muted">Plan nuevo</div>
+      <div style="font-size:20px;font-weight:800" class="num" id="pg-res"></div>
+      <p class="small" id="pg-ses" style="margin:0;line-height:1.5"></p>
+    </div>
+    ${tarde > gracia ? `<div class="note small" style="border-left:3px solid var(--warn);padding:8px 10px">⚠️ Pagó <b>${tarde} días tarde</b> (vencía el ${fmtDY(last.fin)}). El plan parte igual el día que vencía. Si quieres perdonarle esos días: <button type="button" class="btn sm" id="pg-hoy">Partir hoy</button></div>`
+      : tarde > 0 ? `<p class="small muted" style="margin:0">Vencía el ${fmtDY(last.fin)} · pagó dentro de los ${gracia} días de gracia.</p>` : ''}
+    <div class="frow">
+      <label class="f">Monto pagado<input type="number" id="pg-monto" min="1" step="1" value="${esc(monto0)}" required></label>
+      <label class="f">Medio<select id="pg-medio">${MEDIOS.map(m => `<option>${m}</option>`).join('')}</select></label>
+    </div>
+    <details><summary class="small" style="cursor:pointer">Cambiar inicio, clases o valor del plan</summary>
+      <div class="frow" style="margin-top:8px">
+        <label class="f">Inicio<input type="date" id="pg-ini" value="${esc(ini0)}"></label>
+        <label class="f">Clases<input type="number" id="pg-clases" min="1" value="${esc(ncl)}"></label>
+        <label class="f">Valor del plan<input type="number" id="pg-valor" min="0" step="1" value="${esc(monto0)}" placeholder="igual al pago"></label>
+      </div></details>`, {
+    submit: 'Registrar pago',
+    onSubmit: () => {
+      const m = Number(val('pg-monto')); if (!m) { toast('Indica el monto pagado.', true); return false; }
+      const ini = val('pg-ini') || ini0, cl = Number(val('pg-clases')) || null, valor = Number(val('pg-valor')) || m;
+      const fresh = clone(S.alumnos.get(code));
+      const np = {id: 'p' + Date.now().toString(36), inicio: ini, fin: finPlan(fresh, ini, cl, c), monto: valor, clases: cl, mes: monthOf(ini), pagos: [{fecha: t, monto: m, medio: val('pg-medio')}]};
+      fresh.planes = [...(fresh.planes || []), np];
+      if (fresh.estado === 'inactivo') fresh.estado = 'activo';
+      saveAlumno(fresh); avisoPagoAlumno(code, m, np);
+      toast(`Pago registrado ✓ ${a.nombre}: plan ${fmtD(np.inicio)} → ${fmtD(np.fin)}${valor > m ? ' · queda saldo ' + clp(valor - m) : ''}.`);
+    }
+  });
+  const pinta = () => { const ini = val('pg-ini') || ini0, cl = val('pg-clases'); $('#pg-res').textContent = `${fmtDY(ini)} → ${fmtDY(finPlan(a, ini, cl, c))}${cl ? ' · ' + cl + ' clases' : ''}`; $('#pg-ses').innerHTML = sesionesTxt(a, ini, cl); };
+  pinta(); $('#pg-ini')?.addEventListener('change', pinta); $('#pg-clases')?.addEventListener('input', pinta);
+  $('#pg-hoy')?.addEventListener('click', () => { $('#pg-ini').value = t; $('#pg-ini').closest('details').open = true; pinta(); });
+}
+
 function abonarModal(code, pid) {
   const a = S.alumnos.get(code); if (!a) return;
   const p = (a.planes||[]).find(x => x.id === pid) || planActual(a); if (!p) return;
@@ -2389,7 +2439,7 @@ function abonarModal(code, pid) {
       const m = Number(val('ab-monto')); if (!m) { toast('Indica el monto del abono.', true); return false; }
       const fresh = clone(S.alumnos.get(code)); const fp = fresh.planes.find(x => x.id === p.id);
       fp.pagos = [...(fp.pagos||[]), {fecha: val('ab-fecha') || today(), monto: m, medio: val('ab-medio')}];
-      saveAlumno(fresh); toast(`Abono de ${clp(m)} registrado para ${a.nombre}.`);
+      saveAlumno(fresh); avisoPagoAlumno(code, m, fp); toast(`Abono de ${clp(m)} registrado para ${a.nombre}.`);
     }
   });
 }
@@ -2650,7 +2700,7 @@ function pfHero(a) {
         ${tel ? `<a class="pf-b" href="https://wa.me/${tel}" data-act="wa-chat" data-tel="${esc(tel)}" title="WhatsApp">${ICON_WA}<span>WhatsApp</span></a>` : ''}
         <button type="button" class="pf-b" data-act="pf-tab" data-t="agenda" data-foco="msj" title="Mensaje en su app">💬<span>Mensaje</span></button>
         <button type="button" class="pf-b" data-act="pf-dia" data-f="${t}" data-modo="agendar" title="Agendar algo">＋<span>Agendar</span></button>
-        ${p ? (saldo(p) ? `<button type="button" class="pf-b pri" data-act="abonar" data-id="${esc(code)}" data-p="${esc(p.id)}">💳<span>Abonar</span></button>` : `<button type="button" class="pf-b" data-act="renovar" data-id="${esc(code)}">⟳<span>Renovar</span></button>`) : `<button type="button" class="pf-b pri" data-act="nuevo-plan" data-id="${esc(code)}">＋<span>Crear plan</span></button>`}
+        ${p ? `<button type="button" class="pf-b pri" data-act="pago" data-id="${esc(code)}" title="Registrar pago: abona o renueva solo">💳<span>Pagó</span></button><button type="button" class="pf-b" data-act="renovar" data-id="${esc(code)}">⟳<span>Renovar</span></button>` : `<button type="button" class="pf-b pri" data-act="nuevo-plan" data-id="${esc(code)}">＋<span>Crear plan</span></button>`}
       </div>
     </div>
     <div class="pf-tiles">
@@ -3009,7 +3059,7 @@ function pfPagos(a) {
       <div><span class="l">Saldo pendiente</span><b class="num ${deuda ? 'crit' : 'ok'}">${deuda ? mClp(deuda) : '✓ Al día'}</b><span class="s">${deuda ? 'Entre todos sus planes' : 'No debe nada'}</span></div>
       <div><span class="l">Pagado en total</span><b class="num">${mClp(total)}</b><span class="s">${meses ? `${ps.length} plan${ps.length === 1 ? '' : 'es'} · alumno hace ${meses} mes${meses === 1 ? '' : 'es'}` : '—'}</span></div>
     </div>
-    <div class="tools">${p ? `<button type="button" class="btn sm${saldo(p) ? ' pri' : ''}" data-act="abonar" data-id="${esc(code)}" data-p="${esc(p.id)}">Abonar</button><button type="button" class="btn sm" data-act="renovar" data-id="${esc(code)}">Renovar</button><button type="button" class="btn sm" data-act="editar-plan" data-id="${esc(code)}" data-p="${esc(p.id)}">Editar plan</button>` : `<button type="button" class="btn sm pri" data-act="nuevo-plan" data-id="${esc(code)}">Crear plan</button>`}<button type="button" class="btn sm ghost" data-act="msg" data-id="${esc(code)}" data-p="${esc(p?.id || '')}">Mensaje de cobro</button></div>
+    <div class="tools">${p ? `<button type="button" class="btn sm pri" data-act="pago" data-id="${esc(code)}">💳 Pagó</button><button type="button" class="btn sm" data-act="abonar" data-id="${esc(code)}" data-p="${esc(p.id)}">Abonar</button><button type="button" class="btn sm" data-act="renovar" data-id="${esc(code)}">Renovar</button><button type="button" class="btn sm" data-act="editar-plan" data-id="${esc(code)}" data-p="${esc(p.id)}">Editar plan</button>` : `<button type="button" class="btn sm pri" data-act="nuevo-plan" data-id="${esc(code)}">Crear plan</button>`}<button type="button" class="btn sm ghost" data-act="msg" data-id="${esc(code)}" data-p="${esc(p?.id || '')}">Mensaje de cobro</button></div>
     ${ps.length ? `<div class="tbl-wrap"><table><thead><tr><th>Período</th><th class="r">Clases</th><th class="r">Monto</th><th class="r">Abonado</th><th class="r">Saldo</th><th>Estado</th></tr></thead><tbody>
       ${ps.map(x => `<tr class="click" data-act="editar-plan" data-id="${esc(code)}" data-p="${esc(x.id)}" title="Editar este plan"><td class="num">${fmtDY(x.inicio)} → ${fmtDY(x.fin)}${x.id === p?.id ? ' <span class="pill info">actual</span>' : ''}${(x.pagos || []).length ? `<span class="sub">${x.pagos.map(y => `${fmtD(y.fecha)} · ${mClp(y.monto)}${y.medio ? ' · ' + esc(y.medio) : ''}`).join(' / ')}</span>` : ''}</td><td class="r num">${x.clases || '—'}</td><td class="r num">${mClp(x.monto)}</td><td class="r num">${mClp(abonado(x))}</td><td class="r num ${saldo(x) ? 'crit' : ''}">${saldo(x) ? mClp(saldo(x)) : '—'}</td><td>${pill(pagoEstado(x))}</td></tr>`).join('')}
     </tbody></table></div>` : ''}
@@ -3407,6 +3457,7 @@ document.addEventListener('click', e => {
       if (S.view === 'pagos') { render(); window.scrollTo({top:0}); } else location.hash = '#pagos'; break; }
     case 'p-todos': S.ui.pagosQ = ''; S.ui.pagosFoco = null; render(); break;
     case 'abonar': abonarModal(id, el.dataset.p); break;
+    case 'pago': pagoModal(id); break;
     case 'renovar': planModal(id, null, 'renovar'); break;
     case 'nuevo-plan': planModal(id, null, 'nuevo'); break;
     case 'abrir-mes': abrirMesModal(S.ui.pagosMes); break;
