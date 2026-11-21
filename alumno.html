@@ -1556,7 +1556,10 @@ V.rutina = () => {
       ${!st.inf.isC && nV > 1 ? `<div class="row" style="align-items:center"><b>Vuelta ${Math.min(v, nV)} de ${nV}</b>${v < nV ? `<button class="chip" data-vuelta="${bi}">Siguiente vuelta ›</button>` : '<span class="small ok" style="font-weight:700">Última vuelta</span>'}</div>` : ''}
       <div class="circ">${ejs.map((e, ei) => { const tc = tecDe(e.nombre); const on = ck.has(bi + '-' + ei);
         return `<div class="circ-it${on ? ' ok' : ''}"><button class="circ-ck" data-cck="${bi}-${ei}" aria-pressed="${on}" aria-label="Marcar ${esc(e.nombre)}">✓</button><div class="circ-tx"><b>${esc(e.nombre)}</b><span class="small muted">${esc(e.dosis)}</span></div>${tc ? '' : vidBtn(e, tc)}${tc ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</div>`; }).join('')}</div>
-      ${!st.inf.isC ? `<button class="btn" data-timer="${bi}" data-sinres="1" data-vtas="${nV > 1 ? nV : 0}">⏱ Cronómetro · ${esc(timerTxt(Object.assign(detectarTimer(b), (() => { const c = detectarTimer(b); return c.modo === 'crono' && !c.vueltas && nV > 1 ? { nombre: c.nombre === 'Cronómetro' ? 'Circuito' : c.nombre, vueltas: nV } : {}; })())))}</button>` : ''}
+      ${!st.inf.isC ? (() => { const c = detectarTimer(b); if (c.modo === 'crono' && !c.vueltas && nV > 1) { if (c.nombre === 'Cronómetro') c.nombre = 'Circuito'; c.vueltas = nV; }
+        // sin vueltas, tope ni intervalos (ej: 1 vuelta con series por ejercicio) un cronómetro suelto no aporta: no se muestra
+        if (c.modo === 'crono' && !c.vueltas && !c.tope) return '';
+        return `<button class="btn" data-timer="${bi}" data-sinres="1" data-vtas="${nV > 1 ? nV : 0}">⏱ ${esc(timerTxt(c))}</button>`; })() : ''}
       ${st.inf.isC ? `<button class="btn pri" data-timer="${bi}">⏱ Iniciar · ${esc(timerTxt(detectarTimer(b)))}</button>
       ${cIdx === bi ? `<label class="field">Resultado · ${esc(cNom)}<input id="carga" placeholder="Ej: 5 rondas + 8 · 14:32" value="${esc(rd.rec?.carga || '')}"></label>` : ''}` : ''}
     </section>${nav}`; }
