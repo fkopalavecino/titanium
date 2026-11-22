@@ -225,6 +225,7 @@ tr.click{cursor:pointer}
 .ej-n{font-size:14px;font-weight:600;line-height:1.25;min-width:0}
 .ej-n .d{display:block;font-weight:400;font-size:12px;color:var(--muted)}
 .ej-n .d b{color:var(--fg);font-weight:600}
+.sugp{display:block;font-weight:400;font-size:12px;color:var(--muted);line-height:1.35}.sugp b{color:var(--fg);font-weight:700}.sugp.up b{color:var(--red,#d71f30)}.sugp.down b{color:#f2b44f}.sugp-l{display:grid;gap:4px;font-size:12px;padding:4px 0}.sugp-l>div>b{font-size:12px}
 .ej-row .btn{justify-content:center;padding:6px 0}
 .ej-blk{display:grid;gap:4px;padding:10px 0 4px;border-top:1px solid var(--line)}
 .ej-blk:first-child{border-top:0;padding-top:0}
@@ -602,7 +603,7 @@ td.crit{color:var(--crit);font-weight:700}
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supa-shim.js?v=20261119b"></script><script src="inbody-ocr.js?v=20261113a"></script><script src="alimentos.js?v=20261113b"></script><script src="nutri-calc.js?v=20261113g"></script><script src="sonidos.js?v=2"></script>
+<script src="supa-shim.js?v=20261119b"></script><script src="inbody-ocr.js?v=20261113a"></script><script src="alimentos.js?v=20261113b"></script><script src="nutri-calc.js?v=20261113g"></script><script src="sug-carga.js?v=20261122a"></script><script src="sonidos.js?v=2"></script>
 <script>
 (() => {
 'use strict';
@@ -1331,6 +1332,20 @@ function cargasDe(code) { // [{f,h,n,kg,r}] más reciente primero
 const fmtSet = x => x.t != null ? x.t + ' s' : [x.kg != null ? String(x.kg).replace('.', ',') + ' kg' : '', x.r != null ? '× ' + x.r : ''].filter(Boolean).join(' ');
 const setsOf = x => x?.sets?.length ? x.sets.map(s => s || {}) : (x && (x.kg != null || x.r != null) ? [{kg: x.kg ?? null, r: x.r ?? null}] : x && x.t != null ? [{t: x.t}] : []);
 const fmtSets = x => { const ss = setsOf(x).filter(s => s.kg != null || s.r != null || s.t != null); return ss.length > 1 ? ss.map(s => s.t != null ? s.t + ' s' : (s.kg != null ? String(s.kg).replace('.', ',') : '–') + '×' + (s.r ?? '–')).join(' · ') : fmtSet(x); };
+// carga sugerida (misma regla que la app del alumno, en sug-carga.js): última vez que hizo ese ejercicio antes de f|hora
+const CORP_RE = /dominada|pull-?up|chin-?up|fondos|\bdips\b|flexiones|flexi[oó]n de brazos|push-?up|remo invertido|muscle-?up|copenhag|n[oó]rdico|superman|toque de hombro|elevaci[oó]n de piernas|\btrx\b|anillas?\b|anillos?\b|\brings?\b/i;
+let _dd = {n: -1, k: []}; const diasDesc = () => { if (_dd.n !== S.dias.size || _dd.m !== S.dias) _dd = {n: S.dias.size, m: S.dias, k: [...S.dias.keys()].sort().reverse()}; return _dd.k; };
+function prevRecP(code, n, antes) { const nn = window.TLSug ? TLSug.norm(n) : n; let alt = null;
+  for (const df of diasDesc()) { if (df > antes.slice(0, 10)) continue; const d = S.dias.get(df); for (const h of Object.keys(d.bloques || {}).sort().reverse()) { if (df + '|' + h >= antes) continue;
+    const r = d.bloques[h][code]; if (!r) continue;
+    for (const x of r.ej || []) { const ss = setsOf(x).filter(z => z.kg != null || z.r != null || z.t != null); if (!ss.length) continue;
+      if (x.n === n) return {sets: ss, rpe: r.rpe, f: df}; if (!alt && window.TLSug && TLSug.norm(x.n) === nn) alt = {sets: ss, rpe: r.rpe, f: df}; } }
+    if (alt) return alt; }
+  return null; }
+function sugP(code, f, hora, e, rut) { if (!window.TLSug) return null; const a = S.alumnos.get(code); const pg = a ? progEstado(a, f) : null;
+  const tipo = esTiempo(e.n, e.d) ? 'tiempo' : esSalto(e.n) ? 'reps' : CORP_RE.test(e.n) ? 'corporal' : 'kg';
+  return TLSug.calc({nombre: e.n, dosis: e.d, tipo, prev: prevRecP(code, e.n, f + '|' + hora), descarga: !!(pg && rut && TLSug.esDescarga(progLinea(rut, pg.semana)))}); }
+const sugLineP = sg => !sg ? '' : sg.primera ? `<span class="sugp">🆕 Primera vez: busca su carga base</span>` : `<span class="sugp${sg.sube ? ' up' : sg.baja ? ' down' : ''}">${esc(sg.ultima)}${sg.sug ? ` · <b>Sugerencia: ${esc(sg.sug)}</b>` : ''}</span>`;
 function setSerie(k, n, i, patch) {
   const [f, h, code] = k.split('|');
   const ej = clone(rec(f, h, code).ej || []);
@@ -1362,7 +1377,7 @@ function cargasHTML(f, hora, code, key, rut, r) {
     const vac = ejs.filter(e => !conD(e));
     return `<div class="res">${ejs.filter(conD).map(e => { const c = cur.find(x => x.n === e.n); const ss = c ? setsOf(c).filter(z => z.kg != null || z.r != null || z.t != null) : []; const ap = (c?.ap || []).filter(z => z && (z.kg != null || z.r != null));
       return `<div class="res-r${ss.length ? '' : ' vac'}"><span class="res-n">${esc(limpiarEj(e.n))}</span><span class="res-s num">${ap.length ? `<span class="muted">aprox ${ap.map(fmtSetC).map(esc).join(' · ')} →</span> ` : ''}${ss.length ? ss.map(fmtSetC).map(esc).join(' · ') : '—'}</span>${c?.c ? `<span class="res-c">💬 ${esc(c.c)}</span>` : ''}</div>`; }).join('')}
-    ${vac.length ? `<div class="res-vac small muted">Sin anotar: ${vac.map(e => esc(limpiarEj(e.n))).join(' · ')}</div>` : ''}
+    ${vac.length ? `<div class="res-vac small muted">Sin anotar: ${vac.map(e => esc(limpiarEj(e.n))).join(' · ')}</div><div class="sugp-l">${vac.map(e => `<div><b>${esc(limpiarEj(e.n))}</b> ${sugLineP(sugP(code, f, hora, e, rut))}</div>`).join('')}</div>` : ''}
     <div class="st-row"><span class="small muted grow">${hechos}/${ejs.length} ejercicios anotados</span>${btn}</div></div>`; }
   const last = {}, best = {}; cargasDe(code).forEach(x => { if (x.f + '|' + x.h < f + '|' + hora) { if (!last[x.n]) last[x.n] = x; if (x.kg != null && (!best[x.n] || x.kg > best[x.n].kg || (x.kg === best[x.n].kg && (x.r || 0) > (best[x.n].r || 0)))) best[x.n] = x; } });
   const nSer = d => { const m = String(d || '').match(/^(\d+)(?:\s*[–-]\s*\d+)?\s*×/); return m ? m[1] : ''; };
@@ -1375,7 +1390,7 @@ function cargasHTML(f, hora, code, key, rut, r) {
       const nS = Math.max(Number(nSer(e.d)) || 3, sets.length, extra[key + '|' + e.n] || 0);
       const pr = b && c.kg != null && (c.kg > b.kg || (c.kg === b.kg && (c.r || 0) > (b.r || 0)));
       return `<div class="ej-blk">
-      <div class="ej-n">${esc(e.n)}${pr ? '<span class="pr">🏆 Récord</span>' : ''}<span class="d">${esc(e.d)}${l ? ` · última: <b>${esc(fmtSets(l))}</b>` : ''}</span></div>${c.c ? `<div class="small" style="color:var(--muted);font-style:italic">💬 ${esc(c.c)}</div>` : ''}
+      <div class="ej-n">${esc(e.n)}${pr ? '<span class="pr">🏆 Récord</span>' : ''}<span class="d">${esc(e.d)}</span>${sugLineP(sugP(code, f, hora, e, rut))}</div>${c.c ? `<div class="small" style="color:var(--muted);font-style:italic">💬 ${esc(c.c)}</div>` : ''}
       ${esTiempo(e.n, e.d) ? `<div class="ser-row h"><span>Serie</span><span style="grid-column:span 2">segundos</span><span></span></div>${Array.from({length: nS}, (_, j) => { const s = sets[j] || {}, ls = lsets[j]; return `
       <div class="ser-row"><span class="sn num">${j + 1}</span><input type="text" inputmode="numeric" style="grid-column:span 2" id="tt-${kid}-${i}-${j}" data-act="ser" data-k="${esc(key)}" data-n="${esc(e.n)}" data-i="${j}" data-field="t" value="${s.t != null ? esc(s.t) : ''}" placeholder="${ls?.t != null ? esc(ls.t) : 'seg'}" aria-label="segundos serie ${j + 1} ${esc(e.n)}"><span></span></div>`; }).join('')}` : esSalto(e.n) ? `<div class="ser-row h"><span>Serie</span><span style="grid-column:span 2">reps</span><span></span></div>${Array.from({length: nS}, (_, j) => { const s = sets[j] || {}, ls = lsets[j]; return `
       <div class="ser-row"><span class="sn num">${j + 1}</span><input type="text" inputmode="numeric" style="grid-column:span 2" id="rp-${kid}-${i}-${j}" data-act="ser" data-k="${esc(key)}" data-n="${esc(e.n)}" data-i="${j}" data-field="r" value="${s.r != null ? esc(s.r) : ''}" placeholder="${ls?.r != null ? esc(ls.r) : 'reps'}" aria-label="reps serie ${j + 1} ${esc(e.n)}"><span></span></div>`; }).join('')}` : `
@@ -2600,6 +2615,9 @@ function progresoHTML(a, {cuerpo = true} = {}) {
       <div class="card kpi"><div class="l">Volumen estimado · mes</div><div class="v">${vol ? vol.toLocaleString('es-CL') : '—'}<small style="font-size:14px"> kg</small></div><div class="s">${volAnt ? volAnt.toLocaleString('es-CL') + ' kg el mes pasado ' + pctTxt(vol, volAnt) : 'kg × reps × series de las cargas anotadas'}</div></div>
     </div>
     ${cuerpo ? fotosHTML(a) + inbodyHTML(a) + medidasHTML(a) : ''}
+    ${(() => { const pg = progEstado(a, today()); const rid = pg && !pg.terminado ? pg.next[0] : ''; const rut = rid ? S.rutinas.get(rid) : null; const ejs = rut ? ejsDe(rut) : []; if (!ejs.length) return '';
+      return `<div><b>Próxima sesión · carga sugerida</b> <span class="muted small">· ${esc(rut.tipo || 'Rutina')} · semana ${Math.min(pg.semana, pg.total)}</span>
+      <div class="list small" style="margin-top:4px">${ejs.map(e => `<div class="li"><span class="grow"><b>${esc(limpiarEj(e.n))}</b> <span class="muted">· ${esc(e.d)}</span>${sugLineP(sugP(a.codigo, today(), '99:99', e, rut))}</span></div>`).join('')}</div></div>`; })()}
     <div><b>Récords recientes</b>
       <div class="list small" style="margin-top:4px">${prs.slice(0, 6).map(x => `<div class="li"><span class="grow"><b>${esc(x.n)}</b> <span class="muted num">· ${fmtDY(x.f)}</span></span><span class="num">${esc(fmtSet(x.prev))} → <b>${esc(fmtSet(x))}</b></span><span class="pr">🏆 PR</span></div>`).join('') || '<div class="muted">Aún sin récords. Aparecen solos cuando supera su mejor carga anotada.</div>'}</div></div>
     <div><b>Cargas por ejercicio</b> <span class="muted small">· serie más pesada de cada sesión</span>

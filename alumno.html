@@ -48,7 +48,7 @@ h2{font-size:22px}
 .com-i:focus{outline:none;border-color:#5b5358}.com-i::placeholder{color:#6d6469}
 @media (prefers-reduced-motion:reduce){.com-w,.com-add{animation:none}}
 .tec-b{flex:none;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--muted);font:700 14px Barlow,sans-serif;cursor:pointer;display:grid;place-items:center}
-.sug{font-size:13px;color:var(--muted)}.sug.up{color:var(--red-t);font-weight:700}
+.sug{font-size:13px;color:var(--muted);line-height:1.4}.sug b{color:var(--fg,#fff)}.sug.up b{color:var(--red-t)}.sug.down b{color:#f2b44f}.sug-ok{margin-left:4px;padding:2px 12px;min-height:30px;border-radius:999px;border:1px solid var(--red-t);background:transparent;color:var(--red-t);font:700 13px system-ui;cursor:pointer}
 .ej-f{border-top:0;padding:0;gap:8px}.ej-f .ej-n{font:700 30px/1.05 'Barlow Condensed',sans-serif;letter-spacing:.01em}.ej-f .set input,.ej-f .set .chk{height:52px}.ej-f .set input{font-size:22px}
 .tec-d summary{cursor:pointer;color:var(--red-t);font-weight:600;font-size:14px;list-style:none}.tec-d summary::-webkit-details-marker{display:none}
 .tec-d ol,.tec-ol{margin:8px 0 4px;padding-left:20px;display:grid;gap:6px;line-height:1.4}.tec-d .btn{margin-top:6px}
@@ -243,6 +243,7 @@ details.ses summary::-webkit-details-marker{display:none}
 <script src="sonidos.js?v=2"></script>
 <script src="alimentos.js?v=20261113b"></script>
 <script src="nutri-calc.js?v=20261113g"></script>
+<script src="sug-carga.js?v=20261122a"></script>
 <script>
 (async () => {
 const sb = window.__sb;
@@ -1349,22 +1350,31 @@ document.addEventListener('click', ev => { const a = ev.target.closest('[data-co
   const onl = Object.assign({}, S.perfil?.onl || {}); onl.corr = (onl.corr || []).concat({ f: today(), ej: a.dataset.corr }).slice(-40);
   S.perfil = Object.assign({}, S.perfil, { onl }); a.textContent = '📲 Pedir corrección · ' + corrSemana().length + '/2 esta semana';
   sb.rpc('actualizar_mi_perfil', { p_perfil: S.perfil }).then(({ error }) => { if (error) toast('No se pudo registrar la corrección: ' + error.message); }, () => {}); });
-// carga sugerida: si en la sesión anterior llegó al tope de reps en todas sus series pesadas, sube; si no, mantiene
-function sugerencia(e) { if (tipoEj(e) === 'tiempo') { const pv = prevSets(e.nombre).filter(x => x && x.t > 0); if (!pv.length) return null; const t = Math.max(...pv.map(x => x.t)); const obj = segObj(e);
-    if (!obj || pv.every(x => x.t >= obj)) return { t: t + 5, sube: true, txt: `Hoy prueba ${t + 5} s · la vez anterior aguantaste ${t} s` }; return { t, txt: `Mantén ${t} s y apunta a ${obj} s` }; }
-  const m = String(e.dosis || '').match(/×\s*(\d+)(?:\s*[–-]\s*(\d+))?/); if (!m) return null;
-  const lo = Number(m[1]), hi = Number(m[2] || m[1]); const pv = prevSets(e.nombre).filter(x => x && x.kg != null && x.r != null && x.kg > 0); if (!pv.length) return null;
-  const kg = Math.max(...pv.map(x => x.kg)); const top = pv.filter(x => x.kg === kg);
-  const mc = /mancuerna|kb|kettlebell|pesa rusa/i.test(e.nombre); const inc = mc ? 2 : 5; // discos: mínimo 2,5 por lado → saltos de 5 kg
-  if (top.every(x => x.r >= hi)) { const nk = mc ? Math.round((kg + inc) * 2) / 2 : Math.round((kg + inc) / 5) * 5; return { kg: nk, sube: true, txt: `Hoy prueba ${fmtKg(nk)} kg · llegaste a ${hi} reps` }; }
-  if (top.some(x => x.r < lo)) return { kg, txt: `Mantén ${fmtKg(kg)} kg y apunta a ${lo}${hi !== lo ? '–' + hi : ''} reps` };
-  return { kg, txt: `Mantén ${fmtKg(kg)} kg y suma 1 rep` }; }
+// carga sugerida (regla en sug-carga.js): mira la última vez que hizo este mismo ejercicio (kg, reps y RPE de la clase) y la dosis de hoy
+function prevRec(nombre) { const t = S.ses ? S.ses.f : today(); const nn = TLSug.norm(nombre); let alt = null;
+  for (let i = S.clases.length - 1; i >= 0; i--) { const r = S.clases[i]; if (r.fecha >= t) continue;
+    for (const e of r.ej || []) { const ss = e.sets && e.sets.length ? e.sets : [{ kg: e.kg, r: e.r, t: e.t }]; if (!ss.some(conDato)) continue;
+      if (e.n === nombre) return { sets: ss, rpe: r.rpe, f: r.fecha }; if (!alt && TLSug.norm(e.n) === nn) alt = { sets: ss, rpe: r.rpe, f: r.fecha }; }
+    if (alt) return alt; }
+  return null; }
+let _descM = { t: 0, v: false };
+function semanaDescarga() { if (Date.now() - _descM.t < 1500) return _descM.v; let v = false;
+  try { const rd = rutinaDeHoy(); v = !!(rd.pe && rd.r && TLSug.esDescarga(progLinea(rd.r, rd.pe.semana))); } catch (_) {}
+  _descM = { t: Date.now(), v }; return v; }
+function sugerencia(e) { if (!window.TLSug) return null;
+  return TLSug.calc({ nombre: e.nombre, dosis: e.dosis, tipo: tipoEj(e), prev: prevRec(e.nombre), descarga: semanaDescarga() }); }
+const sugHTML = (e, sg) => { if (!sg) return ''; if (sg.primera) return `<div class="sug">🆕 ${esc(sg.txt)}</div>`;
+  const ok = (sg.kg != null && tipoEj(e) !== 'reps') || sg.t != null; return `<div class="sug${sg.sube ? ' up' : sg.baja ? ' down' : ''}"><span>${esc(sg.ultima)}</span>${sg.sug ? ` · <b>Sugerencia: ${esc(sg.sug)}</b>` : ''}${ok && sg.sug ? ` <button type="button" class="sug-ok" data-sugok="${esc(e.nombre)}" data-kg="${sg.kg != null ? sg.kg : ''}" data-t="${sg.t != null ? sg.t : ''}" aria-label="Usar la carga sugerida en ${esc(e.nombre)}">Usar</button>` : ''}</div>`; };
+// «Usar»: llena las series vacías con la carga sugerida (el alumno puede escribir otra encima)
+document.addEventListener('click', ev => { const b = ev.target.closest('[data-sugok]'); if (!b) return; const n = b.dataset.sugok; const f = b.dataset.kg ? 'kg' : 't'; const v = b.dataset.kg || b.dataset.t; if (!v) return;
+  let k = 0; document.querySelectorAll('.set:not(.ap) input[data-f="' + f + '"]').forEach(i => { if (i.dataset.n !== n || i.value.trim()) return; i.value = String(v).replace('.', ','); i.dispatchEvent(new Event('input', { bubbles: true })); k++; });
+  toast(k ? 'Carga sugerida puesta ✓ · cámbiala si quieres' : 'Tus series ya tienen carga anotada'); });
 function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nSer(e.dosis) : 0; const sets = c?.sets || [];
   const tc = tecDe(e.nombre); const sg = isB ? sugerencia(e) : null; const pv = isB ? prevSets(e.nombre) : [];
   const com = c?.c || ''; const pcom = isB ? prevCom(e.nombre) : '';
   return `<div class="ej${foco ? ' ej-f' : ''}"><div class="ej-h"><b class="ej-n">${esc(e.nombre)}</b><span class="ej-acc">${foco ? vidBtn(e, tc) : ''}${tc && !foco ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</span></div>
     <div class="small muted">${esc(e.dosis)}${isB && !/desc|\d\s*(min|s)\b/i.test(String(e.dosis || '').replace(/^\d+\s*[×x]\s*[\d–-]+/, '')) ? ` · ⏱ ${mmss(descansoDe(e))}` : ''}</div>
-    ${sg ? `<div class="sug${sg.sube ? ' up' : ''}">${sg.sube ? '↗' : '→'} ${esc(sg.txt)}</div>` : ''}
+    ${sugHTML(e, sg)}
     ${(e.alt || []).length ? `<details class="tec-d"><summary>🔄 No tengo esta máquina</summary><div class="small" style="margin-top:6px">Haz en su lugar ${e.alt.map(x => `<b>${esc(x)}</b>`).join(' o ')}, con la misma dosis. Anota cuál hiciste en el comentario.</div></details>` : ''}
     ${ONL() && isB ? corrBtn(e) : ''}
     ${tc && foco ? `<details class="tec-d"><summary>¿Cómo se hace?</summary><ol>${(tc.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol></details>` : ''}
@@ -1379,7 +1389,7 @@ function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nS
       if (tp === 'tiempo') { const phT = sg?.t ?? (p && p.t != null ? p.t : segObj(e) || 'seg'); const segC = Number(phT) || segObj(e) || 30;
         return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span><span class="prev"><button type="button" class="tset-b" data-tset="${esc(e.nombre)}" data-i="${i}" data-seg="${segC}" data-rng="${(rangoSeg(e) || []).join('-')}" aria-label="Cuenta regresiva ${segC} segundos serie ${i + 1}">▶ ${segC}s</button></span><input class="t2" inputmode="numeric" placeholder="${esc(phT)}" aria-label="segundos serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="t" value="${s0.t != null ? esc(s0.t) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }
       if (tp === 'reps') return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span>${prev}<input class="t2" inputmode="numeric" placeholder="${p && p.r != null ? esc(p.r) : 'reps'}" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s0.r != null ? esc(s0.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`;
-      const phKg = tp === 'corporal' ? (p && p.kg ? String(p.kg).replace('.', ',') : '+kg') : sg ? fmtKg(sg.kg) : p && p.kg != null ? String(p.kg).replace('.', ',') : 'kg';
+      const phKg = tp === 'corporal' ? (sg && sg.kg != null ? fmtKg(sg.kg) : p && p.kg ? String(p.kg).replace('.', ',') : '+kg') : sg && sg.kg != null ? fmtKg(sg.kg) : p && p.kg != null ? String(p.kg).replace('.', ',') : 'kg';
       return `<div class="set ${done ? 'done' : ''}"><span class="n">${i + 1}</span>${prev}<input inputmode="decimal" placeholder="${esc(phKg)}" aria-label="${tp === 'corporal' ? 'lastre en kg (opcional)' : 'kg'} serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="kg" value="${s0.kg != null ? esc(String(s0.kg).replace('.', ',')) : ''}"><input inputmode="numeric" placeholder="${p && p.r != null ? esc(p.r) : 'reps'}" aria-label="reps serie ${i + 1} ${esc(e.nombre)}" data-n="${esc(e.nombre)}" data-i="${i}" data-f="r" value="${s0.r != null ? esc(s0.r) : ''}"><button type="button" class="chk" data-chk="1" data-rest="${descansoDe(e)}" aria-label="Marcar serie ${i + 1} hecha">✓</button></div>`; }).join('')}
       ${tp === 'kg' ? `<button type="button" class="ap-add" data-apx="${esc(e.nombre)}">+ Serie de aproximación</button>` : ''}</div>`; })() + `
     <button class="com-add" data-com="${esc(e.nombre)}" ${com ? 'hidden' : ''}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 5h16v10H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>${pcom ? 'Comentario · la vez anterior: ' + esc(pcom) : 'Agregar comentario <span>(ej: kg por mano)</span>'}</button>
