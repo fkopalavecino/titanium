@@ -194,7 +194,7 @@ tr.click{cursor:pointer}
 .sc-al{font-size:12px;color:var(--crit);font-weight:600}
 .rg-dias{display:grid;gap:14px;margin-top:8px}.rg-dia{display:grid;gap:6px}.rg-dh{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;padding-bottom:4px;border-bottom:2px solid var(--red)}.rg-n{margin-left:auto;font-size:12px;font-weight:700;background:var(--red);color:var(--red-fg);border-radius:10px;padding:1px 8px}.rg-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;text-decoration:none;color:inherit}.rg-row .grow{flex:1;min-width:0;display:flex;flex-direction:column}.rg-h{min-width:54px;text-align:center;font-weight:700;font-size:15px;padding:4px 0;border-radius:8px;background:color-mix(in srgb,var(--red) 14%,transparent)}.rg-de{margin-top:1px}
 .sc-ic{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}.sc-ic.crit{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 40%,transparent)}.sc-ic.warn{color:var(--warn,#b45309);border-color:color-mix(in srgb,var(--warn,#b45309) 40%,transparent)}
-.ok-t{color:var(--ok);font-weight:600}.crit-t{color:var(--crit)}
+.ok-t{color:var(--ok);font-weight:600}.crit-t{color:var(--crit)}.warn-t{color:var(--warn);font-weight:600}
 .sc .chev{color:var(--muted);font-size:20px;transition:transform .2s}.sc.open .chev{transform:rotate(90deg)}
 .sc-head{display:flex;gap:10px;align-items:center}.sc-head .sc-top{flex:1;min-width:0}
 .seg-sm{display:flex;flex:none}.seg-sm .seg-b{min-width:46px;min-height:40px;padding:0 10px;font-size:16px;font-weight:700}.seg-sm .seg-b:last-child{font-size:13px}
@@ -1215,10 +1215,13 @@ function studentCard(f, hora, code, ruts) {
     ingDe(a).parq.length ? `<span class="sc-ic crit" title="${esc('PAR-Q «sí»: ' + ingDe(a).parq.map(i => PARQ[i] || '').join(' · '))}">PAR-Q</span>` : '',
     (a.perfil?.ficha?.enfermedades || []).length ? (enf => `<span class="sc-ic warn" title="${esc(enf.join(', '))}">❤️ ${esc(enf[0])}${enf.length > 1 ? ' +' + (enf.length - 1) : ''}</span>`)(a.perfil.ficha.enfermedades.map(k => F_ENF_L[k] || k)) : '',
     debe ? `<span class="sc-ic crit go" role="link" tabindex="0" data-act="ir-pago" data-id="${esc(code)}" data-p="${esc(p?.id || '')}" title="Ir a Pagos de este alumno" style="cursor:pointer">$ debe ›</span>` : '',
+    (S.tardesMes?.get(code) || 0) ? `<span class="sc-ic warn" title="Avisos tardíos este mes (menos de 2 h antes)">⏰ ${S.tardesMes.get(code)} tarde</span>` : '',
     cu && cu.dias === 0 ? '<span title="Cumpleaños">🎂</span>' : ''].filter(Boolean).join('');
   const rutNom = r.rutina ? String(S.rutinas.get(r.rutina)?.tipo || 'Rutina').split(' · ')[0] : sug ? 'Le toca ' + String(S.rutinas.get(sug)?.tipo || '').split(' · ')[0] : 'Sin rutina';
   const v = vivoInfo(f, hora, code, rut, r);
-  const estado = v ? v.txt : (cf === 'no_voy' && !vino ? '<span class="crit-t">Avisó que no viene</span>' : cf === 'voy' ? 'Confirmó que viene' : '');
+  const tardeCf = S.confTarde?.has(f + '|' + hora + '|' + code);
+  const estado = v ? v.txt : (cf === 'no_voy' && !vino ? (tardeCf ? '<span class="warn-t">⏰ Avisó tarde (menos de 2 h)</span>' : '<span class="muted">Avisó a tiempo que no viene</span>')
+    : r.asis === 'ausente' && !cf ? '<span class="crit-t">❗ Faltó sin avisar</span>' : r.asis === 'ausente' && cf === 'voy' ? '<span class="crit-t">❗ Confirmó y faltó</span>' : cf === 'voy' ? 'Confirmó que viene' : '');
   const seg = (val, txt, ttl) => `<button class="seg-b ${r.asis === val ? 'on ' + val : ''}" data-act="asis" data-v="${val}" data-k="${esc(key)}" ${val === 'presente' && sug ? `data-r="${esc(sug)}"` : ''} title="${ttl || {presente:'Presente',ausente:'Ausente'}[val] || txt}" aria-label="${ttl || {presente:'Presente',ausente:'Ausente'}[val] || txt}">${txt}</button>`;
   return `
   <article class="card student sc ${r.asis === 'presente' ? 'present' : r.asis === 'ausente' || r.asis === 'aviso' ? 'absent' : ''} ${det ? 'open' : ''}"${det ? ` style="order:${Object.keys(S.ui.stOpen).indexOf(key) - 2}"` : ''}>
@@ -3725,7 +3728,7 @@ function confirmacionesHTML() {
     no: `<span class="small muted">Este navegador no permite avisos (usa Safari en iPhone o Chrome en Android).</span>` }[e];
   const chip = x => x.est === 'voy'
     ? `<span class="cf-c ok">✓ ${esc(corto(x.code))}</span>`
-    : `<button type="button" class="cf-c crit" data-act="msg" data-id="${esc(x.code)}" data-tipo="${esc('recuperar:' + x.f + ':' + x.h)}" title="Ofrecer recuperación a ${esc(nombre(x.code))}">✕ ${esc(corto(x.code))} 💬</button>`;
+    : `<button type="button" class="cf-c ${S.confTarde?.has(x.f + '|' + x.h + '|' + x.code) ? 'warn' : 'no'}" data-act="msg" data-id="${esc(x.code)}" data-tipo="${esc('recuperar:' + x.f + ':' + x.h)}" title="${S.confTarde?.has(x.f + '|' + x.h + '|' + x.code) ? 'Avisó tarde (menos de 2 h)' : 'Avisó a tiempo'} · escribirle a ${esc(nombre(x.code))}">${S.confTarde?.has(x.f + '|' + x.h + '|' + x.code) ? '⏰' : '✕'} ${esc(corto(x.code))} 💬</button>`;
   const dia = (f, lbl) => { const L = items.filter(x => x.f === f); if (!L.length) return '';
     const horas = [...new Set(L.map(x => x.h))];
     return `<div class="cf-dia">${lbl} <span class="muted" style="font-weight:500">· ${L.filter(x => x.est === 'voy').length} vienen${L.some(x => x.est !== 'voy') ? ' · ' + L.filter(x => x.est !== 'voy').length + ' no' : ''}</span></div>`
@@ -3737,11 +3740,12 @@ function confirmacionesHTML() {
     <style>#conf-card .cf-dia{font-weight:700;font-size:13px;margin:8px 0 2px}#conf-card .cf-row{display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--line)}
       #conf-card .cf-h{font-weight:700;font-variant-numeric:tabular-nums;min-width:44px;padding-top:3px;font-size:13px;color:var(--muted)}#conf-card .cf-cs{display:flex;flex-wrap:wrap;gap:6px;flex:1}
       #conf-card .cf-c{font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:3px 10px;border:1px solid transparent;white-space:nowrap}
-      #conf-card .cf-c.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}#conf-card .cf-c.crit{color:var(--crit);background:color-mix(in srgb,var(--crit) 14%,transparent);border-color:color-mix(in srgb,var(--crit) 40%,transparent);cursor:pointer}</style>
+      #conf-card .cf-c.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}#conf-card .cf-c.crit{color:var(--crit);background:color-mix(in srgb,var(--crit) 14%,transparent);border-color:color-mix(in srgb,var(--crit) 40%,transparent);cursor:pointer}
+      #conf-card .cf-c.no{color:var(--muted);background:color-mix(in srgb,var(--muted) 12%,transparent);border-color:var(--line);cursor:pointer}#conf-card .cf-c.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent);border-color:color-mix(in srgb,var(--warn) 45%,transparent);cursor:pointer}</style>
     <div style="display:grid;gap:0">
       ${e === 'on' ? '' : `<div class="tools" style="align-items:center">${ctrl}</div>`}
       ${dia(t, 'Hoy')}${dia(m, 'Mañana')}
-      ${no.length ? '<div class="small muted" style="margin-top:8px">Toca un nombre en rojo para ofrecerle recuperar la clase.</div>' : ''}
+      ${no.length ? '<div class="small muted" style="margin-top:8px">✕ gris: avisó a tiempo · ⏰ naranjo: avisó tarde. Toca un nombre para escribirle.</div>' : ''}
       ${!items.length ? '<p class="small muted" style="margin:0">Cuando un alumno confirme o cancele desde su app, aparece aquí al instante.</p>' : ''}
     </div>
   </details>`; }
@@ -3787,8 +3791,14 @@ route();
   db.collection('dias').onSnapshot(s => { S.dias = new Map(s.docs.map(d => [d.id, clone(d.data())])); S.loaded.dias = true; schedule(); }, fail);
   // confirmaciones de asistencia que marcan los alumnos en su app (✅ / ❌ en Clase de hoy)
   const sbc = window.__sb;
-  if (sbc) { const cargarConf = async () => { const { data } = await sbc.from('confirmaciones').select('fecha,hora,alumno,estado').gte('fecha', addDays(today(), -1));
+  if (sbc) { const cargarConf = async () => { const ini = today().slice(0, 8) + '01', desde = addDays(today(), -1) < ini ? addDays(today(), -1) : ini;
+      const { data } = await sbc.from('confirmaciones').select('fecha,hora,alumno,estado,updated_at,otorgada').gte('fecha', desde);
       const nuevo = new Map((data || []).map(r => [r.fecha + '|' + r.hora + '|' + r.alumno, r.estado]));
+      // aviso tardío: dijo «no voy» con menos de 2 h (y el profe no le dio la recuperación) · contador del mes por alumno
+      const tarde = new Set(), tm = new Map();
+      (data || []).forEach(r => { if (r.estado !== 'no_voy' || r.otorgada || !r.updated_at) return; const lim = new Date(r.fecha + 'T' + String(r.hora).slice(0, 5) + ':00'); lim.setHours(lim.getHours() - 2);
+        if (new Date(r.updated_at) > lim) { tarde.add(r.fecha + '|' + r.hora + '|' + r.alumno); if (r.fecha >= ini) tm.set(r.alumno, (tm.get(r.alumno) || 0) + 1); } });
+      S.confTarde = tarde; S.tardesMes = tm;
       if (S.conf) nuevo.forEach((est, k) => { if (S.conf.get(k) !== est) { const [f, h, code] = k.split('|'); if (f >= today()) toast(`${est === 'voy' ? '✅' : '❌'} ${nombre(code)} ${est === 'voy' ? 'viene' : 'no viene'} · ${f === today() ? 'hoy' : fmtD(f)} ${h}`, est !== 'voy'); } });
       S.conf = nuevo; schedule(); };
     cpRevisar(); cargarProxEventos(); sbc.channel('tl-ev-ini').on('postgres_changes', { event: '*', schema: 'public', table: 'eventos' }, cargarProxEventos).subscribe();

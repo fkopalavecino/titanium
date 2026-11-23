@@ -1884,7 +1884,12 @@ const waNum = () => String(S.cfg.whatsapp || '').replace(/\D/g, '');
 const waNoVoy = (f, h) => { const n = waNum(); if (!n) return ''; const nom = String(S.perfil?.apodo || S.a.nombre || '').split(' ')[0];
   return `https://wa.me/${n}?text=${encodeURIComponent(`Hola Franco, soy ${nom}. No puedo ir a mi clase del ${longD(f).toLowerCase()} a las ${h}.`)}`; };
 // versión compacta para Hoy: una línea si ya respondió; los dos botones solo si falta responder
-function asisCorto(f, h) { const k = f + '_' + h, e = S.conf?.get(k); if (!e) return `<div class="small muted">¿Vienes ${esc(f === today() ? 'hoy' : DL[dayKey(f)].toLowerCase() + ' ' + fmtD(f))} a las ${esc(h)}?</div>${asisBtns(f, h)}`;
+// hora límite para avisar (2 h antes) y si la clase ya empezó
+function asisLim(f, h) { const ini = new Date(f + 'T' + h + ':00'), lim = new Date(ini); lim.setHours(lim.getHours() - 2); const now = new Date();
+  return { hl: String(lim.getHours()).padStart(2, '0') + ':' + String(lim.getMinutes()).padStart(2, '0'), aTiempo: now < lim, empezo: now >= ini }; }
+function asisCorto(f, h) { const k = f + '_' + h, e = S.conf?.get(k); if (!e) { const L = asisLim(f, h);
+    if (L.empezo) return asisBtns(f, h);
+    return `<div class="small muted">¿Vienes ${esc(f === today() ? 'hoy' : DL[dayKey(f)].toLowerCase() + ' ' + fmtD(f))} a las ${esc(h)}?</div>${asisBtns(f, h)}`; }
   const wa = waNoVoy(f, h); const limite = new Date(f + 'T' + h + ':00'); limite.setHours(limite.getHours() - 2);
   const fija = (S.confCambios?.get(k) || 0) >= 1 || new Date() >= limite; const prof = esc(S.cfg?.coach?.split(' ')[0] || 'tu profe');
   const accion = e === 'voy' ? (fija ? (wa ? `<a class="chip" href="${wa}" target="_blank" rel="noopener">Escribir</a>` : '') : `<button class="chip" data-nov="${k}">No puedo ir</button>`)
@@ -1900,9 +1905,14 @@ function asisBtns(f, h) { const k = f + '_' + h, e = S.conf?.get(k), wa = waNoVo
     : e ? `<div class="small muted">Puedes cambiarla 1 vez, hasta las ${hl}${f !== today() ? ' del ' + esc(fmtD(f)) : ''}.</div>` : '';
   if (e === 'voy') return `<div class="note small" style="display:grid;gap:6px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b class="ok">✅ Confirmaste que vienes</b>${fija ? waBtn('Escribir') : `<button class="chip" data-nov="${k}">No puedo ir</button>`}</div>${nota}</div>`;
   if (e === 'no_voy') return `<div class="note small" style="display:grid;gap:8px"><b class="warn">❌ Avisaste que no vienes</b>${fija ? waBtn('Escribirle a ' + esc(S.cfg?.coach?.split(' ')[0] || 'tu profe')) : `<div class="grid2">${waBtn('Escribirle a ' + esc(S.cfg?.coach?.split(' ')[0] || 'tu profe'))}<button class="btn" data-voy="${k}">Al final sí voy</button></div>`}${nota}</div>`;
+  // sin respuesta: con la clase ya empezada no se puede responder (lo controla también el servidor)
+  const L = asisLim(f, h);
+  if (L.empezo) return `<div class="note small" style="display:grid;gap:8px"><b>⏱️ Tu clase ya empezó: ya no puedes responder.</b>${wa ? waBtn('Escribirle a ' + esc(S.cfg?.coach?.split(' ')[0] || 'tu profe')) : ''}</div>`;
+  const aviso = L.aTiempo ? `<div class="small muted" style="margin-top:6px">Si no puedes ir, avisa <b>antes de las ${L.hl}</b>${f !== today() ? ' del ' + esc(fmtD(f)) : ''} y ganas 1 clase para recuperar.</div>`
+    : '<div class="small warn" style="margin-top:6px">⏰ Faltan menos de 2 horas: si avisas ahora, esta clase no se recupera.</div>';
   // Voy en verde (sí) y No puedo ir en gris neutro, para que no se confundan
   const no = wa ? `<a class="btn" data-nov="${k}" href="${wa}" target="_blank" rel="noopener">❌ No puedo ir</a>` : `<button class="btn" data-nov="${k}">❌ No puedo ir</button>`;
-  return `<div class="grid2"><button class="btn" data-voy="${k}" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">✅ Voy</button>${no}</div>`; }
+  return `<div class="grid2"><button class="btn" data-voy="${k}" style="background:#1f7a4d;border-color:#1f7a4d;color:#fff">✅ Voy</button>${no}</div>${aviso}`; }
 /* ventana propia de la app (en vez de Cancelar / OK del teléfono) */
 function dialogo({ titulo, sub = '', avisos = [], ok = 'Aceptar', no = 'Rechazar' }) { return new Promise(res => { const d = document.createElement('div');
   d.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;justify-content:center;padding:16px';

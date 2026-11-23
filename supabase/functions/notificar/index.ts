@@ -118,9 +118,14 @@ Deno.serve(async (req) => {
         const { data: reg } = await sb.from('recordatorios_clase').insert({ alumno: p.alumno, fecha: p.fecha, hora: p.hora }).select().maybeSingle();
         if (!reg) continue;
         const h = hora(p.hora); const cuando = p.fecha === diaCL() ? 'Hoy' : 'Mañana';
+        // hora límite para avisar (2 h antes) · si ya pasó, solo se pide confirmar
+        const [hh, mm] = h.split(':').map(Number); const limMin = hh * 60 + mm - 120;
+        const lim = String(Math.floor(limMin / 60)).padStart(2, '0') + ':' + String(limMin % 60).padStart(2, '0');
+        const [ah, am] = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).split(':').map(Number);
+        const aTiempo = limMin >= 0 && (p.fecha !== diaCL() || (ah % 24) * 60 + am < limMin);
         out.push(await enviar(await subsDe(p.alumno), {
           title: `💪 ${cuando} tienes clase a las ${h}`,
-          body: '¿Vienes? Toca para confirmar tu asistencia.',
+          body: aTiempo ? `¿Vienes? Si no puedes, avisa antes de las ${lim} y la recuperas.` : '¿Vienes? Toca para confirmar tu asistencia.',
           url: `./alumno.html?clase=${p.fecha}_${h}`, tag: `cl-${p.fecha}-${h}`, clase: `${p.fecha}_${h}` }));
       }
       return json({ clases: (pend || []).length, out });
