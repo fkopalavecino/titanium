@@ -84,7 +84,7 @@ h2{font-size:22px}
 .set .n{text-align:center;font-weight:700}.set input.raro{border-color:#f0b35a;color:#f0b35a}
 .set-h .t2,.set input.t2{grid-column:span 2}.set.ap{background:transparent;border-style:dashed}.set.ap .n{color:var(--muted)}.set.ap input{font-weight:600;color:var(--muted)}.set.ap.done{border-style:solid}
 .ap-del{border:0;background:none;color:var(--red,#ea203a);font:700 15px Barlow,sans-serif;min-width:28px;min-height:32px;padding:0 6px 0 0;cursor:pointer;vertical-align:middle}
-.tset-b{border:1px solid var(--line);background:transparent;color:var(--fg);border-radius:999px;font:700 13px Barlow,sans-serif;min-height:32px;padding:0 10px;cursor:pointer}
+.tbs{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.tset-b.ok{border-color:var(--ok);color:var(--ok)}.tset-b{border:1px solid var(--line);background:transparent;color:var(--fg);border-radius:999px;font:700 13px Barlow,sans-serif;min-height:32px;padding:0 10px;cursor:pointer}
 .ap-add{justify-self:start;border:0;background:none;color:var(--muted);font:600 14px Barlow,sans-serif;min-height:44px;padding:0 6px;cursor:pointer}
 .set .prev{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .set input{width:100%;height:42px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:700 18px Barlow,sans-serif;text-align:center;padding:0}
@@ -1206,7 +1206,7 @@ function correrSerie(n, i, seg, lados) { finDescanso(true); const el = document.
     const q = (fin - Date.now()) / 1000;
     if (q <= 0 && lado < lados) { clearInterval(REST); REST = null; lado++; pre = 5; el.classList.add('pre'); SB.textContent = '↔ Cambia de lado · ' + sub(); R.style.strokeDashoffset = '0'; snd('final'); setTimeout(cd, 400); return; }
     if (q <= 0) { clearInterval(REST); REST = null; el.remove(); snd('final'); avisarTmr({ off: 1 }, true);
-      const inp = fila(); if (inp) { inp.value = String(seg); inp.dispatchEvent(new Event('input', { bubbles: true })); inp.closest('.set')?.querySelector('[data-chk]')?.click(); } return; }
+      const inp = fila(); if (inp) { inp.value = String(seg); inp.dispatchEvent(new Event('input', { bubbles: true })); inp.closest('.set')?.querySelector('[data-chk]')?.click(); } else serieSinCasilla(n, i); return; }
     if (q <= 3.05 && Math.ceil(q) !== Number(el.dataset.l)) { el.dataset.l = Math.ceil(q); snd('cuenta', el.dataset.l); }
     T.textContent = seg >= 60 ? mmss(Math.ceil(q)) : String(Math.ceil(q)); R.style.strokeDashoffset = String(C * (1 - q / seg));
     avisarTmr({ n, fase: 'Serie ' + (i + 1) + (lados === 2 ? ' · Lado ' + lado : ''), big: mmss(Math.ceil(q)) }); };
@@ -1234,6 +1234,12 @@ function cuentaSerie(n, i, seg, rng, lados) { finDescanso(true); const el = docu
     if (b.dataset.go) { try { localStorage.setItem('tset:' + n, String(v)); localStorage.setItem('tlados:' + n, l2 ? '2' : '1'); } catch (_) {} return correrSerie(n, i, v, l2 ? 2 : 1); }
     el.remove(); });
   document.body.appendChild(el); pint(); }
+function serieSinCasilla(n, i) { S.tOk = S.tOk || {}; const l = S.tOk[n] = S.tOk[n] || []; if (!l.includes(i)) l.push(i);
+  const bs = [...document.querySelectorAll('.tset-b[data-nser]')].filter(x => x.dataset.tset === n); const b = bs.find(x => Number(x.dataset.i) === i);
+  if (b) { b.classList.add('ok'); b.textContent = b.textContent.replace('▶', '✓'); }
+  const tot = Number(b?.dataset.nser) || 1;
+  if (l.length >= tot) { const ck = b?.closest('.circ-it')?.querySelector('[data-cck]'); if (ck && ck.getAttribute('aria-pressed') !== 'true') ck.click(); }
+  else if (b && Number(b.dataset.rest) > 0) iniciarDescanso(Number(b.dataset.rest), n); }
 function finDescanso(silencio) { const habia = !!REST; clearInterval(REST); REST = null; document.getElementById('rest')?.remove(); if (habia && !silencio) avisarDescanso(0, RESTEJ); }
 
 /* ---------- temporizador del bloque C (EMOM, AMRAP, Tabata, intervalos, por tiempo…) ---------- */
@@ -1374,12 +1380,15 @@ const sugHTML = (e, sg) => { if (!sg) return ''; if (sg.primera) return `<div cl
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-sugok]'); if (!b) return; const n = b.dataset.sugok; const f = b.dataset.kg ? 'kg' : 't'; const v = b.dataset.kg || b.dataset.t; if (!v) return;
   let k = 0; document.querySelectorAll('.set:not(.ap) input[data-f="' + f + '"]').forEach(i => { if (i.dataset.n !== n || i.value.trim()) return; i.value = String(v).replace('.', ','); i.dispatchEvent(new Event('input', { bubbles: true })); k++; });
   toast(k ? 'Carga sugerida puesta ✓ · cámbiala si quieres' : 'Tus series ya tienen carga anotada'); });
+// ejercicios por tiempo fuera del bloque B (activación, core…): un ▶ por serie con su cuenta regresiva (y cambio de lado)
+function tBtns(e) { if (tipoEj(e) !== 'tiempo') return ''; const seg = segObj(e) || 30; const n = Math.max(1, nSer(e.dosis)); const hechos = (S.tOk || {})[e.nombre] || [];
+  return `<div class="tbs">${Array.from({ length: n }, (_, i) => `<button type="button" class="tset-b${hechos.includes(i) ? ' ok' : ''}" data-tset="${esc(e.nombre)}" data-i="${i}" data-seg="${seg}" data-rng="${(rangoSeg(e) || []).join('-')}" data-lados="${porLado(e) ? 2 : 1}" data-rest="${descansoDe(e)}" data-nser="${n}" aria-label="Cuenta regresiva serie ${i + 1} ${esc(e.nombre)}">${hechos.includes(i) ? '✓' : '▶'} ${n > 1 ? 'S' + (i + 1) + ' · ' : ''}${seg}s</button>`).join('')}</div>`; }
 function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nSer(e.dosis) : 0; const sets = c?.sets || [];
   const tc = tecDe(e.nombre); const sg = isB ? sugerencia(e) : null; const pv = isB ? prevSets(e.nombre) : [];
   const com = c?.c || ''; const pcom = isB ? prevCom(e.nombre) : '';
   return `<div class="ej${foco ? ' ej-f' : ''}"><div class="ej-h"><b class="ej-n">${esc(e.nombre)}</b><span class="ej-acc">${foco ? vidBtn(e, tc) : ''}${tc && !foco ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</span></div>
     <div class="small muted">${esc(e.dosis)}${isB && !/desc|\d\s*(min|s)\b/i.test(String(e.dosis || '').replace(/^\d+\s*[×x]\s*[\d–-]+/, '')) ? ` · ⏱ ${mmss(descansoDe(e))}` : ''}</div>
-    ${sugHTML(e, sg)}
+    ${sugHTML(e, sg)}${isB ? '' : tBtns(e)}
     ${(e.alt || []).length ? `<details class="tec-d"><summary>🔄 No tengo esta máquina</summary><div class="small" style="margin-top:6px">Haz en su lugar ${e.alt.map(x => `<b>${esc(x)}</b>`).join(' o ')}, con la misma dosis. Anota cuál hiciste en el comentario.</div></details>` : ''}
     ${ONL() && isB ? corrBtn(e) : ''}
     ${tc && foco ? `<details class="tec-d"><summary>¿Cómo se hace?</summary><ol>${(tc.claves || []).map(k => `<li>${esc(k)}</li>`).join('')}</ol></details>` : ''}
@@ -1565,15 +1574,17 @@ V.rutina = () => {
     <section class="card foco">${st.ei === 0 && st.b.nota ? `<div class="small muted">${esc(st.b.nota)}</div>` : ''}${ejHTML(st.e, true, cur, true)}</section>${nav}`;
     // circuito: todos los ejercicios a la vista, se marcan al pasar; vueltas en el A, temporizador y resultado en el C
     const b = st.b, bi = st.bi, ejs = b.ejercicios || [];
-    const nV = Number((String(b.nota || '') + ' ' + String(b.titulo || '')).match(/(\d+)\s*(?:vueltas?|rondas?)/i)?.[1] || 0) || Math.max(0, ...ejs.map(e => Number((String(e.dosis || '').match(/^\s*(\d+)\s*[×x]/) || [])[1]) || 0));
+    // solo es circuito si el bloque lo dice (vueltas, rondas, circuito, superserie, estaciones); si cada ejercicio trae sus series (2 × 10…) se hace por series, sin timer de vueltas
+    const esCirc = st.inf.isC || /vueltas?|rondas?|circuito|superserie|estaci[oó]n/i.test(String(b.nota || '') + ' ' + String(b.titulo || ''));
+    const nV = !esCirc ? 0 : Number((String(b.nota || '') + ' ' + String(b.titulo || '')).match(/(\d+)\s*(?:vueltas?|rondas?)/i)?.[1] || 0) || Math.max(0, ...ejs.map(e => Number((String(e.dosis || '').match(/^\s*(\d+)\s*[×x]/) || [])[1]) || 0));
     const v = (S.vta && S.vta[bi]) || 1; const ck = S.cck || new Set();
-    return `${head}<div class="eb-row"><div class="eyebrow">Bloque ${esc(st.inf.letra)} · circuito</div>${ojo}</div>
+    return `${head}<div class="eb-row"><div class="eyebrow">Bloque ${esc(st.inf.letra)}${esCirc ? ' · circuito' : ' · por series'}</div>${ojo}</div>
     <h1 style="font-size:28px;line-height:1.05">${esc(st.inf.nomB)}</h1>
     <section class="card foco">${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}
       ${!st.inf.isC && nV > 1 ? `<div class="row" style="align-items:center"><b>Vuelta ${Math.min(v, nV)} de ${nV}</b>${v < nV ? `<button class="chip" data-vuelta="${bi}">Siguiente vuelta ›</button>` : '<span class="small ok" style="font-weight:700">Última vuelta</span>'}</div>` : ''}
       <div class="circ">${ejs.map((e, ei) => { const tc = tecDe(e.nombre); const on = ck.has(bi + '-' + ei);
-        return `<div class="circ-it${on ? ' ok' : ''}"><button class="circ-ck" data-cck="${bi}-${ei}" aria-pressed="${on}" aria-label="Marcar ${esc(e.nombre)}">✓</button><div class="circ-tx"><b>${esc(e.nombre)}</b><span class="small muted">${esc(e.dosis)}</span></div>${tc ? '' : vidBtn(e, tc)}${tc ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</div>`; }).join('')}</div>
-      ${!st.inf.isC ? (() => { const c = detectarTimer(b); if (c.modo === 'crono' && !c.vueltas && nV > 1) { if (c.nombre === 'Cronómetro') c.nombre = 'Circuito'; c.vueltas = nV; }
+        return `<div class="circ-it${on ? ' ok' : ''}"><button class="circ-ck" data-cck="${bi}-${ei}" aria-pressed="${on}" aria-label="Marcar ${esc(e.nombre)}">✓</button><div class="circ-tx"><b>${esc(e.nombre)}</b><span class="small muted">${esc(e.dosis)}</span>${st.inf.isC ? '' : tBtns(e)}</div>${tc ? '' : vidBtn(e, tc)}${tc ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</div>`; }).join('')}</div>
+      ${!st.inf.isC && esCirc ? (() => { const c = detectarTimer(b); if (c.modo === 'crono' && !c.vueltas && nV > 1) { if (c.nombre === 'Cronómetro') c.nombre = 'Circuito'; c.vueltas = nV; }
         // sin vueltas, tope ni intervalos (ej: 1 vuelta con series por ejercicio) un cronómetro suelto no aporta: no se muestra
         if (c.modo === 'crono' && !c.vueltas && !c.tope) return '';
         return `<button class="btn" data-timer="${bi}" data-sinres="1" data-vtas="${nV > 1 ? nV : 0}">⏱ ${esc(timerTxt(c))}</button>`; })() : ''}
