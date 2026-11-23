@@ -240,7 +240,7 @@ details.ses summary::-webkit-details-marker{display:none}
 <script>window.TL_MODE = 'alumno';</script>
 <script src="supa-shim.js"></script>
 <script src="inbody-ocr.js?v=20261113a"></script>
-<script src="sonidos.js?v=2"></script>
+<script src="sonidos.js?v=3"></script>
 <script src="alimentos.js?v=20261113b"></script>
 <script src="nutri-calc.js?v=20261113g"></script>
 <script src="sug-carga.js?v=20261122a"></script>
@@ -1214,8 +1214,8 @@ function correrSerie(n, i, seg, lados) { finDescanso(true); const el = document.
   const fila = () => [...document.querySelectorAll('.set input[data-f="t"]')].find(x => x.dataset.n === n && Number(x.dataset.i) === i);
   const pintar = () => { if (pre > 0 || pausa) return;
     const q = (fin - Date.now()) / 1000;
-    if (q <= 0 && lado < lados) { clearInterval(REST); REST = null; lado++; pre = 5; el.classList.add('pre'); SB.textContent = '↔ Cambia de lado · ' + sub(); R.style.strokeDashoffset = '0'; snd('final'); setTimeout(cd, 400); return; }
-    if (q <= 0) { clearInterval(REST); REST = null; el.remove(); snd('final'); avisarTmr({ off: 1 }, true);
+    if (q <= 0 && lado < lados) { clearInterval(REST); REST = null; lado++; pre = 5; el.classList.add('pre'); SB.textContent = '↔ Cambia de lado · ' + sub(); R.style.strokeDashoffset = '0'; snd('fin'); setTimeout(cd, 400); return; }
+    if (q <= 0) { clearInterval(REST); REST = null; el.remove(); snd('fin'); avisarTmr({ off: 1 }, true);
       const inp = fila(); if (inp) { inp.value = String(seg); inp.dispatchEvent(new Event('input', { bubbles: true })); inp.closest('.set')?.querySelector('[data-chk]')?.click(); } else serieSinCasilla(n, i); return; }
     if (q <= 3.05 && Math.ceil(q) !== Number(el.dataset.l)) { el.dataset.l = Math.ceil(q); snd('cuenta', el.dataset.l); }
     T.textContent = seg >= 60 ? mmss(Math.ceil(q)) : String(Math.ceil(q)); R.style.strokeDashoffset = String(C * (1 - q / seg));

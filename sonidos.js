@@ -183,7 +183,7 @@
       if (MIO[evento]) { decodificar(evento).then(b => b ? sonarBuffer(b, efDe(evento)) : SYN.pitido(AC.currentTime + .01)); return; }
     }
     const t = AC.currentTime + 0.02;
-    if (evento === 'cuenta' || evento === 'prep') { (id === 'pitido' || id === 'pro' || id === 'descanso' ? SYN.cuenta : SYN[id] || SYN.cuenta)(t); return; }
+    if (evento === 'cuenta' || evento === 'prep') { (id === 'pro' || id === 'descanso' ? SYN.cuenta : id === 'pitido' ? (x => plano(880, x, .3)) : SYN[id] || SYN.cuenta)(t); return; }
     (SYN[id] || SYN.pitido)(t);
   }
   function probar(id, evento) { const prev = cfg[evento]; cfg[evento] = id; play(evento, 3); cfg[evento] = prev; }
