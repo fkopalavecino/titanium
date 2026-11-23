@@ -1189,12 +1189,22 @@ const avisarTipeo = n => { clearTimeout(TYPT); TYPT = setTimeout(() => { try { c
 const avisarPaso = (ej, k, n) => { try { const rd = rutinaDeHoy(); const tx = [rd.fecha, rd.hora, ej, k].join('|'); if (tx === PASOTX) return; PASOTX = tx;
   vivoCh().send({ type: 'broadcast', event: 'paso', payload: { a: codigo, f: rd.fecha || today(), h: rd.hora || '', ej, k, n } }); } catch (_) {} };
 let RESTEJ = '';
-function iniciarDescanso(seg, ej) { finDescanso(true); RESTEJ = ej || ''; const el = document.createElement('div'); el.id = 'rest'; let fin = Date.now() + seg * 1000; beep(660, 60); avisarDescanso(seg, RESTEJ);
+// el descanso se guarda con su hora de término: si la app se cierra o queda en segundo plano, al volver sigue con el tiempo real
+const RKEY = 'tl-rest';
+const guardarRest = (fin, ej) => { try { localStorage.setItem(RKEY, JSON.stringify({ fin, ej: ej || '' })); } catch (_) {} };
+const borrarRest = () => { try { localStorage.removeItem(RKEY); } catch (_) {} };
+function retomarDescanso() { if (document.getElementById('rest')) return; let r = null; try { r = JSON.parse(localStorage.getItem(RKEY) || 'null'); } catch (_) {}
+  if (!r || !r.fin) return; const q = r.fin - Date.now();
+  if (q < -60000) { borrarRest(); return; } // terminó hace más de 1 minuto: ya no se muestra
+  iniciarDescanso(Math.max(0, q / 1000), r.ej, r.fin); }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(retomarDescanso, 300); });
+setTimeout(retomarDescanso, 1500); // al abrir la app de nuevo (si iPhone la cerró en el descanso)
+function iniciarDescanso(seg, ej, finAbs) { finDescanso(true); RESTEJ = ej || ''; const el = document.createElement('div'); el.id = 'rest'; let fin = finAbs || Date.now() + seg * 1000; guardarRest(fin, RESTEJ); if (!finAbs) beep(660, 60); avisarDescanso((fin - Date.now()) / 1000, RESTEJ);
   const pintar = () => { const q = (fin - Date.now()) / 1000;
     if (q <= 0) { el.classList.add('go'); el.innerHTML = '<span>💪 ¡Siguiente serie!</span><button data-rx="1" aria-label="Cerrar">✕</button>'; if (!el.dataset.b) { el.dataset.b = 1; snd('inicio'); setTimeout(() => { if (document.getElementById('rest') === el) finDescanso(); }, 4000); } return; }
     if (q <= 3.05 && q > 0 && Math.ceil(q) !== Number(el.dataset.l)) { el.dataset.l = Math.ceil(q); snd('cuenta', el.dataset.l); }
     el.innerHTML = `<span>⏱ Descanso <b>${mmss(Math.ceil(q))}</b></span><button data-rm="-15" aria-label="Quitar 15 segundos">−15</button><button data-rm="15" aria-label="Sumar 15 segundos">+15</button><button data-rx="1" aria-label="Saltar descanso">✕</button>`; };
-  el.addEventListener('click', ev => { const b = ev.target.closest('button'); if (!b) return; ev.stopPropagation(); if (b.dataset.rx) return finDescanso(); fin += Number(b.dataset.rm) * 1000; pintar(); avisarDescanso((fin - Date.now()) / 1000, RESTEJ); });
+  el.addEventListener('click', ev => { const b = ev.target.closest('button'); if (!b) return; ev.stopPropagation(); if (b.dataset.rx) return finDescanso(); fin += Number(b.dataset.rm) * 1000; guardarRest(fin, RESTEJ); pintar(); avisarDescanso((fin - Date.now()) / 1000, RESTEJ); });
   document.body.appendChild(el); pintar(); REST = setInterval(pintar, 250); }
 function correrSerie(n, i, seg, lados) { finDescanso(true); const el = document.createElement('div'); el.id = 'rest'; el.className = 'tsm pre'; let fin = Date.now() + seg * 1000, pre = 3, pausa = 0, lado = 1; lados = lados === 2 ? 2 : 1; beep(660, 60);
   const sub = () => `Serie ${i + 1} · ${lados === 2 ? `Lado ${lado} de 2 · ` : ''}${seg} s`;
@@ -1240,7 +1250,7 @@ function serieSinCasilla(n, i) { S.tOk = S.tOk || {}; const l = S.tOk[n] = S.tOk
   const tot = Number(b?.dataset.nser) || 1;
   if (l.length >= tot) { const ck = b?.closest('.circ-it')?.querySelector('[data-cck]'); if (ck && ck.getAttribute('aria-pressed') !== 'true') ck.click(); }
   else if (b && Number(b.dataset.rest) > 0) iniciarDescanso(Number(b.dataset.rest), n); }
-function finDescanso(silencio) { const habia = !!REST; clearInterval(REST); REST = null; document.getElementById('rest')?.remove(); if (habia && !silencio) avisarDescanso(0, RESTEJ); }
+function finDescanso(silencio) { const habia = !!REST; borrarRest(); clearInterval(REST); REST = null; document.getElementById('rest')?.remove(); if (habia && !silencio) avisarDescanso(0, RESTEJ); }
 
 /* ---------- temporizador del bloque C (EMOM, AMRAP, Tabata, intervalos, por tiempo…) ---------- */
 function detectarTimer0(b) { const t = (b.titulo || '') + ' ' + (b.nota || ''); const tit = b.titulo || '';
