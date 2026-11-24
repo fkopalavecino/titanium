@@ -561,7 +561,16 @@ function sugerirSiguiente(row) { const ins = [...row.querySelectorAll('input[dat
   ins.forEach(x => { const y = nx.querySelector(`input[data-f="${x.dataset.f}"]`); if (y) y.placeholder = x.value.trim(); }); }
 // valor de la serie anterior hecha (mismo campo), para marcar con un toque
 function valorAnterior(row, f) { let pv = row.previousElementSibling; while (pv) { if (pv.classList.contains('set') && !pv.classList.contains('ap')) { const v = pv.querySelector(`input[data-f="${f}"]`)?.value.trim(); if (v) return v; } pv = pv.previousElementSibling; } return ''; }
-function applyDraft() { if (S.v !== 'rutina') return; const d = getDraft();
+function rescatarBorradores() { try { const rd = rutinaDeHoy(); if (!rd.r || rd.futuro || !/^\d\d:\d\d$/.test(rd.hora || '')) return false;
+  const pre = 'tl-draft-' + codigo + '-' + rd.fecha; const k0 = DKEY(); const hh = rd.hora.replace(':', ''); let d = null, cambio = false;
+  Object.keys(localStorage).filter(k => k.startsWith(pre + '-') && k !== k0 && !k.endsWith('-foco')).forEach(k => { const h = k.slice(pre.length + 1).split('-')[0]; if (h !== hh && h !== 'libre') return;
+    const o = JSON.parse(localStorage.getItem(k) || 'null'); if (!o) return; d = d || getDraft();
+    ['sets', 'ap'].forEach(g => Object.entries(o[g] || {}).forEach(([n, arr]) => Object.entries(arr || {}).forEach(([i, z]) => { if (!z) return; ['kg', 'r', 't'].forEach(f => { const v = String(z[f] ?? '').trim(); if (v === '') return; const t = ((d[g] = d[g] || {})[n] = d[g][n] || {}); t[i] = t[i] || {}; if (String(t[i][f] ?? '').trim() === '') { t[i][f] = v; cambio = true; } }); })));
+    Object.entries(o.com || {}).forEach(([n, v]) => { if (String(v || '').trim() && !String((d.com || {})[n] || '').trim()) { (d.com = d.com || {})[n] = v; cambio = true; } });
+    if (o.carga && !d.carga) { d.carga = o.carga; cambio = true; } if (o.rpe != null && d.rpe == null) { d.rpe = o.rpe; cambio = true; }
+    localStorage.removeItem(k); });
+  if (cambio) putDraft(d); return cambio; } catch (_) { return false; } }
+function applyDraft() { if (S.v !== 'rutina') return; if (rescatarBorradores()) { autoGuardar(800); toast('Pasamos a tu clase lo que habías anotado ✓'); } const d = getDraft();
   document.querySelectorAll('.set input').forEach(i => { const v = d[i.dataset.ap ? 'ap' : 'sets']?.[i.dataset.n]?.[i.dataset.i]?.[i.dataset.f]; const row = i.closest('.set');
     if (v != null && v !== '' && v !== i.value) { i.value = v; if (!d.ok?.[okKey(i)]) row.classList.remove('done'); }
     if (d.ok?.[okKey(i)] && row.querySelector('input') === i) row.classList.add('done'); });
@@ -1395,6 +1404,11 @@ document.addEventListener('click', ev => { const b = ev.target.closest('[data-su
 function tBtns(e) { if (tipoEj(e) !== 'tiempo') return ''; const seg = segObj(e) || 30; const n = Math.max(1, nSer(e.dosis)); const hechos = (S.tOk || {})[e.nombre] || [];
   return `<div class="tbs">${Array.from({ length: n }, (_, i) => `<button type="button" class="tset-b${hechos.includes(i) ? ' ok' : ''}" data-tset="${esc(e.nombre)}" data-i="${i}" data-seg="${seg}" data-rng="${(rangoSeg(e) || []).join('-')}" data-lados="${porLado(e) ? 2 : 1}" data-rest="${descansoDe(e)}" data-nser="${n}" aria-label="Cuenta regresiva serie ${i + 1} ${esc(e.nombre)}">${hechos.includes(i) ? '✓' : '▶'} ${n > 1 ? 'S' + (i + 1) + ' · ' : ''}${seg}s</button>`).join('')}</div>`; }
 function ejHTML(e, isB, cur, foco) { const c = cur[e.nombre]; const n = isB ? nSer(e.dosis) : 0; const sets = c?.sets || [];
+  // fuera del modo clase solo se mira: las series se anotan dentro del modo clase
+  if (isB && !foco) { const tc0 = tecDe(e.nombre); const pv0 = prevSets(e.nombre); const hoy0 = sets.filter(conDato);
+    return `<div class="ej"><div class="ej-h"><b class="ej-n">${esc(e.nombre)}</b><span class="ej-acc">${tc0 ? `<button class="tec-b" data-tec="${esc(tc0.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</span></div>
+    <div class="small muted">${esc(e.dosis)}</div>
+    ${hoy0.length ? `<div class="small ok" style="font-weight:600">✓ Hoy: ${esc(hoy0.map(fmtSet).join(' · '))}</div>` : pv0.some(conDato) ? `<div class="small muted">La vez anterior: ${esc(pv0.filter(conDato).map(fmtSet).join(' · '))}</div>` : ''}</div>`; }
   const tc = tecDe(e.nombre); const sg = isB ? sugerencia(e) : null; const pv = isB ? prevSets(e.nombre) : [];
   const com = c?.c || ''; const pcom = isB ? prevCom(e.nombre) : '';
   return `<div class="ej${foco ? ' ej-f' : ''}"><div class="ej-h"><b class="ej-n">${esc(e.nombre)}</b><span class="ej-acc">${foco ? vidBtn(e, tc) : ''}${tc && !foco ? `<button class="tec-b" data-tec="${esc(tc.id)}" aria-label="Cómo se hace: ${esc(e.nombre)}">?</button>` : ''}</span></div>
@@ -1569,7 +1583,7 @@ V.rutina = () => {
     <button class="btn pri" id="guardar">${guardada ? 'Actualizar mi entrenamiento' : 'Terminar y guardar'}</button>
     ${foco ? (rd.otroDia ? `<div class="small muted">Se guarda en tu sesión del ${esc(fmtD(rd.fecha))}.</div>` : '') : `<div class="small muted">${rd.otroDia ? `Se guarda en tu sesión del ${esc(fmtD(rd.fecha))}. ` : ''}Tus series se guardan solas mientras entrenas.</div>`}
   </section>`;
-  const finalHTML = finalDe(false);
+  const finalHTML = rd.futuro ? finalDe(false) : '';
   // modo paso a paso: el bloque B ejercicio por ejercicio (series y kilos); los bloques A y C como un circuito en una sola pantalla
   const pasos = []; bloques.forEach((b, bi) => { const inf = info(b); if (inf.isB) (b.ejercicios || []).forEach((e, ei) => pasos.push({ t: 'ej', b, bi, e, ei, inf })); else if ((b.ejercicios || []).length) pasos.push({ t: 'circ', b, bi, inf }); });
   if (S.foco != null && !rd.futuro && pasos.length) {
@@ -1605,7 +1619,7 @@ V.rutina = () => {
   return `${otro}${tambien}${okCard}
   <div style="display:grid;gap:6px"><div class="eyebrow">${esc(r.familia || '')}${rd.pe ? ' · Semana ' + Math.min(rd.pe.semana, rd.pe.total) + ' de ' + rd.pe.total : ''}</div><h1 style="font-size:30px;line-height:1.05">${esc(r.tipo || 'Rutina')}</h1>${r.lugar ? `<div><span class="tg" style="margin:0">${r.lugar === 'titanium' ? '🏠 En Titanium' : r.lugar === 'casa' ? '🏡 En casa' : '🏋️ En tu otro gimnasio'}</span></div>` : ''}${(() => { const l = rd.pe ? progLinea(r, rd.pe.semana) : ''; return l ? `<div class="small muted">💡 ${esc(l.replace(/^Semana \d+ · /, ''))}</div>` : ''; })()}
     <div class="chips" style="margin-top:2px">${r.minutos ? `<span class="chip">⏱ ~${esc(r.minutos)} min</span>` : ''}<span class="chip">${items.length} ejercicios</span>${rd.hora && rd.hora !== 'libre' ? `<span class="chip">${rd.hora === 'online' ? '🌐' : '🕒'} ${esc(horaTxt(rd.hora))}</span>` : ''}</div>
-    ${(!rd.futuro || S.tourSes) && items.length ? `<div class="row" style="align-items:center"><button class="btn pri foco-go" data-foco="1">${(() => { const g = getFoco(); return g && g.k > 0 ? '▶ Seguir modo clase · paso ' + (g.k + 1) : '▶ Modo clase'; })()}</button></div>${asHTML()}` : ''}</div>
+    ${(!rd.futuro || S.tourSes) && items.length ? `<div class="row" style="align-items:center"><button class="btn pri foco-go" data-foco="1">${(() => { const g = getFoco(); return g && g.k > 0 ? '▶ Seguir modo clase · paso ' + (g.k + 1) : '▶ Modo clase'; })()}</button></div><div class="small muted">✍️ Tus pesos, series y RPE se anotan dentro del Modo clase.</div>${asHTML()}` : ''}</div>
   ${bloques.map((b, bi) => { const { letra, nomB, isB, isC } = info(b);
     const nEj = (b.ejercicios || []).length; const cerrado = !blkAbiertos.has(bi); const det = isB ? 'anota tus series' : isC ? '⏱ con temporizador' : '';
     return `<details class="card blk" data-blk="${bi}" ${cerrado ? '' : 'open'}><summary><span class="blk-l ${isB ? 'b' : ''}">${esc(letra)}</span><div style="flex:1;min-width:0"><div class="blk-t">${esc(nomB)}</div><div class="small muted">${nEj} ejercicio${nEj === 1 ? '' : 's'}${det ? ' · ' + esc(det) : ''}</div>${cerrado ? `<div class="blk-p">${esc((b.ejercicios || []).map(e => String(e.nombre || '').replace(/^(min(uto)?\s*\d+|\d+[ab]?)\s*·\s*/i, '')).join(' · '))}</div>` : ''}</div><span class="chev" aria-hidden="true">›</span></summary>${b.nota ? `<div class="small muted">${esc(b.nota)}</div>` : ''}${isC ? `<button class="btn tbtn" data-timer="${bi}">⏱ Abrir temporizador · ${esc(timerTxt(detectarTimer(b)))}</button>` : ''}
