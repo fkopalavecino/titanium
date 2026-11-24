@@ -1280,7 +1280,7 @@ function tmrHTML(key) { let x = (S.tmr || {})[key]; if (!x) return ''; const cor
   if (corre) x = Object.assign({}, x, { big: x.modo === 'amrap' ? mmssP(Math.ceil(Math.max(0, x.T - e))) : mmssP(e) });
   if (x.fin) return `<span class="sc-tmr fin">✓ ${esc(x.n)} terminado · ${esc(x.big || '')}${x.res ? ' · ' + esc(x.res) : ''}</span>`;
   const fz = x.ronda ? String(x.fase || '').replace(/\s*·?\s*(ronda\s*)?\d+\s*(\/|de)\s*\d+\s*$/i, '').trim() : String(x.fase || '');
-  const partes = ['⏱ ' + esc(x.n), x.ronda ? `<b class="num">Ronda ${esc(x.ronda)}</b>` : '', esc(fz), `<b class="num">${esc(x.big || '')}</b>`, x.sub ? esc(x.sub) : ''].filter(Boolean);
+  const partes = ['⏱ ' + esc(x.n), x.ronda ? `<b class="num">Ronda ${esc(x.ronda)}</b>` : '', esc(fz), `<b class="num">${esc(x.big || '')}</b>`, x.sub ? esc(x.sub) : '', x.sig ? esc(x.sig) : ''].filter(Boolean);
   return `<span class="sc-tmr">${partes.join(' · ')}</span>`; }
 function pintarVivo(k) { const c = (S.vivoCtx || {})[k]; const el = document.querySelector(`[data-vivo-k="${CSS.escape(k)}"]`); if (!c || !el) return schedule();
   const v = vivoInfo(c.f, c.hora, c.code, c.rut, rec(c.f, c.hora, c.code)); if (v && el.innerHTML !== v.txt) el.innerHTML = v.txt; }
