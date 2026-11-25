@@ -1327,6 +1327,37 @@ function ejsDe(rut) {
   src.forEach(b => (b.ejercicios || []).forEach(e => { if (e.nombre && !out.some(o => o.n === e.nombre)) out.push({n: e.nombre, d: e.dosis || ''}); }));
   return out;
 }
+// bloque C: resultados anotados (tiempo del circuito, rondas…) agrupados por circuito, para ver si lo termina más rápido
+const segDe = t => { t = String(t || ''); let m = t.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/); if (m) return m[3] != null ? (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) : (+m[1]) * 60 + (+m[2]);
+  if (/emom|amrap|intervalo|tabata|completo/i.test(t)) return null; // tiempo fijo: lo que cuenta son las rondas, no cuánto demoró
+  m = t.match(/(\d+(?:[.,]\d+)?)\s*(?:min|minutos?)\b/i); return m ? Math.round(parseFloat(m[1].replace(',', '.')) * 60) : null; };
+const segTxtP = x => Math.floor(x / 60) + ':' + String(x % 60).padStart(2, '0');
+function cNomDe(rut) { const bs = rut?.bloques || []; let k = -1; bs.forEach((b, bi) => { if (!/bloque b/i.test(b.titulo || '') && (/bloque c/i.test(b.titulo || '') || bi >= 2)) k = bi; });
+  return k >= 0 ? (String(bs[k].titulo || '').replace(/^bloque\s+[a-z]\s*[·:-]?\s*/i, '').split('·')[0].trim() || 'Bloque C') : ''; }
+function circuitosC(code) { // [{k, nom, rut, xs:[{f,h,res,seg}]}] más reciente primero
+  const by = {};
+  for (const [f, d] of S.dias) for (const h in d.bloques || {}) { const r = d.bloques[h][code]; const res = String(r?.carga || '').trim(); if (!res || r.quitado) continue;
+    const rut = S.rutinas.get(r.rutina); const k = r.rutina || 'sin-rutina';
+    (by[k] = by[k] || { k, nom: cNomDe(rut) || 'Bloque C', rut: rut?.tipo || '', xs: [] }).xs.push({ f, h, res, seg: segDe(res) }); }
+  const out = Object.values(by); out.forEach(g => g.xs.sort((a, b) => (a.f + a.h).localeCompare(b.f + b.h)));
+  return out.sort((a, b) => (b.xs[b.xs.length - 1].f).localeCompare(a.xs[a.xs.length - 1].f));
+}
+function circuitosCHTML(code) {
+  const gs = circuitosC(code);
+  if (!gs.length) return `<div><b>Bloque C · tiempos</b><div class="muted small" style="margin-top:4px">Aún sin resultados. Aparecen solos cuando el alumno termina el circuito con el temporizador o anota su resultado.</div></div>`;
+  const filas = gs.map(g => { const xs = g.xs, last = xs[xs.length - 1], prev = xs[xs.length - 2]; const ts = xs.filter(x => x.seg != null);
+    const best = ts.length ? ts.reduce((b, x) => x.seg < b.seg ? x : b) : null;
+    let vs = '<span class="muted">—</span>';
+    if (last.seg != null && prev?.seg != null) { const d = last.seg - prev.seg; vs = d === 0 ? '<span class="muted">= igual</span>' : d < 0 ? `<span class="up">▲ ${segTxtP(-d)} más rápido</span>` : `<span class="down">▼ ${segTxtP(d)} más lento</span>`; }
+    const pr = best && best === last && ts.length > 1 ? ' <span class="pr">🏆 PR</span>' : '';
+    return `<tr><td><b>${esc(g.nom)}</b><span class="sub">${esc(g.rut)}${g.rut ? ' · ' : ''}${xs.length} vez${xs.length === 1 ? '' : 'es'}</span>
+      ${xs.length > 1 ? `<details class="sec" style="margin-top:4px"><summary class="small">Ver todas</summary><div class="small num" style="display:grid;gap:2px;margin-top:4px">${xs.slice().reverse().map(x => `<div>${fmtDY(x.f)} · <b>${esc(x.res)}</b>${best && x === best ? ' 🏆' : ''}</div>`).join('')}</div></details>` : ''}</td>
+      <td class="num"><b>${esc(last.res)}</b>${pr}<span class="sub">${fmtD(last.f)}</span></td>
+      <td class="num">${best ? esc(segTxtP(best.seg)) + `<span class="sub">${fmtD(best.f)}</span>` : '—'}</td>
+      <td>${spark(ts.map(x => -x.seg))}</td><td class="r">${vs}</td></tr>`; }).join('');
+  return `<div><b>Bloque C · tiempos</b> <span class="muted small">· cuánto se demora en cada circuito, del más reciente al más antiguo</span>
+    <div class="tbl-wrap" style="margin-top:6px"><table><thead><tr><th>Circuito</th><th>Último</th><th>Mejor tiempo</th><th>Evolución</th><th class="r">Vs anterior</th></tr></thead><tbody>${filas}</tbody></table></div></div>`;
+}
 function cargasDe(code) { // [{f,h,n,kg,r}] más reciente primero
   const out = [];
   for (const [f, d] of S.dias) for (const h in d.bloques || {}) { const r = d.bloques[h][code]; (r?.ej || []).forEach(x => { if (x.kg != null || x.r != null || x.t != null) out.push({f, h, n: x.n, kg: x.kg, r: x.r, t: x.t, s: x.s, sets: x.sets, c: x.c, ap: x.ap}); }); }
@@ -2625,6 +2656,7 @@ function progresoHTML(a, {cuerpo = true} = {}) {
       <div class="list small" style="margin-top:4px">${prs.slice(0, 6).map(x => `<div class="li"><span class="grow"><b>${esc(x.n)}</b> <span class="muted num">· ${fmtDY(x.f)}</span></span><span class="num">${esc(fmtSet(x.prev))} → <b>${esc(fmtSet(x))}</b></span><span class="pr">🏆 PR</span></div>`).join('') || '<div class="muted">Aún sin récords. Aparecen solos cuando supera su mejor carga anotada.</div>'}</div></div>
     <div><b>Cargas por ejercicio</b> <span class="muted small">· serie más pesada de cada sesión</span>
       ${filas ? `<div class="tbl-wrap" style="margin-top:6px"><table><thead><tr><th>Ejercicio</th><th>Última</th><th>Mejor</th><th>Evolución (kg)</th><th class="r">Desde el inicio</th></tr></thead><tbody>${filas}</tbody></table></div>` : '<div class="muted small" style="margin-top:4px">Aún sin cargas. Anótalas en Clase de hoy con "Anotar kg y reps".</div>'}</div>
+    ${circuitosCHTML(code)}
     <div><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap"><b>Logros</b><span class="small muted">${hechos} de ${lg.length}</span></div>
       <div class="badges" style="margin-top:6px">${lg.map(x => `<div class="badge ${x.ok ? '' : 'off'}"><span class="ic">${x.ic}</span><span>${esc(x.t)}<small>${esc(x.d)}</small></span></div>`).join('')}</div></div>`;
 }
