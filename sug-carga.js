@@ -14,7 +14,8 @@
   const POLEA = /polea|cable|cruce|face ?pull|jal[oó]n/i;
   const MAQ = /m[aá]quina|prensa|pec ?deck|contractora|hack|extensi[oó]n de (cu[aá]driceps|piernas|rodilla)|curl femoral(?!.*fitball)|abductor|aductor|gemelos? (en|sentado)/i;
   const SALTO = /salto|jump|pogo|brinco|pliom[eé]tric|skipping|step-?up explosivo|burpee/i;
-  const DESCARGA = /descarga|deload|semana suave/i;
+  const SIN_LASTRE = /remo.*(anillas|trx|invertido)|(anillas|trx).*remo/i;
+  const DESCARGA =/descarga|deload|semana suave/i;
 
   function dosisDe(d) {
     d = String(d || '');
@@ -63,6 +64,8 @@
       const rs = sets.filter(s => s.r != null); if (!rs.length) return out('');
       const lastre = Math.max(0, ...rs.map(s => s.kg || 0));
       const top = rs.length >= nS && rs.every(s => s.r >= ds.hi);
+      // remo en anillas / TRX / remo invertido: no lleva lastre, se progresa inclinando el cuerpo
+      if (top && rirOk && !desc && SIN_LASTRE.test(nombre)) return out('pies más adelante (cuerpo más horizontal)', { sube: true });
       if (top && rirOk && !desc) { const nk = lastre + 2.5; return out(lastre ? `+${fx(nk)} kg de lastre` : 'agrega lastre: +2,5 kg', { kg: nk, sube: true, lastre: true }); }
       if (desc) return out('semana de descarga: mismas reps' + (lastre ? ` con +${fx(lastre)} kg` : ''), lastre ? { kg: lastre } : {});
       if (masDuro || rs.some(s => s.r < ds.lo)) return out('mantén y apunta a ' + ds.lo + (ds.hi !== ds.lo ? '–' + ds.hi : '') + ' reps', lastre ? { kg: lastre } : {});
